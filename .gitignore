@@ -1,0 +1,26 @@
+# Logs
+*.log
+*.txt
+backend/*.log
+backend/*.txt
+backend/maven-bin/
+backend/target/
+frontend/node_modules/
+frontend/dist/
+
+# Keep some txt if needed, but for now exclude all as there are many log-like txt files
+!README.md
+!frontend/README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
