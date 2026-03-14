@@ -7,10 +7,14 @@ spring:
   application:
     name: baknusbelajar-api
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration
+
   datasource:
     url: jdbc:oracle:thin:@192.168.100.2:1521/XEPDB1
     username: sys as sysdba
-    password: YOUR_DB_PASSWORD
+    password: on5laught
     driver-class-name: oracle.jdbc.OracleDriver
   
   jpa:
@@ -23,38 +27,34 @@ spring:
     redis:
       host: 192.168.100.2
       port: 6379
-      password: YOUR_REDIS_PASSWORD
+      password: on5laught
 
 jwt:
-  secret: YOUR_JWT_SECRET
+  secret: 4578b87c7e5a611598db4c552085cf55272a5aa4d5a9c0498a442b3bf7cb95a3
   expirationMs: 86400000
 
 mailcow:
   url: http://mail.smk.baktinusantara666.sch.id
-  api-key: YOUR_MAILCOW_API_KEY
+  api-key: YOUR_MAILCOW_KEY
 
 gemini:
-  keys: YOUR_GEMINI_KEYS_HERE
+  keys: YOUR_GEMINI_KEYS
   model: gemini-flash-latest
 
 grok:
-  api-key: YOUR_GROK_API_KEY
+  api-key: YOUR_GROK_KEY
 
 # Fallback AI provider (used when Gemini quota is exceeded)
 # Supports: openai, grok (xAI)
 fallback-ai:
-  # provider: openai
-  # api-key: YOUR_OPENAI_API_KEY
-  # model: gpt-4o-mini
-  # base-url: https://api.openai.com/v1
   provider: grok
-  api-key: YOUR_GROK_API_KEY
+  api-key: YOUR_GROK_KEY
   model: grok-2-latest
   base-url: https://api.x.ai/v1
 
 baknus-drive:
-  url: http://baknusdrive.smkbn666.sch.id/api
-  api-key: BAKNUS_CLASS_SECRET
+  url: https://baknusdrive.smkbn666.sch.id/api
+  api-key: YOUR_DRIVE_KEY
 
 logging:
   level:

@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class KartuSoalRequest {
     private Long ujianMapelId;
+    private Long soalEssayId; // Optional: if set, will update existing SoalEssay instead of creating new
     private String judul;
     private String tujuanPembelajaran;
     private String kriteriaKetercapaian;

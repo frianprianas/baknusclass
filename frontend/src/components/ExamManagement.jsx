@@ -148,6 +148,7 @@ const ExamManagement = () => {
 
     // Kartu Soal States
     const [isKartuModalOpen, setIsKartuModalOpen] = useState(false);
+    const [editingKartuSoal, setEditingKartuSoal] = useState(null); // holds existing SoalEssay object being edited via kartu
     const [kartuForm, setKartuForm] = useState({
         judul: '',
         tujuanPembelajaran: '',
@@ -194,11 +195,12 @@ const ExamManagement = () => {
             setLoading(true);
             const payload = {
                 ...kartuForm,
-                ujianMapelId: viewingQuestions.id
+                ujianMapelId: viewingQuestions.id,
+                soalEssayId: editingKartuSoal ? editingKartuSoal.id : null // if editing existing soal
             };
             const res = await axios.post('/api/exam/create-kartu-soal', payload, { headers });
 
-            if (keepOpen) {
+            if (keepOpen && !editingKartuSoal) {
                 alert(`Soal ke-${kartuForm.nomorSoal} Berhasil Dibuat & Diupload!`);
                 // Clear only question fields, increment nomorSoal
                 setKartuForm(prev => ({
@@ -208,8 +210,12 @@ const ExamManagement = () => {
                     nomorSoal: prev.nomorSoal + 1
                 }));
             } else {
-                alert('Kartu Soal Berhasil Dibuat: ' + res.data);
+                alert(editingKartuSoal
+                    ? 'Kartu Soal berhasil diperbarui: ' + res.data
+                    : 'Kartu Soal Berhasil Dibuat: ' + res.data
+                );
                 setIsKartuModalOpen(false);
+                setEditingKartuSoal(null);
                 setKartuForm({
                     judul: '', tujuanPembelajaran: '', kriteriaKetercapaian: '',
                     petunjukAssesment: '', kunciJawaban: '', bobotNilai: 10, nomorSoal: 1
@@ -219,10 +225,25 @@ const ExamManagement = () => {
             handleManageQuestions(viewingQuestions);
         } catch (err) {
             console.error(err);
-            alert('Gagal membuat Kartu Soal: ' + (err.response?.data || err.message));
+            alert('Gagal menyimpan Kartu Soal: ' + (err.response?.data || err.message));
         } finally {
             setLoading(false);
         }
+    };
+
+    const openKartuSoalEdit = (q, idx) => {
+        // Open kartu soal modal in edit mode, pre-filling from existing essay question
+        setEditingKartuSoal(q);
+        setKartuForm({
+            judul: viewingQuestions.namaMapel + ' - Soal ' + (idx + 1),
+            tujuanPembelajaran: '',
+            kriteriaKetercapaian: '',
+            petunjukAssesment: q.pertanyaan || '',
+            kunciJawaban: q.kunciJawaban || '',
+            bobotNilai: q.bobotNilai || 10,
+            nomorSoal: questionsPG.length + idx + 1
+        });
+        setIsKartuModalOpen(true);
     };
 
     const resetQuestionForm = () => {
@@ -636,10 +657,28 @@ const ExamManagement = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => {
+                                                    const isPG = qType === 'pg';
+                                                    const currentPertanyaan = isPG ? questionFormPG.pertanyaan : questionForm.pertanyaan;
+                                                    let currentKunci = '';
+                                                    if (isPG) {
+                                                        const optKey = questionFormPG.kunciJawaban || 'A';
+                                                        currentKunci = `${optKey}. ${questionFormPG['pilihan' + optKey] || ''}`;
+                                                    } else {
+                                                        currentKunci = questionForm.kunciJawaban;
+                                                    }
+                                                    const currentBobot = isPG ? questionFormPG.bobotNilai : questionForm.bobotNilai;
+
                                                     setKartuForm(prev => ({
                                                         ...prev,
+                                                        petunjukAssesment: currentPertanyaan,
+                                                        kunciJawaban: currentKunci,
+                                                        bobotNilai: currentBobot,
                                                         nomorSoal: (questions.length + questionsPG.length + 1)
                                                     }));
+                                                    // Reload existing essay questions before opening modal
+                                                    if (viewingQuestions) {
+                                                        handleManageQuestions(viewingQuestions);
+                                                    }
                                                     setIsKartuModalOpen(true);
                                                 }}
                                                 style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer' }}
@@ -818,6 +857,14 @@ const ExamManagement = () => {
                                                         <span className="q-badge-essay">Essay</span>
                                                     </div>
                                                     <div className="q-actions-v2">
+                                                        <button
+                                                            className="q-btn-edit"
+                                                            onClick={() => openKartuSoalEdit(q, idx)}
+                                                            title="Edit via Kartu Soal (Word)"
+                                                            style={{ background: '#fef3c7', color: '#b45309', borderColor: '#fde68a' }}
+                                                        >
+                                                            <FileText size={16} />
+                                                        </button>
                                                         <button className="q-btn-edit" onClick={() => handleEditSoal(q, 'essay')} title="Edit Soal">
                                                             <Edit3 size={16} />
                                                         </button>
@@ -1137,11 +1184,16 @@ const ExamManagement = () => {
                                         <FileText size={24} />
                                     </div>
                                     <div>
-                                        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900 }}>Buat Kartu Soal Baru</h3>
-                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Sistem akan menyimpan soal & membuat file Word ke Drive</p>
+                                        <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900 }}>{editingKartuSoal ? 'Edit Kartu Soal' : 'Buat Kartu Soal Baru'}</h3>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                                            {editingKartuSoal
+                                                ? `Mengedit Soal ID ${editingKartuSoal.id} — perubahan akan diupload ulang ke Drive`
+                                                : 'Sistem akan menyimpan soal & membuat file Word ke Drive'
+                                            }
+                                        </p>
                                     </div>
                                 </div>
-                                <button type="button" className="close-btn" onClick={() => setIsKartuModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><XCircle size={24} /></button>
+                                <button type="button" className="close-btn" onClick={() => { setIsKartuModalOpen(false); setEditingKartuSoal(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><XCircle size={24} /></button>
                             </div>
 
                             <div style={{ flex: 1, overflowY: 'auto', padding: '30px 40px', background: '#ffffff' }} className="custom-scrollbar">
@@ -1256,12 +1308,37 @@ const ExamManagement = () => {
                                                     </div>
                                                 ) : (
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                        {questions.map((q, i) => (
-                                                            <div key={q.id} style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                                                <div style={{ fontWeight: 900, color: '#3b82f6', marginBottom: '6px', fontSize: '0.75rem', textTransform: 'uppercase' }}>Soal {i + 1}</div>
-                                                                <div style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
-                                                            </div>
-                                                        ))}
+                                                        {questions.map((q, i) => {
+                                                            const isCurrentlyEditing = editingKartuSoal && editingKartuSoal.id === q.id;
+                                                            return (
+                                                                <div
+                                                                    key={q.id}
+                                                                    style={{
+                                                                        background: isCurrentlyEditing ? '#fffbeb' : 'white',
+                                                                        padding: '16px',
+                                                                        borderRadius: '12px',
+                                                                        border: isCurrentlyEditing ? '2px solid #f59e0b' : '1.5px solid #e2e8f0',
+                                                                        boxShadow: isCurrentlyEditing ? '0 0 0 3px rgba(245,158,11,0.15)' : '0 2px 4px rgba(0,0,0,0.02)',
+                                                                        cursor: 'pointer',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                    onClick={() => openKartuSoalEdit(q, i)}
+                                                                    title="Klik untuk edit soal ini via Kartu Soal"
+                                                                >
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                                        <div style={{ fontWeight: 900, color: isCurrentlyEditing ? '#b45309' : '#3b82f6', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                                                                            Soal {i + 1}
+                                                                        </div>
+                                                                        {isCurrentlyEditing && (
+                                                                            <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800 }}>
+                                                                                ✏️ Sedang Diedit
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div style={{ color: '#1e293b', fontSize: '0.85rem', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
                                             </div>
@@ -1274,19 +1351,21 @@ const ExamManagement = () => {
                             </div>
 
                             <div className="modal-footer" style={{ flexShrink: 0, borderTop: '2px solid #f1f5f9', padding: '24px 40px', background: 'white', display: 'flex', justifyContent: 'flex-end', gap: '12px', zIndex: 30 }}>
-                                <button type="button" className="btn-secondary" onClick={() => setIsKartuModalOpen(false)} style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 700, background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>Batal</button>
+                                <button type="button" className="btn-secondary" onClick={() => { setIsKartuModalOpen(false); setEditingKartuSoal(null); }} style={{ padding: '12px 24px', borderRadius: '12px', fontWeight: 700, background: '#f1f5f9', border: 'none', cursor: 'pointer' }}>Batal</button>
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <button type="button" className="btn-primary" style={{ background: '#3b82f6', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: 800, cursor: 'pointer' }} onClick={(e) => handleSaveKartuSoal(e, false)}>
-                                        <Save size={18} /> Simpan & Selesai
+                                    <button type="button" className="btn-primary" style={{ background: editingKartuSoal ? '#f59e0b' : '#3b82f6', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: 800, cursor: 'pointer' }} onClick={(e) => handleSaveKartuSoal(e, false)}>
+                                        <Save size={18} /> {editingKartuSoal ? 'Perbarui & Selesai' : 'Simpan & Selesai'}
                                     </button>
-                                    <button
-                                        type="button"
-                                        className="btn-primary"
-                                        style={{ background: '#10b981', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: 800, cursor: 'pointer' }}
-                                        onClick={(e) => handleSaveKartuSoal(e, true)}
-                                    >
-                                        <Plus size={18} /> Simpan & Lanjut Soal {kartuForm.nomorSoal + 1}
-                                    </button>
+                                    {!editingKartuSoal && (
+                                        <button
+                                            type="button"
+                                            className="btn-primary"
+                                            style={{ background: '#10b981', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: 800, cursor: 'pointer' }}
+                                            onClick={(e) => handleSaveKartuSoal(e, true)}
+                                        >
+                                            <Plus size={18} /> Simpan & Lanjut Soal {kartuForm.nomorSoal + 1}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

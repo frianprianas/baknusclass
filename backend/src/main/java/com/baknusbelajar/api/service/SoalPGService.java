@@ -19,6 +19,7 @@ public class SoalPGService {
 
     private final SoalPGRepository soalPGRepository;
     private final UjianMapelRepository ujianMapelRepository;
+    private final KartuSoalService kartuSoalService;
 
     @Cacheable(value = "soalPGCache", key = "#ujianId + '-' + #includeKunci")
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
@@ -46,7 +47,14 @@ public class SoalPGService {
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
 
-        return mapToDTO(soalPGRepository.save(entity));
+        SoalPG saved = soalPGRepository.save(entity);
+        String fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
+                dto.getPertanyaan(), dto.getPilihanA(), dto.getPilihanB(), dto.getPilihanC(), dto.getPilihanD(),
+                dto.getPilihanE() != null ? dto.getPilihanE() : "-");
+        kartuSoalService.generateAndUploadAutoKartuSoal(ujian, fullPertanyaan, dto.getKunciJawaban(),
+                dto.getBobotNilai(), "PG");
+
+        return mapToDTO(saved);
     }
 
     @CacheEvict(value = "soalPGCache", allEntries = true)
@@ -68,7 +76,14 @@ public class SoalPGService {
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
 
-        return mapToDTO(soalPGRepository.save(entity));
+        SoalPG saved = soalPGRepository.save(entity);
+        String fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
+                dto.getPertanyaan(), dto.getPilihanA(), dto.getPilihanB(), dto.getPilihanC(), dto.getPilihanD(),
+                dto.getPilihanE() != null ? dto.getPilihanE() : "-");
+        kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), fullPertanyaan, dto.getKunciJawaban(),
+                dto.getBobotNilai(), "PG_Update");
+
+        return mapToDTO(saved);
     }
 
     private SoalPGDTO mapToDTO(SoalPG s) {

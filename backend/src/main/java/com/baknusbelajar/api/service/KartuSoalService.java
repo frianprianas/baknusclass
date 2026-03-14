@@ -8,6 +8,7 @@ import com.baknusbelajar.api.repository.UjianMapelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -26,17 +27,32 @@ public class KartuSoalService {
     private final BaknusDriveService baknusDriveService;
 
     @Transactional
+    @CacheEvict(value = "soalEssayCache", allEntries = true)
     public String createKartuSoal(KartuSoalRequest request) {
         UjianMapel ujian = ujianMapelRepository.findById(request.getUjianMapelId())
                 .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan"));
 
-        // 1. Save to Database as SoalEssay
-        SoalEssay soal = new SoalEssay();
-        soal.setUjianMapel(ujian);
-        // Remove HTML tags for docx but keep for DB if needed.
-        // User is using Quill so it might have HTML.
-        soal.setPertanyaan(request.getPetunjukAssesment());
-        soal.setKunciJawaban(request.getKunciJawaban());
+        // Prevent Oracle empty string mapped to NULL error
+        String pertanyaan = request.getPetunjukAssesment();
+        if (pertanyaan == null || pertanyaan.trim().isEmpty())
+            pertanyaan = "-";
+
+        String kunciJawaban = request.getKunciJawaban();
+        if (kunciJawaban == null || kunciJawaban.trim().isEmpty())
+            kunciJawaban = "-";
+
+        SoalEssay soal;
+        // If soalEssayId is provided, update existing; otherwise create new
+        if (request.getSoalEssayId() != null) {
+            soal = soalEssayRepository.findById(request.getSoalEssayId())
+                    .orElseThrow(() -> new RuntimeException("Soal tidak ditemukan"));
+        } else {
+            soal = new SoalEssay();
+            soal.setUjianMapel(ujian);
+        }
+
+        soal.setPertanyaan(pertanyaan);
+        soal.setKunciJawaban(kunciJawaban);
         soal.setBobotNilai(request.getBobotNilai() != null ? request.getBobotNilai() : 10.0);
         soalEssayRepository.save(soal);
 
@@ -44,7 +60,7 @@ public class KartuSoalService {
         byte[] docxBytes = generateDocx(request, ujian);
 
         // 3. Upload to BaknusDrive
-        String safeJudul = request.getJudul().replaceAll("[^a-zA-Z0-9]", "_");
+        String safeJudul = (request.getJudul() != null ? request.getJudul() : "Kartu").replaceAll("[^a-zA-Z0-9]", "_");
         String noSoal = request.getNomorSoal() != null ? "_" + request.getNomorSoal() : "";
         String fileName = "Kartu_Soal_" + safeJudul + noSoal + ".docx";
 
@@ -63,6 +79,39 @@ public class KartuSoalService {
         } catch (Exception e) {
             log.error("Gagal upload kartu soal ke drive: {}", e.getMessage());
             return "Soal tersimpan di DB, tapi gagal upload ke Drive: " + e.getMessage();
+        }
+    }
+
+    @Transactional
+    public void generateAndUploadAutoKartuSoal(UjianMapel ujian, String pertanyaan, String kunciJawaban, Double bobot,
+            String jenis) {
+        try {
+            KartuSoalRequest req = new KartuSoalRequest();
+            req.setUjianMapelId(ujian.getId());
+            req.setJudul("Soal " + jenis + " - " + ujian.getGuruMapel().getMapel().getNamaMapel());
+            req.setTujuanPembelajaran("-");
+            req.setKriteriaKetercapaian("-");
+            req.setPetunjukAssesment(pertanyaan);
+            req.setKunciJawaban(kunciJawaban);
+            req.setBobotNilai(bobot);
+            req.setNomorSoal(null);
+
+            byte[] docxBytes = generateDocx(req, ujian);
+            String fileName = "Kartu_Soal_Auto_" + jenis + "_" + System.currentTimeMillis() + ".docx";
+
+            Resource resource = new ByteArrayResource(docxBytes) {
+                @Override
+                public String getFilename() {
+                    return fileName;
+                }
+            };
+
+            baknusDriveService.uploadFileResource(
+                    ujian.getEventUjian().getNamaEvent(),
+                    ujian.getGuruMapel().getMapel().getNamaMapel(),
+                    resource);
+        } catch (Exception e) {
+            log.error("Gagal auto upload kartu soal ke drive (Terjadi error di service): {}", e.getMessage(), e);
         }
     }
 

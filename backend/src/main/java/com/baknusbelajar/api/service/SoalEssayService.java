@@ -19,6 +19,7 @@ public class SoalEssayService {
 
     private final SoalEssayRepository soalEssayRepository;
     private final UjianMapelRepository ujianMapelRepository;
+    private final KartuSoalService kartuSoalService;
 
     @Cacheable(value = "soalEssayCache", key = "#ujianId + '-' + #withKunci")
     public List<SoalEssayDTO> getSoalByUjian(Long ujianId, boolean withKunci) {
@@ -38,7 +39,10 @@ public class SoalEssayService {
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
 
-        return mapToDTO(soalEssayRepository.save(entity), true);
+        SoalEssay saved = soalEssayRepository.save(entity);
+        kartuSoalService.generateAndUploadAutoKartuSoal(ujian, dto.getPertanyaan(), dto.getKunciJawaban(),
+                dto.getBobotNilai(), "Essay");
+        return mapToDTO(saved, true);
     }
 
     @CacheEvict(value = "soalEssayCache", allEntries = true)
@@ -50,7 +54,10 @@ public class SoalEssayService {
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
 
-        return mapToDTO(soalEssayRepository.save(entity), true);
+        SoalEssay saved = soalEssayRepository.save(entity);
+        kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), dto.getPertanyaan(),
+                dto.getKunciJawaban(), dto.getBobotNilai(), "Essay_Update");
+        return mapToDTO(saved, true);
     }
 
     @CacheEvict(value = "soalEssayCache", allEntries = true)
