@@ -142,6 +142,14 @@ public class BaknusDriveService {
         }
     }
 
+    public String uploadFileBytes(String eventName, String subjectName, byte[] bytes, String fileName) {
+        ensureFoldersExist(eventName, subjectName);
+        log.info(">>> BaknusDrive: Uploading byte array file '{}' event={} subject={}",
+                fileName, eventName, subjectName);
+        return multipartUpload(driveApiUrl + "/class/upload-soal",
+                eventName, subjectName, bytes, fileName);
+    }
+
     private String multipartUpload(String urlStr, String eventName, String subjectName,
             byte[] fileBytes, String fileName) {
         String boundary = "----FormBoundary" + UUID.randomUUID().toString().replace("-", "");

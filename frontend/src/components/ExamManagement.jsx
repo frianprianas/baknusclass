@@ -124,6 +124,8 @@ const ExamManagement = () => {
 
     // Sub-view for entering questions
     const [viewingQuestions, setViewingQuestions] = useState(null); // Will hold exam object
+    const [viewingPraktek, setViewingPraktek] = useState(null);
+    const [nilaiPraktekList, setNilaiPraktekList] = useState([]);
     const [qType, setQType] = useState('essay'); // 'essay' or 'pg'
     const [questions, setQuestions] = useState([]);
     const [questionsPG, setQuestionsPG] = useState([]);
@@ -511,6 +513,40 @@ const ExamManagement = () => {
         setIsModalOpen(true);
     };
 
+    const handleManagePraktek = async (exam) => {
+        setViewingPraktek(exam);
+        const token = localStorage.getItem('token');
+        try {
+            setLoading(true);
+            const res = await axios.get(`/api/exam/nilai-praktek/${exam.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setNilaiPraktekList(res.data);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal mengambil daftar siswa');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSavePraktek = async () => {
+        const token = localStorage.getItem('token');
+        try {
+            setLoading(true);
+            const res = await axios.post('/api/exam/nilai-praktek/save', nilaiPraktekList, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(res.data);
+            setViewingPraktek(null);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menyimpan nilai');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleManageQuestions = async (exam) => {
         setViewingQuestions(exam);
         const token = localStorage.getItem('token');
@@ -593,6 +629,113 @@ const ExamManagement = () => {
             alert('Gagal hapus soal');
         }
     };
+
+    if (viewingPraktek) {
+        return (
+            <div className="exam-management animate-fade-in pb-10">
+                <div className="page-header-v2">
+                    <div className="flex items-center gap-5">
+                        <button onClick={() => setViewingPraktek(null)} className="back-btn-v2" title="Kembali ke Daftar Ujian">
+                            <ArrowLeft size={22} />
+                        </button>
+                        <div>
+                            <div className="breadcrumb">Manajemen Ujian / Input Nilai Praktek</div>
+                            <h1 className="title-v2">{viewingPraktek.namaMapel}</h1>
+                            <div className="subtitle-v2">
+                                <span className="event-tag">{viewingPraktek.namaEvent}</span>
+                                <span className="separator">•</span>
+                                <span className="guru-tag"><ShieldCheck size={14} /> {viewingPraktek.namaGuru}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="header-stats">
+                        <div className="stat-item valid">
+                            <label>Siswa Terdata</label>
+                            <div className="value">{nilaiPraktekList.length}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card-v2 p-8" style={{ padding: '32px' }}>
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Pengisian Nilai Praktek</h3>
+                            <p style={{ color: '#64748b', fontWeight: 600 }}>Nilai akan otomatis di-upload ke BaknusDrive dalam format Excel.</p>
+                        </div>
+                        <button
+                            onClick={handleSavePraktek}
+                            className="btn-save-v2"
+                            style={{ padding: '12px 32px', width: 'auto' }}
+                            disabled={loading}
+                        >
+                            <CloudUpload size={20} />
+                            {loading ? 'Menyimpan...' : 'Simpan & Sinkron ke Drive'}
+                        </button>
+                    </div>
+
+                    <div className="table-card" style={{ border: '2px solid #f1f5f9', borderRadius: '20px', overflow: 'hidden' }}>
+                        <table className="exam-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '80px' }}>No</th>
+                                    <th>NISN</th>
+                                    <th>Nama Lengkap</th>
+                                    <th style={{ width: '200px', textAlign: 'center' }}>Nilai Praktek (1-100)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {nilaiPraktekList.map((item, idx) => (
+                                    <tr key={item.siswaId}>
+                                        <td style={{ fontWeight: 800, color: '#94a3b8' }}>{idx + 1}</td>
+                                        <td style={{ fontWeight: 600 }}>{item.nisn}</td>
+                                        <td style={{ fontWeight: 800, color: '#1e293b' }}>{item.namaSiswa}</td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={item.nilai}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    const newList = [...nilaiPraktekList];
+                                                    newList[idx].nilai = isNaN(val) ? 0 : Math.min(100, Math.max(0, val));
+                                                    setNilaiPraktekList(newList);
+                                                }}
+                                                className="score-input"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <style>{`
+                    .score-input {
+                        width: 100px;
+                        margin: 0 auto;
+                        display: block;
+                        padding: 12px;
+                        border: 2.5px solid #e2e8f0;
+                        border-radius: 12px;
+                        text-align: center;
+                        font-weight: 900;
+                        font-size: 1.25rem;
+                        color: #3b82f6;
+                        background: #f8fafc;
+                        transition: all 0.2s;
+                    }
+                    .score-input:focus {
+                        border-color: #3b82f6;
+                        background: white;
+                        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+                        transform: scale(1.05);
+                        outline: none;
+                    }
+                `}</style>
+            </div>
+        );
+    }
 
     if (viewingQuestions) {
         return (
@@ -1606,6 +1749,13 @@ const ExamManagement = () => {
                                                                     onClick={() => handleManageQuestions(exam)}
                                                                 >
                                                                     Input Soal
+                                                                </button>
+                                                                <button
+                                                                    className="btn-lengkapi"
+                                                                    style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0' }}
+                                                                    onClick={() => handleManagePraktek(exam)}
+                                                                >
+                                                                    Input Nilai Praktek
                                                                 </button>
                                                                 <button
                                                                     className="btn-lengkapi"
