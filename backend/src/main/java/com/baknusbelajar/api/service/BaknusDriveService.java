@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -36,7 +37,7 @@ public class BaknusDriveService {
         log.info(">>> BaknusDrive: Calling URL: {}", urlStr);
         log.info(">>> BaknusDrive: Creating event folder: {}", eventName);
         try {
-            java.net.URL url = new java.net.URL(urlStr);
+            java.net.URL url = java.net.URI.create(urlStr).toURL();
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
             conn.setInstanceFollowRedirects(false); // We want to see 301/302 location
             conn.setDoOutput(true);
@@ -80,7 +81,7 @@ public class BaknusDriveService {
         String urlStr = driveApiUrl + "/class/create-subject-folder";
         log.info(">>> BaknusDrive: Creating subject folder: {} inside event: {}", subjectName, eventName);
         try {
-            java.net.URL url = new java.net.URL(urlStr);
+            java.net.URL url = java.net.URI.create(urlStr).toURL();
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
             conn.setInstanceFollowRedirects(true);
             conn.setDoOutput(true);
@@ -154,7 +155,7 @@ public class BaknusDriveService {
             byte[] fileBytes, String fileName) {
         String boundary = "----FormBoundary" + UUID.randomUUID().toString().replace("-", "");
         try {
-            URL url = new URL(urlStr);
+            URL url = URI.create(urlStr).toURL();
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setInstanceFollowRedirects(true);
             conn.setDoOutput(true);
@@ -206,10 +207,80 @@ public class BaknusDriveService {
         os.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
         os.write(("Content-Disposition: form-data; name=\"" + fieldName
                 + "\"; filename=\"" + fileName + "\"\r\n").getBytes(StandardCharsets.UTF_8));
-        os.write("Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n"
-                .getBytes(StandardCharsets.UTF_8));
+
+        String contentType = "application/octet-stream";
+        if (fileName.endsWith(".docx")) {
+            contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        } else if (fileName.endsWith(".xlsx")) {
+            contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        }
+
+        os.write(("Content-Type: " + contentType + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
         os.write(fileBytes);
         os.write("\r\n".getBytes(StandardCharsets.UTF_8));
+    }
+
+    // 5. Guru mengupload Materi (Privat ke Drive Guru)
+    public String uploadMateri(String teacherEmail, String subjectName, String className, MultipartFile file) {
+        try {
+            return uploadMateriBytes(teacherEmail, subjectName, className, file.getBytes(), file.getOriginalFilename());
+        } catch (IOException e) {
+            log.error("Error reading file bytes: {}", e.getMessage());
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    public String uploadMateriBytes(String teacherEmail, String subjectName, String className, byte[] fileBytes,
+            String fileName) {
+        String url = driveApiUrl + "/class/upload-materi";
+        log.info(">>> BaknusDrive: Uploading data as file '{}' for teacher '{}' subject '{}' class '{}'",
+                fileName, teacherEmail, subjectName, className);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.set("X-Class-API-Key", apiKey);
+
+        // Simple custom implementation of Resource for byte arrays to work with
+        // LinkedMultiValueMap
+        org.springframework.core.io.Resource resource = new org.springframework.core.io.ByteArrayResource(fileBytes) {
+            @Override
+            public String getFilename() {
+                return fileName;
+            }
+        };
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("teacher_email", teacherEmail);
+        body.add("subject_name", subjectName);
+        body.add("class_name", className);
+        body.add("file", resource);
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
+            log.info("BaknusDrive Upload Response: {} - {}", response.getStatusCode(), response.getBody());
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error uploading to BaknusDrive: {}", e.getMessage());
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    public ResponseEntity<byte[]> downloadFile(Long driveFileId) {
+        // Construct WOPI download URL (internal trust)
+        // driveApiUrl is https://baknusdrive.smkbn666.sch.id/api
+        String baseUrl = driveApiUrl.replace("/api", "");
+        String internalToken = "BAKNUS_SECRET_INTERNAL_KEY_999";
+        String url = baseUrl + "/wopi/files/" + driveFileId + "/contents?access_token=" + internalToken;
+
+        log.info(">>> BaknusDrive: Proxying download from internal WOPI URL: {}", url);
+        try {
+            ResponseEntity<byte[]> response = restTemplate.getForEntity(url, byte[].class);
+            return response;
+        } catch (Exception e) {
+            log.error("Error proxying download from BaknusDrive: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
     }
 
     private void ensureFoldersExist(String eventName, String subjectName) {
