@@ -126,11 +126,17 @@ public class NilaiPraktekService {
             byte[] bytes = bos.toByteArray();
 
             // Upload to BaknusDrive
-            baknusDriveService.uploadFileBytes(eventName, subjectName, bytes, fileName);
-            log.info("Successfully synced Nilai Praktek to Drive: {}", fileName);
-
+            String res = baknusDriveService.uploadFileBytes(eventName, subjectName, bytes, fileName);
+            if (res != null && (res.toLowerCase().contains("success") || res.toLowerCase().contains("uploaded")
+                    || res.contains("200") || res.contains("201"))) {
+                log.info("Successfully synced Nilai Praktek to Drive: {}", fileName);
+            } else {
+                log.error("Failed to sync Nilai Praktek to Drive: {}. Response: {}", fileName, res);
+                throw new RuntimeException("Gagal upload ke Drive: " + res);
+            }
         } catch (IOException e) {
             log.error("Error generating Excel for Nilai Praktek: {}", e.getMessage());
+            throw new RuntimeException("Gagal generate Excel: " + e.getMessage());
         }
     }
 }

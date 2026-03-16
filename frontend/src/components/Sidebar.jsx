@@ -60,6 +60,8 @@ const Sidebar = ({ activePage, setActivePage }) => {
     if (id === 'master_data') navigate('/master-data');
     if (id === 'security' || id === 'monitoring') navigate('/security');
     if (id === 'settings') navigate('/settings');
+    if (id === 'subject_management') navigate('/subject-management');
+    if (id === 'materi_student') navigate('/student-materi');
   };
 
   const toggleTheme = () => {
@@ -73,6 +75,8 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: 'dashboard', label: 'Dashboard', icon: Home, roles: ['ADMIN', 'TU', 'GURU', 'SISWA'] },
     { id: 'monitoring', label: 'Pengawasan Ujian', icon: ShieldCheck, roles: isProctor ? ['GURU'] : [] },
     { id: 'exams', label: 'Manajemen Ujian', icon: BookOpen, roles: ['ADMIN', 'TU', 'GURU'] },
+    { id: 'subject_management', label: 'Manajemen Mapel', icon: BookOpen, roles: ['GURU'] },
+    { id: 'materi_student', label: 'Materi Pelajaran', icon: BookOpen, roles: ['SISWA'] },
     { id: 'exam_scoring', label: 'Koreksi & Nilai', icon: FileText, roles: ['ADMIN', 'TU', 'GURU'] },
     { id: 'student_exams', label: 'Daftar Ujian', icon: FileText, roles: ['ADMIN', 'SISWA'] },
     { id: 'master_data', label: 'Data Master', icon: Layout, roles: ['ADMIN', 'TU'] },
@@ -198,6 +202,25 @@ const Sidebar = ({ activePage, setActivePage }) => {
           display: flex;
           flex-direction: column;
           gap: 8px;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+
+        .sidebar-menu::-webkit-scrollbar {
+          width: 5px;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
         }
 
         .menu-item {

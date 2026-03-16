@@ -532,6 +532,74 @@ const Dashboard = () => {
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
           .dashboard-grid { grid-template-columns: 1fr; }
         }
+
+        /* Dark Mode Overrides for Dashboard */
+        [data-theme="dark"] .top-nav-standalone,
+        [data-theme="dark"] .stat-card,
+        [data-theme="dark"] .chart-container,
+        [data-theme="dark"] .activity-container,
+        [data-theme="dark"] .proctor-alert {
+          background: #1e293b;
+          border-color: #334155;
+        }
+
+        [data-theme="dark"] .proctor-alert {
+          border-color: #3b82f640;
+        }
+
+        [data-theme="dark"] .proctor-alert:hover {
+          background: #1e293b;
+          border-color: #3b82f6;
+        }
+
+        [data-theme="dark"] .alert-icon-ring {
+          background: #0f172a;
+          color: #60a5fa;
+        }
+
+        [data-theme="dark"] .alert-body h3,
+        [data-theme="dark"] .dashboard-header h1,
+        [data-theme="dark"] .container-header h3,
+        [data-theme="dark"] .stat-value,
+        [data-theme="dark"] .welcome-text span,
+        [data-theme="dark"] .search-bar input {
+          color: #f8fafc;
+        }
+
+        [data-theme="dark"] .alert-body p,
+        [data-theme="dark"] .dashboard-header p,
+        [data-theme="dark"] .container-header p,
+        [data-theme="dark"] .stat-label,
+        [data-theme="dark"] .welcome-text p,
+        [data-theme="dark"] .activity-time {
+          color: #94a3b8;
+        }
+
+        [data-theme="dark"] .search-bar {
+          background: #0f172a;
+          border: 1px solid #334155;
+        }
+
+        [data-theme="dark"] .v-divider {
+          background: #334155;
+        }
+
+        [data-theme="dark"] .activity-text {
+          color: #cbd5e1;
+        }
+
+        [data-theme="dark"] .activity-text strong {
+          color: #f8fafc;
+        }
+
+        [data-theme="dark"] .activity-item {
+          border-left-color: #334155;
+        }
+
+        [data-theme="dark"] .activity-dot {
+          background: #3b82f6;
+          box-shadow: 0 0 0 4px #1e293b;
+        }
       `}</style>
     </div>
   );

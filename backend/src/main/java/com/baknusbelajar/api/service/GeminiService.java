@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class GeminiService {
 
     private final WebClient webClient;
-    private final GrokService grokService;
+    private final FallbackAiService fallbackAiService;
     private final AppSettingService appSettingService;
     private final AtomicInteger keyIndex = new AtomicInteger(0);
 
@@ -31,6 +31,7 @@ public class GeminiService {
         // Check for user-configured key in database first
         String userKey = appSettingService.getSettingValue("ai_api_key", "");
         if (!userKey.trim().isEmpty()) {
+            log.info("Using AI API Key from Database Setting 'ai_api_key'");
             return userKey.trim();
         }
 
@@ -40,7 +41,7 @@ public class GeminiService {
             throw new RuntimeException("No Gemini API keys configured");
         }
         int index = Math.abs(keyIndex.get()) % actualKeys.size();
-        log.info("Using AI API Key index: {}", index);
+        log.info("Using AI API Key index: {} of total keys: {}", index, actualKeys.size());
         return actualKeys.get(index);
     }
 
@@ -102,8 +103,8 @@ public class GeminiService {
 
     private Mono<String> doScoreFallback(String prompt, String question, String answerKey, String studentAnswer,
             boolean tryGeminiNext) {
-        if (grokService.isAvailable()) {
-            return grokService.scoreEssay(question, answerKey, studentAnswer)
+        if (fallbackAiService.isAvailable()) {
+            return fallbackAiService.scoreEssay(question, answerKey, studentAnswer)
                     .doOnSuccess(r -> log.info("Fallback AI succeeded!"))
                     .onErrorResume(error -> {
                         if (tryGeminiNext) {
@@ -131,7 +132,8 @@ public class GeminiService {
                 log.info("Using Gemini Model from Config (YML): {}", activeModel);
             }
 
-            // Use v1beta as it supports more flexible model aliases like gemini-1.5-flash
+            // Use v1beta as it is required for gemini-2.5-flash and other newer models in
+            // this region
             String url = "https://generativelanguage.googleapis.com/v1beta/models/" + activeModel
                     + ":generateContent?key="
                     + apiKey;

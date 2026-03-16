@@ -9,6 +9,8 @@ import ExamScoring from './components/ExamScoring'
 import StudentExams from './components/StudentExams'
 import SecurityToken from './components/SecurityToken'
 import Settings from './components/Settings'
+import SubjectManagement from './components/SubjectManagement'
+import StudentMaterials from './components/StudentMaterials'
 import DashboardLayout from './components/DashboardLayout'
 
 function App() {
@@ -33,6 +35,8 @@ function App() {
           <Route path="/student-exams" element={<StudentExams />} />
           <Route path="/security" element={<SecurityToken />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/subject-management" element={<SubjectManagement />} />
+          <Route path="/student-materi" element={<StudentMaterials />} />
         </Route>
       </Routes>
     </Router>

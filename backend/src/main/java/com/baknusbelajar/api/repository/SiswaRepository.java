@@ -13,6 +13,8 @@ public interface SiswaRepository extends JpaRepository<Siswa, Long> {
 
     Optional<Siswa> findByUserId(Long userId);
 
+    Optional<Siswa> findByUserUsername(String username);
+
     List<Siswa> findByKelasId(Long kelasId);
 
 }

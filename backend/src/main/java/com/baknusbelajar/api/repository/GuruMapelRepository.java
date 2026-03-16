@@ -13,4 +13,6 @@ public interface GuruMapelRepository extends JpaRepository<GuruMapel, Long> {
     List<GuruMapel> findByMapelId(Long mapelId);
 
     void deleteByGuruId(Long guruId);
+
+    List<GuruMapel> findByKelasId(Long kelasId);
 }

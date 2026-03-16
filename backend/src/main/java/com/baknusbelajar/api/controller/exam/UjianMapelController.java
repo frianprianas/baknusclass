@@ -70,7 +70,7 @@ public class UjianMapelController {
 
     @PostMapping("/{id}/validate-token")
     @PreAuthorize("hasAnyRole('SISWA')")
-    public ResponseEntity<?> validateToken(@PathVariable Long id, @RequestParam String token,
+    public ResponseEntity<?> validateToken(@PathVariable Long id, @RequestParam String ujianToken,
             @RequestParam(required = false) String deviceId,
             Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
@@ -78,7 +78,7 @@ public class UjianMapelController {
             if (deviceId != null && !deviceId.isEmpty()) {
                 examStatusService.checkAndLockDevice(id, userDetails.getUsername(), deviceId);
             }
-            return ResponseEntity.ok(ujianMapelService.validateToken(id, token, userDetails.getId()));
+            return ResponseEntity.ok(ujianMapelService.validateToken(id, ujianToken, userDetails.getId()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(e.getMessage());
         }

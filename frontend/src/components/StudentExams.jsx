@@ -100,7 +100,8 @@ const StudentExams = () => {
                 localStorage.setItem('deviceId', deviceId);
             }
 
-            const resp = await axios.post(`/api/exam/ujian-mapel/${showTokenOverlay.id}/validate-token?token=${tokenInput}&deviceId=${deviceId}`, {}, { headers });
+            const trimmedToken = tokenInput.trim();
+            const resp = await axios.post(`/api/exam/ujian-mapel/${showTokenOverlay.id}/validate-token?ujianToken=${trimmedToken}&deviceId=${deviceId}`, {}, { headers });
             if (resp.data === true) {
                 startExam(showTokenOverlay);
                 setShowTokenOverlay(null);

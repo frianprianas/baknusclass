@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-    BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown
+    BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
+    ArrowLeft, CloudUpload, ShieldCheck
 } from 'lucide-react';
 
 const ExamScoring = () => {
@@ -10,11 +11,15 @@ const ExamScoring = () => {
     const [selectedEventId, setSelectedEventId] = useState('');
     const [selectedExam, setSelectedExam] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [viewingPraktek, setViewingPraktek] = useState(null);
+    const [nilaiPraktekList, setNilaiPraktekList] = useState([]);
+    const [loadingSync, setLoadingSync] = useState(false);
 
     // Scoring State
     const [questions, setQuestions] = useState([]);
     const [studentsData, setStudentsData] = useState([]); // Array of { siswaId, namaSiswa, nisn, answers: [] }
     const [selectedStudent, setSelectedStudent] = useState(null);
+    const [showAiModal, setShowAiModal] = useState(false);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
@@ -228,6 +233,7 @@ const ExamScoring = () => {
 
     const triggerAiScoring = async (answerId) => {
         setSavingId(answerId);
+        setShowAiModal(true);
         try {
             const res = await axios.post(`/api/exam/jawaban/${answerId}/ai-score`, {}, { headers });
 
@@ -261,6 +267,55 @@ const ExamScoring = () => {
             alert(`AI ERROR (${status || 'API'}): ${msg}`);
         } finally {
             setSavingId(null);
+            setShowAiModal(false);
+        }
+    };
+
+    const handleManagePraktek = async (exam) => {
+        setViewingPraktek(exam);
+        const token = localStorage.getItem('token');
+        try {
+            setLoading(true);
+            const res = await axios.get(`/api/exam/nilai-praktek/${exam.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setNilaiPraktekList(res.data);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal mengambil daftar siswa');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSavePraktek = async () => {
+        const token = localStorage.getItem('token');
+        try {
+            setLoading(true);
+            const res = await axios.post('/api/exam/nilai-praktek/save', nilaiPraktekList, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(res.data);
+            setViewingPraktek(null);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menyimpan nilai: ' + (err.response?.data || err.message));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSyncToDrive = async () => {
+        if (!selectedExam) return;
+        setLoadingSync(true);
+        try {
+            const resp = await axios.post(`/api/exam/jawaban/ujian/${selectedExam.id}/sync-drive`, {}, { headers });
+            alert(resp.data);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal sinkronisasi ke Drive');
+        } finally {
+            setLoadingSync(false);
         }
     };
 
@@ -326,6 +381,127 @@ const ExamScoring = () => {
         URL.revokeObjectURL(url);
     };
 
+    if (viewingPraktek) {
+        return (
+            <div className="exam-scoring-page animate-fade-in pb-10">
+                <div className="workspace-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button className="btn-back" onClick={() => setViewingPraktek(null)}>
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div className="ws-title">
+                            <h3>{viewingPraktek.namaMapel}</h3>
+                            <span className="badge-guru"><ShieldCheck size={14} /> {viewingPraktek.namaGuru}</span>
+                        </div>
+                    </div>
+                    <div className="header-stats-praktek">
+                        <div className="stat-praktek">
+                            <label>Siswa Terdata</label>
+                            <strong>{nilaiPraktekList.length}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card-box" style={{ padding: '32px' }}>
+                    <div className="flex justify-between items-center mb-8" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                        <div>
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Pengisian Nilai Praktek</h3>
+                            <p style={{ color: '#64748b', fontWeight: 600 }}>Nilai akan otomatis di-upload ke BaknusDrive dalam format Excel.</p>
+                        </div>
+                        <button
+                            onClick={handleSavePraktek}
+                            className="btn-save-praktek"
+                            disabled={loading}
+                        >
+                            <CloudUpload size={20} />
+                            {loading ? 'Menyimpan...' : 'Simpan & Sinkron ke Drive'}
+                        </button>
+                    </div>
+
+                    <div className="table-wrapper">
+                        <table className="praktek-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '80px' }}>No</th>
+                                    <th>NISN</th>
+                                    <th>Nama Lengkap</th>
+                                    <th style={{ width: '200px', textAlign: 'center' }}>Nilai Praktek (1-100)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {nilaiPraktekList.map((item, idx) => (
+                                    <tr key={item.siswaId}>
+                                        <td style={{ fontWeight: 800, color: '#94a3b8' }}>{idx + 1}</td>
+                                        <td style={{ fontWeight: 600 }}>{item.nisn}</td>
+                                        <td style={{ fontWeight: 800, color: '#1e293b' }}>{item.namaSiswa}</td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={item.nilai}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    const newList = [...nilaiPraktekList];
+                                                    newList[idx].nilai = isNaN(val) ? 0 : Math.min(100, Math.max(0, val));
+                                                    setNilaiPraktekList(newList);
+                                                }}
+                                                className="score-input-praktek"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <style>{`
+                    .table-wrapper { border: 2px solid #f1f5f9; border-radius: 20px; overflow: hidden; }
+                    .praktek-table { width: 100%; border-collapse: collapse; }
+                    .praktek-table th { background: #f8fafc; padding: 16px 24px; text-align: left; font-weight: 950; color: #475569; text-transform: uppercase; font-size: 0.8rem; border-bottom: 2px solid #f1f5f9; }
+                    .praktek-table td { padding: 16px 24px; border-bottom: 1px solid #f1f5f9; }
+                    .praktek-table tr:last-child td { border-bottom: none; }
+                    
+                    .score-input-praktek {
+                        width: 100px;
+                        margin: 0 auto;
+                        display: block;
+                        padding: 12px;
+                        border: 2.5px solid #e2e8f0;
+                        border-radius: 12px;
+                        text-align: center;
+                        font-weight: 900;
+                        font-size: 1.25rem;
+                        color: #3b82f6;
+                        background: #f8fafc;
+                        transition: all 0.2s;
+                    }
+                    .score-input-praktek:focus {
+                        border-color: #3b82f6;
+                        background: white;
+                        outline: none;
+                        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+                    }
+                    .btn-save-praktek {
+                        background: #0f172a;
+                        color: white;
+                        border: none;
+                        padding: 14px 32px;
+                        border-radius: 16px;
+                        font-weight: 800;
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .btn-save-praktek:hover { background: #1e293b; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+                    .btn-save-praktek:disabled { opacity: 0.6; cursor: not-allowed; }
+                `}</style>
+            </div>
+        );
+    }
+
     return (
         <div className="exam-scoring-page animate-fade-in">
             <div className="page-header">
@@ -383,9 +559,17 @@ const ExamScoring = () => {
                                 <span className="badge-guru">{selectedExam.namaGuru}</span>
                             </div>
                         </div>
-                        <button className="btn-export" onClick={exportToExcel}>
-                            <FileDown size={18} /> Export Nilai (Excel)
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <button className="btn-praktek" onClick={() => handleManagePraktek(selectedExam)}>
+                                <CloudUpload size={18} /> Nilai Praktek
+                            </button>
+                            <button className="btn-sync-drive" onClick={handleSyncToDrive} disabled={loadingSync}>
+                                <CloudUpload size={18} /> {loadingSync ? 'Syncing...' : 'Sync Essay ke Drive'}
+                            </button>
+                            <button className="btn-export" onClick={exportToExcel}>
+                                <FileDown size={18} /> Export Nilai (Excel)
+                            </button>
+                        </div>
                     </div>
 
                     <div className="scoring-grid">
@@ -464,13 +648,18 @@ const ExamScoring = () => {
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <button
-                                                className="btn-ai-all"
-                                                onClick={triggerAllAiScoring}
-                                                disabled={isProcessingAll}
-                                            >
-                                                <Brain size={16} /> {isProcessingAll ? 'Memproses...' : 'Analisis Semua dengan AI'}
-                                            </button>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                                                <button
+                                                    className="btn-ai-all"
+                                                    onClick={triggerAllAiScoring}
+                                                    disabled={isProcessingAll}
+                                                >
+                                                    <Brain size={16} /> {isProcessingAll ? 'Memproses...' : 'Analisis Semua dengan AI'}
+                                                </button>
+                                                <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', maxWidth: '300px', textAlign: 'right' }}>
+                                                    * BaknusAI bisa membuat kesalahan. Keputusan nilai tetap pada Guru.
+                                                </span>
+                                            </div>
                                             <div className="total-score-badge">
                                                 Total Nilai: <strong>{selectedStudent.totalGuru}</strong> / {questions.reduce((a, b) => a + b.bobotNilai, 0)}
                                             </div>
@@ -504,6 +693,9 @@ const ExamScoring = () => {
                                                         <div className="scoring-actions">
                                                             <div className="ai-box">
                                                                 <div className="ai-head"><Brain size={16} /> Analisis AI (by BaknusAI)</div>
+                                                                <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '-12px', marginBottom: '16px', fontStyle: 'italic', fontWeight: '500' }}>
+                                                                    * BaknusAI bisa saja membuat kesalahan, Kami harap penilaian siswa tetap berpedoman pada Guru.
+                                                                </p>
                                                                 {ans.skorAi !== null ? (
                                                                     <>
                                                                         <div className="ai-score">Saran Nilai Kandungan: <strong>{ans.skorAi}</strong></div>
@@ -556,7 +748,74 @@ const ExamScoring = () => {
                 </div>
             )}
 
+            {/* AI LOADING MODAL */}
+            {showAiModal && (
+                <div className="ai-modal-overlay">
+                    <div className="ai-modal-content">
+                        <img src="/baknusai.gif" alt="BaknusAI is thinking..." className="ai-gif" />
+                        <div className="ai-modal-text">
+                            <h3>BaknusAI Sedang Berpikir...</h3>
+                            <p>Menganalisis jawaban sesuai kunci jawaban dan rubrik penilaian.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style>{`
+            .ai-modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(15, 23, 42, 0.85);
+                backdrop-filter: blur(10px);
+                user-select: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: fade-in 0.3s ease-out;
+            }
+            .ai-modal-content {
+                background: white;
+                padding: 40px;
+                border-radius: 40px;
+                text-align: center;
+                max-width: 450px;
+                width: 90%;
+                box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+                border: 4px solid #3b82f6;
+                animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .ai-gif {
+                width: 250px;
+                height: 250px;
+                object-fit: contain;
+                margin-bottom: 24px;
+                border-radius: 24px;
+            }
+            .ai-modal-text h3 {
+                font-size: 1.7rem;
+                font-weight: 950;
+                color: #0f172a;
+                margin-bottom: 8px;
+            }
+            .ai-modal-text p {
+                color: #64748b;
+                font-weight: 700;
+                line-height: 1.5;
+                font-size: 1.1rem;
+            }
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes slide-up {
+                from { transform: translateY(40px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+
             .page-header { margin-bottom: 32px; }
                 .page-header h1 { font-size: 2rem; color: #0f172a; font-weight: 950; margin-bottom: 8px; letter-spacing: -1px; }
                 .page-header p { color: #64748b; font-size: 1.1rem; }
@@ -670,8 +929,18 @@ const ExamScoring = () => {
                 .btn-save-score:disabled { background: #86efac; cursor: not-allowed; transform: none; box-shadow: none; }
 
                 .btn-export { background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); }
-                .btn-export:hover { background: #059669; transform: translateY(-1px); }
                 .btn-export:active { transform: translateY(0); }
+
+                .btn-praktek { background: #f8fafc; color: #3b82f6; border: 2px solid #3b82f6; padding: 10px 20px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; }
+                .btn-praktek:hover { background: #eff6ff; transform: translateY(-1px); }
+
+                .btn-sync-drive { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2); }
+                .btn-sync-drive:hover { background: #2563eb; transform: translateY(-1px); }
+                .btn-sync-drive:disabled { background: #94a3b8; cursor: not-allowed; }
+
+                .header-stats-praktek { background: white; border: 2px solid #f1f5f9; padding: 12px 24px; border-radius: 16px; display: flex; align-items: center; }
+                .stat-praktek label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; }
+                .stat-praktek strong { font-size: 1.5rem; color: #1e293b; font-weight: 950; }
 
 
 `}</style>

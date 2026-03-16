@@ -11,8 +11,13 @@ import com.baknusbelajar.api.repository.SiswaUjianStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.baknusbelajar.api.repository.UjianMapelRepository;
+import com.baknusbelajar.api.entity.UjianMapel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.ByteArrayOutputStream;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +33,8 @@ public class JawabanSiswaService {
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
     private final SiswaUjianStatusRepository siswaUjianStatusRepository;
+    private final UjianMapelRepository ujianMapelRepository;
+    private final BaknusDriveService baknusDriveService;
 
     public List<JawabanSiswaDTO> getJawabanBySoal(Long soalId) {
         return jawabanSiswaRepository.findBySoalEssayId(soalId).stream()
@@ -153,6 +160,82 @@ public class JawabanSiswaService {
             entity.setSkorFinalGuru(skorGuru);
 
         return mapToDTO(jawabanSiswaRepository.save(entity));
+    }
+
+    public void syncToBaknusDrive(Long ujianId) {
+        UjianMapel ujian = ujianMapelRepository.findById(ujianId)
+                .orElseThrow(() -> new RuntimeException("Ujian not found"));
+
+        List<JawabanSiswa> jawabanList = jawabanSiswaRepository.findBySoalEssay_UjianMapel_Id(ujianId);
+
+        String eventName = ujian.getEventUjian().getNamaEvent();
+        String subjectName = ujian.getGuruMapel().getMapel().getNamaMapel();
+        String className = ujian.getGuruMapel().getKelas() != null ? ujian.getGuruMapel().getKelas().getNamaKelas()
+                : "Gabungan";
+
+        byte[] excelBytes = generateExcelReport(jawabanList, subjectName, className);
+        String fileName = "Rekap_Nilai_AI_" + subjectName.replace(" ", "_") + "_" + className.replace(" ", "_")
+                + ".xlsx";
+
+        baknusDriveService.uploadFileBytes(eventName, subjectName, excelBytes, fileName);
+    }
+
+    private byte[] generateExcelReport(List<JawabanSiswa> jawabanList, String subjectName, String className) {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Rekap Nilai AI");
+
+            // Header Style
+            CellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFillForegroundColor(IndexedColors.BLUE_GREY.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            Font font = workbook.createFont();
+            font.setColor(IndexedColors.WHITE.getIndex());
+            font.setBold(true);
+            headerStyle.setFont(font);
+
+            // Headers
+            Row headerRow = sheet.createRow(0);
+            String[] columns = { "No", "NISN", "Nama Siswa", "Kelas", "Pertanyaan", "Jawaban Siswa", "Skor AI",
+                    "Alasan AI", "Skor Guru" };
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Data
+            int rowIdx = 1;
+            for (JawabanSiswa j : jawabanList) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(rowIdx - 1);
+
+                String nisn = "";
+                if (j.getSiswa() != null && j.getSiswa().getUser() != null) {
+                    String email = j.getSiswa().getUser().getEmail();
+                    nisn = (email != null && email.contains("@")) ? email.substring(0, email.indexOf("@"))
+                            : j.getSiswa().getNisn();
+                }
+
+                row.createCell(1).setCellValue(nisn);
+                row.createCell(2).setCellValue(j.getSiswa() != null ? j.getSiswa().getNamaLengkap() : "-");
+                row.createCell(3).setCellValue(className);
+                row.createCell(4).setCellValue(j.getSoalEssay() != null ? j.getSoalEssay().getPertanyaan() : "-");
+                row.createCell(5).setCellValue(j.getTeksJawaban());
+                row.createCell(6).setCellValue(j.getSkorAi() != null ? j.getSkorAi() : 0.0);
+                row.createCell(7).setCellValue(j.getAlasanAi() != null ? j.getAlasanAi() : "-");
+                row.createCell(8).setCellValue(j.getSkorFinalGuru() != null ? j.getSkorFinalGuru() : 0.0);
+            }
+
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Error generating Excel report", e);
+            throw new RuntimeException("Gagal generate excel: " + e.getMessage());
+        }
     }
 
     private JawabanSiswaDTO mapToDTO(JawabanSiswa entity) {

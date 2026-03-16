@@ -17,6 +17,11 @@ spring:
     password: on5laught
     driver-class-name: oracle.jdbc.OracleDriver
   
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  
   jpa:
     hibernate:
       ddl-auto: update
@@ -38,24 +43,23 @@ mailcow:
   api-key: YOUR_MAILCOW_KEY
 
 gemini:
-  keys: YOUR_GEMINI_KEYS
-  model: gemini-flash-latest
+  keys: AIzaSyBE37KDFxAglp3BPUp0-rAu6iM1KEMuZfg,AIzaSyChdjVCxGSUxrqS7U-wP3mcqM2klBmfR1I
+  model: gemini-2.5-flash
 
-grok:
-  api-key: YOUR_GROK_KEY
 
 # Fallback AI provider (used when Gemini quota is exceeded)
-# Supports: openai, grok (xAI)
+# Supports: openai, grok (xAI), mistral
 fallback-ai:
-  provider: grok
-  api-key: YOUR_GROK_KEY
-  model: grok-2-latest
-  base-url: https://api.x.ai/v1
+  provider: mistral
+  api-key: ${FALLBACK_AI_KEY:ZxLIg6l2lF6mh8T17Je84V9joZw4pgk6}
+  model: mistral-large-latest
+  base-url: https://api.mistral.ai/v1
 
 baknus-drive:
   url: https://baknusdrive.smkbn666.sch.id/api
-  api-key: YOUR_DRIVE_KEY
+  api-key: BAKNUS_CLASS_SECRET
 
 logging:
   level:
     org.springframework.security: INFO
+    com.baknusbelajar.api.service: DEBUG

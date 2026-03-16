@@ -62,4 +62,12 @@ public class JawabanSiswaController {
             @RequestParam(required = false) Double skorGuru) {
         return ResponseEntity.ok(jawabanSiswaService.updateNilai(id, skorAi, alasanAi, skorGuru));
     }
+
+    @PostMapping("/ujian/{ujianId}/sync-drive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    public ResponseEntity<String> syncToDrive(@PathVariable Long ujianId) {
+        log.info("Syncing Exam ID {} to BaknusDrive", ujianId);
+        jawabanSiswaService.syncToBaknusDrive(ujianId);
+        return ResponseEntity.ok("Berhasil sinkronisasi ke BaknusDrive");
+    }
 }

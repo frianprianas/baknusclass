@@ -124,8 +124,6 @@ const ExamManagement = () => {
 
     // Sub-view for entering questions
     const [viewingQuestions, setViewingQuestions] = useState(null); // Will hold exam object
-    const [viewingPraktek, setViewingPraktek] = useState(null);
-    const [nilaiPraktekList, setNilaiPraktekList] = useState([]);
     const [qType, setQType] = useState('essay'); // 'essay' or 'pg'
     const [questions, setQuestions] = useState([]);
     const [questionsPG, setQuestionsPG] = useState([]);
@@ -513,39 +511,7 @@ const ExamManagement = () => {
         setIsModalOpen(true);
     };
 
-    const handleManagePraktek = async (exam) => {
-        setViewingPraktek(exam);
-        const token = localStorage.getItem('token');
-        try {
-            setLoading(true);
-            const res = await axios.get(`/api/exam/nilai-praktek/${exam.id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setNilaiPraktekList(res.data);
-        } catch (err) {
-            console.error(err);
-            alert('Gagal mengambil daftar siswa');
-        } finally {
-            setLoading(false);
-        }
-    };
 
-    const handleSavePraktek = async () => {
-        const token = localStorage.getItem('token');
-        try {
-            setLoading(true);
-            const res = await axios.post('/api/exam/nilai-praktek/save', nilaiPraktekList, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            alert(res.data);
-            setViewingPraktek(null);
-        } catch (err) {
-            console.error(err);
-            alert('Gagal menyimpan nilai');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleManageQuestions = async (exam) => {
         setViewingQuestions(exam);
@@ -630,112 +596,6 @@ const ExamManagement = () => {
         }
     };
 
-    if (viewingPraktek) {
-        return (
-            <div className="exam-management animate-fade-in pb-10">
-                <div className="page-header-v2">
-                    <div className="flex items-center gap-5">
-                        <button onClick={() => setViewingPraktek(null)} className="back-btn-v2" title="Kembali ke Daftar Ujian">
-                            <ArrowLeft size={22} />
-                        </button>
-                        <div>
-                            <div className="breadcrumb">Manajemen Ujian / Input Nilai Praktek</div>
-                            <h1 className="title-v2">{viewingPraktek.namaMapel}</h1>
-                            <div className="subtitle-v2">
-                                <span className="event-tag">{viewingPraktek.namaEvent}</span>
-                                <span className="separator">•</span>
-                                <span className="guru-tag"><ShieldCheck size={14} /> {viewingPraktek.namaGuru}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="header-stats">
-                        <div className="stat-item valid">
-                            <label>Siswa Terdata</label>
-                            <div className="value">{nilaiPraktekList.length}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="card-v2 p-8" style={{ padding: '32px' }}>
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>Pengisian Nilai Praktek</h3>
-                            <p style={{ color: '#64748b', fontWeight: 600 }}>Nilai akan otomatis di-upload ke BaknusDrive dalam format Excel.</p>
-                        </div>
-                        <button
-                            onClick={handleSavePraktek}
-                            className="btn-save-v2"
-                            style={{ padding: '12px 32px', width: 'auto' }}
-                            disabled={loading}
-                        >
-                            <CloudUpload size={20} />
-                            {loading ? 'Menyimpan...' : 'Simpan & Sinkron ke Drive'}
-                        </button>
-                    </div>
-
-                    <div className="table-card" style={{ border: '2px solid #f1f5f9', borderRadius: '20px', overflow: 'hidden' }}>
-                        <table className="exam-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: '80px' }}>No</th>
-                                    <th>NISN</th>
-                                    <th>Nama Lengkap</th>
-                                    <th style={{ width: '200px', textAlign: 'center' }}>Nilai Praktek (1-100)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {nilaiPraktekList.map((item, idx) => (
-                                    <tr key={item.siswaId}>
-                                        <td style={{ fontWeight: 800, color: '#94a3b8' }}>{idx + 1}</td>
-                                        <td style={{ fontWeight: 600 }}>{item.nisn}</td>
-                                        <td style={{ fontWeight: 800, color: '#1e293b' }}>{item.namaSiswa}</td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={item.nilai}
-                                                onChange={(e) => {
-                                                    const val = parseInt(e.target.value);
-                                                    const newList = [...nilaiPraktekList];
-                                                    newList[idx].nilai = isNaN(val) ? 0 : Math.min(100, Math.max(0, val));
-                                                    setNilaiPraktekList(newList);
-                                                }}
-                                                className="score-input"
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <style>{`
-                    .score-input {
-                        width: 100px;
-                        margin: 0 auto;
-                        display: block;
-                        padding: 12px;
-                        border: 2.5px solid #e2e8f0;
-                        border-radius: 12px;
-                        text-align: center;
-                        font-weight: 900;
-                        font-size: 1.25rem;
-                        color: #3b82f6;
-                        background: #f8fafc;
-                        transition: all 0.2s;
-                    }
-                    .score-input:focus {
-                        border-color: #3b82f6;
-                        background: white;
-                        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-                        transform: scale(1.05);
-                        outline: none;
-                    }
-                `}</style>
-            </div>
-        );
-    }
 
     if (viewingQuestions) {
         return (
@@ -761,7 +621,7 @@ const ExamManagement = () => {
                                 <label>Total Soal</label>
                                 <div className="value">{questions.length + questionsPG.length}</div>
                             </div>
-                            <div className={`stat-item ${questions.reduce((acc, q) => acc + q.bobotNilai, 0) + questionsPG.reduce((acc, q) => acc + q.bobotNilai, 0) === 100 ? 'valid' : 'warning'}`}>
+                            <div className={`stat - item ${questions.reduce((acc, q) => acc + q.bobotNilai, 0) + questionsPG.reduce((acc, q) => acc + q.bobotNilai, 0) === 100 ? 'valid' : 'warning'} `}>
                                 <label>Total Bobot</label>
                                 <div className="value">
                                     {questions.reduce((acc, q) => acc + q.bobotNilai, 0) + questionsPG.reduce((acc, q) => acc + q.bobotNilai, 0)}
@@ -776,14 +636,14 @@ const ExamManagement = () => {
                             <div className="card-v2 question-form-card">
                                 <div className="q-type-switcher-v2">
                                     <button
-                                        className={`q-type-btn-v2 ${qType === 'pg' ? 'active' : ''}`}
+                                        className={`q - type - btn - v2 ${qType === 'pg' ? 'active' : ''} `}
                                         onClick={() => { setQType('pg'); setEditingQuestion(null); }}
                                     >
                                         <div className="icon-circle"><CheckCircle2 size={16} /></div>
                                         <span>Pilihan Ganda</span>
                                     </button>
                                     <button
-                                        className={`q-type-btn-v2 ${qType === 'essay' ? 'active' : ''}`}
+                                        className={`q - type - btn - v2 ${qType === 'essay' ? 'active' : ''} `}
                                         onClick={() => { setQType('essay'); setEditingQuestion(null); }}
                                     >
                                         <div className="icon-circle"><FileText size={16} /></div>
@@ -805,7 +665,7 @@ const ExamManagement = () => {
                                                     let currentKunci = '';
                                                     if (isPG) {
                                                         const optKey = questionFormPG.kunciJawaban || 'A';
-                                                        currentKunci = `${optKey}. ${questionFormPG['pilihan' + optKey] || ''}`;
+                                                        currentKunci = `${optKey}. ${questionFormPG['pilihan' + optKey] || ''} `;
                                                     } else {
                                                         currentKunci = questionForm.kunciJawaban;
                                                     }
@@ -854,7 +714,7 @@ const ExamManagement = () => {
                                             <label className="section-label">Opsi Jawaban & Kunci</label>
                                             <div className="space-y-3">
                                                 {['A', 'B', 'C', 'D', 'E'].map(opt => (
-                                                    <div key={opt} className={`opt-input-v2 ${questionFormPG.kunciJawaban === opt ? 'selected' : ''}`}>
+                                                    <div key={opt} className={`opt - input - v2 ${questionFormPG.kunciJawaban === opt ? 'selected' : ''} `}>
                                                         <button
                                                             type="button"
                                                             className="opt-check"
@@ -865,8 +725,8 @@ const ExamManagement = () => {
                                                         </button>
                                                         <input
                                                             type="text"
-                                                            value={questionFormPG[`pilihan${opt}`]}
-                                                            onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
+                                                            value={questionFormPG[`pilihan${opt} `]}
+                                                            onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt} `]: e.target.value })}
                                                             placeholder={`Pilihan ${opt}...`}
                                                             required={opt !== 'E'}
                                                         />
@@ -955,7 +815,7 @@ const ExamManagement = () => {
                                     <div className="questions-grid-v2">
                                         {/* PG Questions */}
                                         {questionsPG.map((q, idx) => (
-                                            <div key={`pg-${q.id}`} className={`q-card-v2 pg-type ${editingQuestion?.id === q.id ? 'is-editing' : ''}`}>
+                                            <div key={`pg - ${q.id} `} className={`q - card - v2 pg - type ${editingQuestion?.id === q.id ? 'is-editing' : ''} `}>
                                                 <div className="q-card-header">
                                                     <div className="q-meta">
                                                         <span className="q-number-v2">Soal {idx + 1}</span>
@@ -973,10 +833,10 @@ const ExamManagement = () => {
                                                 <div className="q-card-body">
                                                     <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
                                                     <div className="q-options-v2">
-                                                        {['A', 'B', 'C', 'D', 'E'].map(opt => q[`pilihan${opt}`] && (
-                                                            <div key={opt} className={`opt-item-v2 ${q.kunciJawaban === opt ? 'is-correct' : ''}`}>
+                                                        {['A', 'B', 'C', 'D', 'E'].map(opt => q[`pilihan${opt} `] && (
+                                                            <div key={opt} className={`opt - item - v2 ${q.kunciJawaban === opt ? 'is-correct' : ''} `}>
                                                                 <div className="opt-marker">{opt}</div>
-                                                                <div className="opt-text">{q[`pilihan${opt}`]}</div>
+                                                                <div className="opt-text">{q[`pilihan${opt} `]}</div>
                                                                 {q.kunciJawaban === opt && <div className="correct-check"><CheckCircle2 size={14} /></div>}
                                                             </div>
                                                         ))}
@@ -993,7 +853,7 @@ const ExamManagement = () => {
 
                                         {/* Essay Questions */}
                                         {questions.map((q, idx) => (
-                                            <div key={`essay-${q.id}`} className={`q-card-v2 essay-type ${editingQuestion?.id === q.id ? 'is-editing' : ''}`}>
+                                            <div key={`essay - ${q.id} `} className={`q - card - v2 essay - type ${editingQuestion?.id === q.id ? 'is-editing' : ''} `}>
                                                 <div className="q-card-header">
                                                     <div className="q-meta">
                                                         <span className="q-number-v2">Soal {questionsPG.length + idx + 1}</span>
@@ -1041,7 +901,7 @@ const ExamManagement = () => {
 
                     <style>{`
                     .exam-management { max-width: 1400px; margin: 0 auto; }
-                    
+
                     /* Page Header V2 */
                     .page-header-v2 { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; padding: 0 4px; }
                     .back-btn-v2 { background: white; border: 1.5px solid #e2e8f0; color: #64748b; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -1056,26 +916,26 @@ const ExamManagement = () => {
                     .header-stats { display: flex; gap: 24px; }
                     .stat-item { background: white; padding: 12px 24px; border-radius: 18px; border: 1.5px solid #e2e8f0; border-bottom: 4px solid #e2e8f0; min-width: 140px; }
                     .stat-item label { display: block; font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-                    .stat-item .value { font-size: 1.5rem; font-weight: 900; color: #1e293b; display: flex; align-items: baseline; gap: 2px; }
-                    .stat-item .total { font-size: 0.9rem; color: #94a3b8; font-weight: 600; }
+                    .stat-item.value { font-size: 1.5rem; font-weight: 900; color: #1e293b; display: flex; align-items: baseline; gap: 2px; }
+                    .stat-item.total { font-size: 0.9rem; color: #94a3b8; font-weight: 600; }
                     .stat-item.valid { border-color: #22c55e; border-bottom-color: #16a34a; background: #f0fdf4; }
-                    .stat-item.valid .value { color: #166534; }
+                    .stat-item.valid.value { color: #166534; }
                     .stat-item.warning { border-color: #f59e0b; border-bottom-color: #d97706; background: #fffbeb; }
-                    .stat-item.warning .value { color: #92400e; }
+                    .stat-item.warning.value { color: #92400e; }
 
                     /* Questions Layout V2 */
-                    .questions-layout-v2 { display: grid; grid-template-columns: 600px 1fr !important; gap: 40px; align-items: start; }
+                    .questions-layout-v2 { display: grid; grid-template-columns: 600px 1fr!important; gap: 40px; align-items: start; }
                     .sticky-form-container { position: sticky; top: 20px; }
                     
-                    .card-v2 { background: white; border-radius: 24px; border: 2.5px solid #f1f5f9; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.03); overflow: hidden; }
-                    .question-form-card { padding: 24px !important; }
+                    .card-v2 { background: white; border-radius: 24px; border: 2.5px solid #f1f5f9; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.03); overflow: hidden; }
+                    .question-form-card { padding: 24px!important; }
 
                     /* Type Switcher V2 */
                     .q-type-switcher-v2 { display: grid; grid-template-columns: 1fr 1fr; background: #f1f5f9; padding: 8px; border-radius: 20px; margin-bottom: 32px; gap: 10px; }
                     .q-type-btn-v2 { border: none; padding: 16px; border-radius: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; font-size: 0.95rem; color: #64748b; background: transparent; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-                    .q-type-btn-v2 .icon-circle { background: white; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: #94a3b8; }
-                    .q-type-btn-v2.active { background: white; color: #3b82f6; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
-                    .q-type-btn-v2.active .icon-circle { background: #3b82f6; color: white; }
+                    .q-type-btn-v2.icon-circle { background: white; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); color: #94a3b8; }
+                    .q-type-btn-v2.active { background: white; color: #3b82f6; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); }
+                    .q-type-btn-v2.active.icon-circle { background: #3b82f6; color: white; }
 
                     .form-header-v2 { margin-bottom: 24px; }
                     .form-indicator { width: 32px; height: 6px; background: #3b82f6; border-radius: 10px; margin-bottom: 12px; }
@@ -1087,29 +947,29 @@ const ExamManagement = () => {
                     
                     .editor-container-v2 { border: 2.5px solid #f1f5f9; border-radius: 16px; overflow: hidden; transition: all 0.3s; background: white; }
                     .editor-container-v2:focus-within { border-color: #3b82f6; box-shadow: 0 4px 15px -5px rgba(59, 130, 246, 0.1); }
-                    .editor-container-v2 .quill { border: none; }
-                    .editor-container-v2 .ql-toolbar { border: none !important; border-bottom: 2.5px solid #f1f5f9 !important; background: #f8fafc; padding: 8px; }
-                    .editor-container-v2 .ql-container { border: none !important; font-size: 1.05rem; font-family: 'Inter', sans-serif; min-height: 280px; }
-                    .editor-container-v2 .ql-editor { padding: 16px; line-height: 1.5; color: #1e293b; font-weight: 500; }
-                    .editor-container-v2 .ql-editor.ql-blank::before { color: #94a3b8; font-style: normal; font-weight: 600; left: 16px; }
+                    .editor-container-v2.quill { border: none; }
+                    .editor-container-v2.ql-toolbar { border: none!important; border-bottom: 2.5px solid #f1f5f9!important; background: #f8fafc; padding: 8px; }
+                    .editor-container-v2.ql-container { border: none!important; font-size: 1.05rem; font-family: 'Inter', sans-serif; min-height: 280px; }
+                    .editor-container-v2.ql-editor { padding: 16px; line-height: 1.5; color: #1e293b; font-weight: 500; }
+                    .editor-container-v2.ql-editor.ql-blank::before { color: #94a3b8; font-style: normal; font-weight: 600; left: 16px; }
 
                     .section-label { display: block; font-size: 0.85rem; font-weight: 900; color: #334155; text-transform: uppercase; margin-bottom: 24px; border-top: 2.5px solid #f8fafc; padding-top: 32px; letter-spacing: 2px; }
-                    
+
                     /* Large Question Inputs */
                     .opt-input-v2 { display: flex; align-items: center; gap: 12px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; padding: 8px 16px 8px 8px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); margin-bottom: 10px; }
-                    .opt-input-v2:focus-within { border-color: #3b82f6; background: white; transform: scale(1.01); box-shadow: 0 4px 10px -5px rgba(59,130,246,0.15); }
+                    .opt-input-v2:focus-within { border-color: #3b82f6; background: white; transform: scale(1.01); box-shadow: 0 4px 10px -5px rgba(59, 130, 246, 0.15); }
                     .opt-input-v2.selected { border-color: #22c55e; background: #f0fdf4; }
                     
                     .opt-check { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: white; border: 2px solid #e2e8f0; color: #64748b; font-weight: 950; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1rem; }
-                    .opt-input-v2.selected .opt-check { background: #22c55e; color: white; border-color: #22c55e; }
+                    .opt-input-v2.selected.opt-check { background: #22c55e; color: white; border-color: #22c55e; }
                     .opt-input-v2 input { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1.05rem; font-weight: 600; color: #1e293b; outline: none; }
 
-                    .kunci-textarea { border: 2px solid #fef3c7 !important; background: #fffbeb !important; font-size: 1rem !important; font-weight: 600 !important; }
-                    .kunci-textarea:focus { border-color: #f59e0b !important; box-shadow: 0 0 0 4px rgba(245,158,11,0.1) !important; }
+                    .kunci-textarea { border: 2px solid #fef3c7!important; background: #fffbeb!important; font-size: 1rem!important; font-weight: 600!important; }
+                    .kunci-textarea:focus { border-color: #f59e0b!important; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1)!important; }
 
                     .input-with-icon input { width: 100%; padding: 14px 16px 14px 44px; border: 2px solid #f1f5f9; background: #f8fafc; border-radius: 16px; font-size: 1.1rem; font-weight: 800; transition: all 0.2s; color: #1e293b; }
                     .input-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-                    .input-with-icon input:focus { border-color: #3b82f6; background: white; box-shadow: 0 0 0 4px rgba(59,130,246,0.08); }
+                    .input-with-icon input:focus { border-color: #3b82f6; background: white; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08); }
 
                     .form-actions-v2 { display: grid; gap: 12px; margin-top: 20px; }
                     .btn-save-v2 { background: #3b82f6; color: white; border: none; padding: 16px; border-radius: 18px; font-weight: 900; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: all 0.2s; }
@@ -1129,11 +989,11 @@ const ExamManagement = () => {
                     .questions-grid-v2 { display: grid; gap: 24px; padding-bottom: 30px; }
                     
                     .q-card-v2 { background: white; border-radius: 24px; border: 2px solid #f1f5f9; padding: 24px; transition: all 0.3s ease; position: relative; overflow: hidden; }
-                    .q-card-v2:hover { border-color: #3b82f6; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.06); transform: translateY(-4px); }
+                    .q-card-v2:hover { border-color: #3b82f6; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.06); transform: translateY(-4px); }
                     .q-card-v2.is-editing { border-color: #3b82f6; background: #eff6ff; border-style: dashed; }
                     
                     .q-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .q-number-v2 { font-size: 0.85rem; font-weight: 900; color: #3b82f6; text-transform: uppercase; background: #eff6ff; padding: 6px 16px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+                    .q-number-v2 { font-size: 0.85rem; font-weight: 900; color: #3b82f6; text-transform: uppercase; background: #eff6ff; padding: 6px 16px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04); }
                     
                     .q-actions-v2 { display: flex; gap: 8px; }
                     .q-actions-v2 button { background: white; border: 2px solid #f1f5f9; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: #64748b; }
@@ -1146,7 +1006,7 @@ const ExamManagement = () => {
                     .opt-item-v2 { padding: 14px 18px; background: #f8fafc; border-radius: 16px; border: 2px solid #f1f5f9; display: flex; gap: 12px; align-items: center; }
                     .opt-item-v2.is-correct { background: #f0fdf4; border-color: #22c55e; color: #166534; font-weight: 800; }
                     .opt-marker { width: 30px; height: 30px; min-width: 30px; border-radius: 8px; background: white; border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; color: #64748b; }
-                    .opt-item-v2.is-correct .opt-marker { background: #22c55e; color: white; border-color: #22c55e; }
+                    .opt-item-v2.is-correct.opt-marker { background: #22c55e; color: white; border-color: #22c55e; }
 
                     .essay-rubric-v2 { background: #fffbeb; border-radius: 16px; padding: 20px; border-left: 6px solid #f59e0b; margin-top: 20px; }
                     .rubric-header { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 950; color: #b45309; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
@@ -1169,111 +1029,27 @@ const ExamManagement = () => {
 
                     /* Transitions */
                     .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-                    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-                    
-                    /* Custom Scrollbar */
-                    .questions-scroll-v2::-webkit-scrollbar { width: 8px; }
-                    .questions-scroll-v2::-webkit-scrollbar-track { background: transparent; }
-                    .questions-scroll-v2::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-                    .questions-scroll-v2::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-
-                    .exam-management { max-width: 1400px; margin: 0 auto; }
-                    .page-header-v2 { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; padding: 0 4px; }
-                    .back-btn-v2 { background: white; border: 1.5px solid #e2e8f0; color: #64748b; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-                    .back-btn-v2:hover { background: #f8fafc; color: #3b82f6; border-color: #3b82f6; transform: translateX(-4px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1); }
-                    .breadcrumb { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-                    .title-v2 { font-size: 2.25rem; font-weight: 900; color: #0f172a; letter-spacing: -1px; margin: 0; }
-                    .subtitle-v2 { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 0.95rem; color: #64748b; }
-                    .event-tag { color: #3b82f6; font-weight: 700; }
-                    .guru-tag { display: flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 2px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; }
-                    .header-stats { display: flex; gap: 24px; }
-                    .stat-item { background: white; padding: 12px 24px; border-radius: 18px; border: 1.5px solid #e2e8f0; border-bottom: 4px solid #e2e8f0; min-width: 140px; }
-                    .stat-item label { display: block; font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-                    .stat-item .value { font-size: 1.5rem; font-weight: 900; color: #1e293b; display: flex; align-items: baseline; gap: 2px; }
-                    .stat-item .total { font-size: 0.9rem; color: #94a3b8; font-weight: 600; }
-                    .stat-item.valid { border-color: #22c55e; border-bottom-color: #16a34a; background: #f0fdf4; }
-                    .stat-item.valid .value { color: #166534; }
-                    .stat-item.warning { border-color: #f59e0b; border-bottom-color: #d97706; background: #fffbeb; }
-                    .stat-item.warning .value { color: #92400e; }
-                    .questions-layout-v2 { display: grid; grid-template-columns: 600px 1fr !important; gap: 40px; align-items: start; }
-                    .sticky-form-container { position: sticky; top: 20px; }
-                    .card-v2 { background: white; border-radius: 24px; border: 2.5px solid #f1f5f9; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.03); overflow: hidden; }
-                    .question-form-card { padding: 24px !important; }
-                    .q-type-switcher-v2 { display: grid; grid-template-columns: 1fr 1fr; background: #f1f5f9; padding: 8px; border-radius: 20px; margin-bottom: 32px; gap: 10px; }
-                    .q-type-btn-v2 { border: none; padding: 16px; border-radius: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; font-size: 0.95rem; color: #64748b; background: transparent; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-                    .q-type-btn-v2 .icon-circle { background: white; width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); color: #94a3b8; }
-                    .q-type-btn-v2.active { background: white; color: #3b82f6; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
-                    .q-type-btn-v2.active .icon-circle { background: #3b82f6; color: white; }
-                    .form-header-v2 { margin-bottom: 24px; }
-                    .form-indicator { width: 32px; height: 6px; background: #3b82f6; border-radius: 10px; margin-bottom: 12px; }
-                    .form-header-v2 h3 { font-size: 1.4rem; font-weight: 950; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
-                    .form-header-v2 p { color: #64748b; font-size: 0.85rem; margin-top: 4px; font-weight: 600; }
-                    .form-group-v2 { margin-bottom: 28px; }
-                    .form-group-v2 label { display: block; font-size: 0.85rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
-                    .editor-container-v2 { border: 2.5px solid #f1f5f9; border-radius: 16px; overflow: hidden; transition: all 0.3s; background: white; }
-                    .editor-container-v2:focus-within { border-color: #3b82f6; box-shadow: 0 4px 15px -5px rgba(59, 130, 246, 0.1); }
-                    .editor-container-v2 .quill { border: none; }
-                    .editor-container-v2 .ql-toolbar { border: none !important; border-bottom: 2.5px solid #f1f5f9 !important; background: #f8fafc; padding: 8px; }
-                    .editor-container-v2 .ql-container { border: none !important; font-size: 1.05rem; font-family: 'Inter', sans-serif; min-height: 280px; }
-                    .editor-container-v2 .ql-editor { padding: 16px; line-height: 1.5; color: #1e293b; font-weight: 500; }
-                    .editor-container-v2 .ql-editor.ql-blank::before { color: #94a3b8; font-style: normal; font-weight: 600; left: 16px; }
-                    .section-label { display: block; font-size: 0.85rem; font-weight: 900; color: #334155; text-transform: uppercase; margin-bottom: 24px; border-top: 2.5px solid #f8fafc; padding-top: 32px; letter-spacing: 2px; }
-                    .opt-input-v2 { display: flex; align-items: center; gap: 12px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; padding: 8px 16px 8px 8px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); margin-bottom: 10px; }
-                    .opt-input-v2:focus-within { border-color: #3b82f6; background: white; transform: scale(1.01); box-shadow: 0 4px 10px -5px rgba(59,130,246,0.15); }
-                    .opt-input-v2.selected { border-color: #22c55e; background: #f0fdf4; }
-                    .opt-check { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: white; border: 2px solid #e2e8f0; color: #64748b; font-weight: 950; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 1rem; }
-                    .opt-input-v2.selected .opt-check { background: #22c55e; color: white; border-color: #22c55e; }
-                    .opt-input-v2 input { flex: 1; border: none; background: transparent; padding: 10px; font-size: 1.05rem; font-weight: 600; color: #1e293b; outline: none; }
-                    .kunci-textarea { border: 2px solid #fef3c7 !important; background: #fffbeb !important; font-size: 1rem !important; font-weight: 600 !important; }
-                    .kunci-textarea:focus { border-color: #f59e0b !important; box-shadow: 0 0 0 4px rgba(245,158,11,0.1) !important; }
-                    .input-with-icon input { width: 100%; padding: 14px 16px 14px 44px; border: 2px solid #f1f5f9; background: #f8fafc; border-radius: 16px; font-size: 1.1rem; font-weight: 800; transition: all 0.2s; color: #1e293b; }
-                    .input-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-                    .input-with-icon input:focus { border-color: #3b82f6; background: white; box-shadow: 0 0 0 4px rgba(59,130,246,0.08); }
-                    .form-actions-v2 { display: grid; gap: 12px; margin-top: 20px; }
-                    .btn-save-v2 { background: #3b82f6; color: white; border: none; padding: 16px; border-radius: 18px; font-weight: 900; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: all 0.2s; }
-                    .btn-save-v2:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(59, 130, 246, 0.3); }
-                    .btn-cancel-v2 { background: white; color: #64748b; border: 2px solid #e2e8f0; padding: 14px; border-radius: 16px; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
-                    .btn-cancel-v2:hover { background: #f8fafc; color: #1e293b; border-color: #94a3b8; }
-                    .question-list-section-v2 { flex: 1; }
-                    .list-header-v2 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-                    .header-icon { background: #3b82f6; color: white; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
-                    .list-header-v2 h3 { font-size: 1.4rem; font-weight: 900; color: #0f172a; margin: 0; }
-                    .filter-badges { display: flex; gap: 8px; }
-                    .badge-v2 { background: white; border: 2px solid #f1f5f9; padding: 4px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; color: #64748b; }
-                    .questions-scroll-v2 { max-height: calc(100vh - 220px); overflow-y: auto; padding-right: 12px; scroll-behavior: smooth; }
-                    .questions-grid-v2 { display: grid; gap: 24px; padding-bottom: 30px; }
-                    .q-card-v2 { background: white; border-radius: 24px; border: 2px solid #f1f5f9; padding: 24px; transition: all 0.3s ease; position: relative; overflow: hidden; }
-                    .q-card-v2:hover { border-color: #3b82f6; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.06); transform: translateY(-4px); }
-                    .q-card-v2.is-editing { border-color: #3b82f6; background: #eff6ff; border-style: dashed; }
-                    .q-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .q-number-v2 { font-size: 0.85rem; font-weight: 900; color: #3b82f6; text-transform: uppercase; background: #eff6ff; padding: 6px 16px; border-radius: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
-                    .q-actions-v2 { display: flex; gap: 8px; }
-                    .q-actions-v2 button { background: white; border: 2px solid #f1f5f9; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: #64748b; }
-                    .q-btn-edit:hover { color: #3b82f6; border-color: #3b82f6; background: #eff6ff; }
-                    .btn-delete:hover { color: #ef4444; border-color: #fca5a5; background: #fef2f2; }
-                    .q-text-v2 { font-size: 1.15rem; color: #0f172a; line-height: 1.6; font-weight: 700; margin-bottom: 24px; }
-                    .q-options-v2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-                    .opt-item-v2 { padding: 14px 18px; background: #f8fafc; border-radius: 16px; border: 2px solid #f1f5f9; display: flex; gap: 12px; align-items: center; }
-                    .opt-item-v2.is-correct { background: #f0fdf4; border-color: #22c55e; color: #166534; font-weight: 800; }
-                    .opt-marker { width: 30px; height: 30px; min-width: 30px; border-radius: 8px; background: white; border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; color: #64748b; }
-                    .opt-item-v2.is-correct .opt-marker { background: #22c55e; color: white; border-color: #22c55e; }
-                    .essay-rubric-v2 { background: #fffbeb; border-radius: 16px; padding: 20px; border-left: 6px solid #f59e0b; margin-top: 20px; }
-                    .rubric-header { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 950; color: #b45309; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
-                    .rubric-content { font-size: 1rem; color: #78350f; line-height: 1.6; font-weight: 600; white-space: pre-wrap; }
-                    .q-card-footer { border-top: 2px dashed #f1f5f9; margin-top: 24px; padding-top: 16px; display: flex; justify-content: flex-end; }
-                    .bobot-tag { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #64748b; font-weight: 700; padding: 8px 16px; background: #f8fafc; border-radius: 50px; border: 2px solid #f1f5f9; }
-                    .bobot-tag strong { color: #0f172a; font-size: 1rem; font-weight: 900; }
-                    .empty-questions-v2 { text-align: center; padding: 60px 20px; background: white; border-radius: 24px; border: 2px dashed #e2e8f0; color: #94a3b8; }
-                    .empty-illustration { color: #e2e8f0; margin-bottom: 16px; }
-                    .empty-questions-v2 h3 { font-size: 1.3rem; color: #475569; margin-bottom: 8px; font-weight: 800; }
-                    .empty-questions-v2 p { font-size: 1rem; }
-                    .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-                    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                    .questions-scroll-v2::-webkit-scrollbar { width: 8px; }
-                    .questions-scroll-v2::-webkit-scrollbar-track { background: transparent; }
-                    .questions-scroll-v2::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-                    .questions-scroll-v2::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+                    .opt - item - v2.is - correct { background: #f0fdf4; border - color: #22c55e; color: #166534; font - weight: 800; }
+                    .opt - marker { width: 30px; height: 30px; min - width: 30px; border - radius: 8px; background: white; border: 2px solid #e2e8f0; display: flex; align - items: center; justify - content: center; font - size: 0.8rem; font - weight: 900; color: #64748b; }
+                    .opt - item - v2.is - correct.opt - marker { background: #22c55e; color: white; border - color: #22c55e; }
+                    .essay - rubric - v2 { background: #fffbeb; border - radius: 16px; padding: 20px; border - left: 6px solid #f59e0b; margin - top: 20px; }
+                    .rubric - header { display: flex; align - items: center; gap: 8px; font - size: 0.8rem; font - weight: 950; color: #b45309; text - transform: uppercase; margin - bottom: 12px; letter - spacing: 0.5px; }
+                    .rubric - content { font - size: 1rem; color: #78350f; line - height: 1.6; font - weight: 600; white - space: pre - wrap; }
+                    .q - card - footer { border - top: 2px dashed #f1f5f9; margin - top: 24px; padding - top: 16px; display: flex; justify - content: flex - end; }
+                    .bobot - tag { display: flex; align - items: center; gap: 8px; font - size: 0.9rem; color: #64748b; font - weight: 700; padding: 8px 16px; background: #f8fafc; border - radius: 50px; border: 2px solid #f1f5f9; }
+                    .bobot - tag strong { color: #0f172a; font - size: 1rem; font - weight: 900; }
+                    .empty - questions - v2 { text - align: center; padding: 60px 20px; background: white; border - radius: 24px; border: 2px dashed #e2e8f0; color: #94a3b8; }
+                    .empty - illustration { color: #e2e8f0; margin - bottom: 16px; }
+                    .empty - questions - v2 h3 { font - size: 1.3rem; color: #475569; margin - bottom: 8px; font - weight: 800; }
+                    .empty - questions - v2 p { font - size: 1rem; }
+                    .animate - fade -in { animation: fadeIn 0.4s cubic- bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                    .questions - scroll - v2:: -webkit - scrollbar { width: 8px; }
+                    .questions - scroll - v2:: -webkit - scrollbar - track { background: transparent; }
+                    .questions - scroll - v2:: -webkit - scrollbar - thumb { background: #e2e8f0; border - radius: 10px; }
+                    .questions - scroll - v2:: -webkit - scrollbar - thumb:hover { background: #cbd5e1; }
 
                     /* Modal Styles */
                     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
@@ -1285,7 +1061,7 @@ const ExamManagement = () => {
                     .modal-footer { display: flex; justify-content: flex-end; gap: 16px; margin-top: 32px; }
                     
                     .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-                    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
                     .form-group { margin-bottom: 20px; }
                     .form-group label { display: block; margin-bottom: 10px; font-size: 0.85rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; }
@@ -1295,13 +1071,13 @@ const ExamManagement = () => {
                     .btn-secondary { background: #f1f5f9; color: #475569; padding: 14px 28px; border-radius: 14px; font-weight: 700; border: none; cursor: pointer; transition: all 0.2s; }
                     .btn-secondary:hover { background: #e2e8f0; color: #1e293b; }
                     
-                    .btn-primary { 
-                        background: #3b82f6; color: white; padding: 12px 24px; border-radius: 14px; font-weight: 700; 
+                    .btn-primary {
+                        background: #3b82f6; color: white; padding: 12px 24px; border-radius: 14px; font-weight: 700;
                         display: flex; align-items: center; gap: 10px; transition: all 0.3s; border: none; cursor: pointer;
                         box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
                     }
                     .btn-primary:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.3); }
-                `}</style>
+`}</style>
 
                 </div>
 
@@ -1549,7 +1325,7 @@ const ExamManagement = () => {
                 <div className="tabs-container">
                     {(userRole === 'ADMIN' || userRole === 'TU') && (
                         <button
-                            className={`nav-tab ${activeTab === 'events' ? 'active' : ''}`}
+                            className={`nav - tab ${activeTab === 'events' ? 'active' : ''} `}
                             onClick={() => setActiveTab('events')}
                         >
                             <Calendar size={18} />
@@ -1585,7 +1361,7 @@ const ExamManagement = () => {
                                                 {userRole === 'ADMIN' && (
                                                     <button
                                                         onClick={() => handleToggleEventStatus(event.id)}
-                                                        className={`icon-btn ${event.statusAktif ? 'deactivate' : 'activate'}`}
+                                                        className={`icon - btn ${event.statusAktif ? 'deactivate' : 'activate'} `}
                                                         title={event.statusAktif ? 'Nonaktifkan' : 'Aktifkan'}
                                                     >
                                                         {event.statusAktif ? <PowerOff size={16} /> : <Power size={16} />}
@@ -1752,13 +1528,6 @@ const ExamManagement = () => {
                                                                 </button>
                                                                 <button
                                                                     className="btn-lengkapi"
-                                                                    style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0' }}
-                                                                    onClick={() => handleManagePraktek(exam)}
-                                                                >
-                                                                    Input Nilai Praktek
-                                                                </button>
-                                                                <button
-                                                                    className="btn-lengkapi"
                                                                     style={{ background: '#f8fafc', color: '#64748b', border: '1.5px solid #e2e8f0' }}
                                                                     onClick={() => {
                                                                         setUploadingExam(exam);
@@ -1916,7 +1685,7 @@ const ExamManagement = () => {
                                         if (!ev || !ev.tanggalMulai) return null;
                                         const isInvalid = new Date(ev.tanggalSelesai) < new Date(ev.tanggalMulai);
                                         return (
-                                            <div className={`event - range - info ${isInvalid ? 'invalid' : ''} `}>
+                                            <div className={`event-range-info ${isInvalid ? 'invalid' : ''}`}>
                                                 <Info size={16} />
                                                 <div className="flex-1">
                                                     <p className="font-semibold">{isInvalid ? '⚠️ Rentang Waktu Event Tidak Valid' : '📅 Rentang Waktu Event'}</p>
@@ -1945,7 +1714,7 @@ const ExamManagement = () => {
                                                     const ev = events.find(e => e.id == examForm.eventId);
                                                     if (!ev || !ev.tanggalSelesai) return '';
                                                     const isInvalid = new Date(ev.tanggalSelesai) < new Date(ev.tanggalMulai);
-                                                    return isInvalid ? '' : `${ev.tanggalSelesai} T23: 59`;
+                                                    return isInvalid ? '' : `${ev.tanggalSelesai}T23:59`;
                                                 })()}
                                                 required
                                             />
@@ -1980,231 +1749,358 @@ const ExamManagement = () => {
             {/* End of main list return block */}
             <style>{`
                 .modal-overlay {
-                position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(8px);
-            z-index: 9999;
+                    position: fixed;
+                    top: 0; left: 0;
+                    width: 100%; height: 100%;
+                    background: rgba(15, 23, 42, 0.75);
+                    backdrop-filter: blur(8px);
+                    z-index: 9999;
                 }
-            .custom-scrollbar::-webkit-scrollbar {width: 8px; }
-            .custom-scrollbar::-webkit-scrollbar-track {background: transparent; }
-            .custom-scrollbar::-webkit-scrollbar-thumb {background: #cbd5e1; border-radius: 20px; border: 2px solid transparent; background-clip: content-box; }
-            .custom-scrollbar::-webkit-scrollbar-thumb:hover {background: #94a3b8; }
+                .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; border: 2px solid transparent; background-clip: content-box; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-            .exam-management {padding: 0; }
-            .page-header h1 { font-size: 2.25rem; font-weight: 900; color: #0f172a; letter-spacing: -1px; margin: 0; }
-            .page-header p { color: #64748b; font-size: 1rem; margin-top: 4px; }
+                .exam-management { padding: 0; }
+                .page-header h1 { font-size: 2.25rem; font-weight: 900; color: #0f172a; letter-spacing: -1px; margin: 0; }
+                .page-header p { color: #64748b; font-size: 1rem; margin-top: 4px; }
 
-            .btn-primary {
-                background: #3b82f6;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 14px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
+                .btn-primary {
+                    background: #3b82f6;
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 14px;
+                    font-weight: 700;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    border: none;
+                    cursor: pointer;
+                    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
                 }
-            .btn-primary:hover {background: #2563eb; transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.3); }
+                .btn-primary:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.3); }
 
-            .tabs-container {
-                display: flex;
-            gap: 12px;
-            margin-bottom: 40px;
-            background: #f1f5f9;
-            padding: 6px;
-            border-radius: 20px;
-            width: fit-content;
-                }
-
-            .nav-tab {
-                background: none;
-                border: none;
-                padding: 12px 28px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                font-weight: 700;
-                color: #64748b;
-                cursor: pointer;
-                border-radius: 16px;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            .nav-tab.active { background: white; color: #3b82f6; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-
-            .my-assignments-summary {
-                background: white;
-            padding: 24px;
-            border-radius: 20px;
-            margin-bottom: 32px;
-            border: 1.5px solid #f1f5f9;
+                .tabs-container {
+                    display: flex;
+                    gap: 12px;
+                    margin-bottom: 40px;
+                    background: #f1f5f9;
+                    padding: 6px;
+                    border-radius: 20px;
+                    width: fit-content;
                 }
 
-            .my-assignments-summary h3 {
-                display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.1rem;
-            font-weight: 800;
-            color: #0f172a;
-            margin-bottom: 20px;
+                .nav-tab {
+                    background: none;
+                    border: none;
+                    padding: 12px 28px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-weight: 700;
+                    color: #64748b;
+                    cursor: pointer;
+                    border-radius: 16px;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .nav-tab.active { background: white; color: #3b82f6; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+
+                .my-assignments-summary {
+                    background: white;
+                    padding: 24px;
+                    border-radius: 20px;
+                    margin-bottom: 32px;
+                    border: 1.5px solid #f1f5f9;
                 }
 
-            .assignments-grid {display: flex; flex-wrap: wrap; gap: 12px; }
-
-            .assignment-badge {
-                display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
-            background: #f8fafc;
-            border-radius: 14px;
-            border: 1.5px solid #e2e8f0;
+                .my-assignments-summary h3 {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    color: #0f172a;
+                    margin-bottom: 20px;
                 }
 
-            .badge-mapel { font-weight: 800; color: #3b82f6; }
-            .badge-kelas { font-size: 0.8rem; color: #64748b; background: white; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
+                .assignments-grid { display: flex; flex-wrap: wrap; gap: 12px; }
 
-            .event-range-info {
-                background: #f0f9ff;
-            padding: 20px;
-            border-radius: 18px;
-            margin-bottom: 32px;
-            border: 1.5px solid #bae6fd;
-            color: #0369a1;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: flex-start;
-            gap: 16px;
+                .assignment-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px 20px;
+                    background: #f8fafc;
+                    border-radius: 14px;
+                    border: 1.5px solid #e2e8f0;
                 }
-            .event-range-info.invalid {background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 
+                .badge-mapel { font-weight: 800; color: #3b82f6; }
+                .badge-kelas { font-size: 0.8rem; color: #64748b; background: white; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
 
-            .event-grid {display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 32px; }
-            .event-card {
-                background: white;
-            border-radius: 30px;
-            border: 1.5px solid #f1f5f9;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
+                .event-range-info {
+                    background: #f0f9ff;
+                    padding: 20px;
+                    border-radius: 18px;
+                    margin-bottom: 32px;
+                    border: 1.5px solid #bae6fd;
+                    color: #0369a1;
+                    font-size: 0.95rem;
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 16px;
                 }
-            .event-card:hover {transform: translateY(-12px); box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.08); border-color: #3b82f6; }
+                .event-range-info.invalid { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 
-            .event-header {padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f8fafc; }
-            .badge-active {background: #f0fdf4; color: #16a34a; padding: 8px 16px; border-radius: 50px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 8px; border: 1.5px solid #bbf7d0; }
-            .badge-inactive {background: #fef2f2; color: #ef4444; padding: 8px 16px; border-radius: 50px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 8px; border: 1.5px solid #fecaca; }
 
-            .icon-btn {background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 10px; border-radius: 12px; cursor: pointer; color: #64748b; transition: all 0.2s; }
-            .icon-btn:hover {transform: scale(1.1); }
-            .icon-btn.edit:hover {background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
-            .icon-btn.delete:hover {background: #fef2f2; color: #ef4444; border-color: #fecaca; }
-            .icon-btn.activate:hover {background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
-            .icon-btn.deactivate:hover {background: #fffbeb; color: #d97706; border-color: #fde68a; }
+                .event-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 32px; }
+                .event-card {
+                    background: white;
+                    border-radius: 30px;
+                    border: 1.5px solid #f1f5f9;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                    position: relative;
+                }
+                .event-card:hover { transform: translateY(-12px); box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.08); border-color: #3b82f6; }
 
-            .event-options {display: flex; gap: 8px; align-items: center; }
+                .event-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #f8fafc; }
+                .badge-active { background: #f0fdf4; color: #16a34a; padding: 8px 16px; border-radius: 50px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 8px; border: 1.5px solid #bbf7d0; }
+                .badge-inactive { background: #fef2f2; color: #ef4444; padding: 8px 16px; border-radius: 50px; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; gap: 8px; border: 1.5px solid #fecaca; }
 
-            .event-body {padding: 28px; flex: 1; }
-            .event-body h3 {color: #0f172a; margin-bottom: 20px; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px; }
-            .event-info {display: grid; gap: 12px; }
-            .event-info p {font-size: 0.95rem; color: #64748b; display: flex; align-items: center; gap: 10px; font-weight: 500; }
-            .event-info span {font-weight: 800; color: #94a3b8; width: 100px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+                .icon-btn { background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 10px; border-radius: 12px; cursor: pointer; color: #64748b; transition: all 0.2s; }
+                .icon-btn:hover { transform: scale(1.1); }
+                .icon-btn.edit:hover { background: #eff6ff; color: #3b82f6; border-color: #3b82f6; }
+                .icon-btn.delete:hover { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+                .icon-btn.activate:hover { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+                .icon-btn.deactivate:hover { background: #fffbeb; color: #d97706; border-color: #fde68a; }
 
-            .event-footer {padding: 24px; background: #f8fafc; border-top: 1.5px solid #f1f5f9; }
-            .btn-outline {background: white; border: 2px solid #e2e8f0; color: #475569; padding: 14px; border-radius: 16px; font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.3s; width: 100%; }
-            .btn-outline:hover {background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 15px 20px -5px rgba(59, 130, 246, 0.25); }
+                .event-options { display: flex; gap: 8px; align-items: center; }
 
-            .selection-bar {display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 20px; background: white; padding: 12px; border-radius: 20px; border: 1.5px solid #f1f5f9; }
-            .event-selector {flex: 1; padding: 12px 20px; border-radius: 14px; border: 2px solid #f1f5f9; font-weight: 700; color: #1e293b; outline: none; transition: all 0.2s; background: #f8fafc; cursor: pointer; }
-            .event-selector:focus {border-color: #3b82f6; background: white; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.05); }
-            .empty-state {padding: 100px 0; text-align: center; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 20px; background: white; border-radius: 32px; border: 3px dashed #e2e8f0; }
-            .empty-state p {font-size: 1.1rem; font-weight: 600; color: #64748b; }
+                .event-body { padding: 28px; flex: 1; }
+                .event-body h3 { color: #0f172a; margin-bottom: 20px; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px; }
+                .event-info { display: grid; gap: 12px; }
+                .event-info p { font-size: 0.95rem; color: #64748b; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+                .event-info span { font-weight: 800; color: #94a3b8; width: 100px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
 
-            .table-card {background: white; border-radius: 32px; border: 1.5px solid #f1f5f9; box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.03); overflow: hidden; }
-            .exam-table {width: 100%; border-collapse: collapse; }
-            .exam-table th {background: #f8fafc; padding: 24px; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 1.5px; border-bottom: 2px solid #f1f5f9; }
-            .exam-table td {padding: 24px; border-bottom: 1.5px solid #f8fafc; font-size: 1rem; color: #334155; }
-            .mapel-cell { font-weight: 950; color: #0f172a; font-size: 1.15rem; letter-spacing: -0.5px; }
-            .time-cell { display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 0.95rem; font-weight: 700; background: #f1f5f9; padding: 8px 16px; border-radius: 12px; width: fit-content; }
-            .token-badge {background: #eff6ff; border: 2.5px dashed #3b82f6; padding: 8px 18px; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 950; color: #2563eb; display: inline-block; font-size: 1.25rem; letter-spacing: 2px; }
-            .duration-badge {background: #fffbeb; color: #92400e; padding: 8px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 800; border: 1.5px solid #fef3c7; }
-            .btn-lengkapi {background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 800; font-size: 0.9rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 6px 12px rgba(59, 130, 246, 0.15); }
-            .btn-lengkapi:hover {background: #2563eb; transform: scale(1.05); box-shadow: 0 12px 20px rgba(59, 130, 246, 0.25); }
-            .btn-icon-outline {background: white; border: 2px solid #f1f5f9; color: #64748b; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
-            .btn-icon-outline:hover {background: #3b82f6; color: white; border-color: #3b82f6; }
+                .event-footer { padding: 24px; background: #f8fafc; border-top: 1.5px solid #f1f5f9; }
+                .btn-outline { background: white; border: 2px solid #e2e8f0; color: #475569; padding: 14px; border-radius: 16px; font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: all 0.3s; width: 100%; }
+                .btn-outline:hover { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 15px 20px -5px rgba(59, 130, 246, 0.25); }
 
-            .modal-overlay {position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-            .modal-content {background: white; border-radius: 32px; width: 100%; max-width: 550px; padding: 40px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); }
-            .animate-slide-up {animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-            @keyframes slideUp {from {opacity: 0; transform: translateY(20px); } to {opacity: 1; transform: translateY(0); } }
-            .modal-header h3 { font-size: 1.75rem; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
-            .form-group label {display: block; margin-bottom: 10px; font-size: 0.85rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; }
-            .form-group input, .form-group select, .form-group textarea {width: 100%; padding: 16px; border: 2.5px solid #f1f5f9; border-radius: 16px; font-size: 1rem; font-weight: 600; color: #1e293b; background: #f8fafc; transition: all 0.2s; }
-            .form-group input:focus, .form-group select:focus, .form-group textarea:focus {border-color: #3b82f6; background: white; outline: none; box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.08); }
-            .auto-generate-box {background: #f8fafc; padding: 16px; border-radius: 16px; border: 2.5px dashed #cbd5e1; display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 0.9rem; }
-            .btn-refresh-token {background: #f1f5f9; border: 1.5px solid #e2e8f0; color: #64748b; padding: 6px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
-            .btn-refresh-token:hover {background: #e2e8f0; color: #3b82f6; transform: rotate(180deg); }
-            .modal-footer {display: flex; justify-content: flex-end; gap: 16px; margin-top: 32px; }
-            .btn-secondary {background: #f1f5f9; color: #475569; padding: 14px 28px; border-radius: 14px; font-weight: 700; border: none; cursor: pointer; }
+                .selection-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 20px; background: white; padding: 12px; border-radius: 20px; border: 1.5px solid #f1f5f9; }
+                .event-selector { flex: 1; padding: 12px 20px; border-radius: 14px; border: 2px solid #f1f5f9; font-weight: 700; color: #1e293b; outline: none; transition: all 0.2s; background: #f8fafc; cursor: pointer; }
+                .event-selector:focus { border-color: #3b82f6; background: white; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.05); }
+                .empty-state { padding: 100px 0; text-align: center; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 20px; background: white; border-radius: 32px; border: 3px dashed #e2e8f0; }
+                .empty-state p { font-size: 1.1rem; font-weight: 600; color: #64748b; }
 
-            .back-btn {background: #f8fafc; border: 1.5px solid #e2e8f0; color: #64748b; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
-            .back-btn:hover {background: #fff; color: #3b82f6; border-color: #3b82f6; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1); }
+                .table-card { background: white; border-radius: 32px; border: 1.5px solid #f1f5f9; box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.03); overflow: hidden; }
+                .exam-table { width: 100%; border-collapse: collapse; }
+                .exam-table th { background: #f8fafc; padding: 24px; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 1.5px; border-bottom: 2px solid #f1f5f9; }
+                .exam-table td { padding: 24px; border-bottom: 1.5px solid #f8fafc; font-size: 1rem; color: #334155; }
+                .mapel-cell { font-weight: 950; color: #0f172a; font-size: 1.15rem; letter-spacing: -0.5px; }
+                .time-cell { display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 0.95rem; font-weight: 700; background: #f1f5f9; padding: 8px 16px; border-radius: 12px; width: fit-content; }
+                .token-badge { background: #eff6ff; border: 2.5px dashed #3b82f6; padding: 8px 18px; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 950; color: #2563eb; display: inline-block; font-size: 1.25rem; letter-spacing: 2px; }
+                .duration-badge { background: #fffbeb; color: #92400e; padding: 8px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 800; border: 1.5px solid #fef3c7; }
+                .btn-lengkapi { background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 800; font-size: 0.9rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 6px 12px rgba(59, 130, 246, 0.15); }
+                .btn-lengkapi:hover { background: #2563eb; transform: scale(1.05); box-shadow: 0 12px 20px rgba(59, 130, 246, 0.25); }
+                .btn-icon-outline { background: white; border: 2px solid #f1f5f9; color: #64748b; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+                .btn-icon-outline:hover { background: #3b82f6; color: white; border-color: #3b82f6; }
+
+                .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+                .modal-content { background: white; border-radius: 32px; width: 100%; max-width: 550px; padding: 40px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); }
+                .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                .modal-header h3 { font-size: 1.75rem; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
+                .form-group label { display: block; margin-bottom: 10px; font-size: 0.85rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; }
+                .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 16px; border: 2.5px solid #f1f5f9; border-radius: 16px; font-size: 1rem; font-weight: 600; color: #1e293b; background: #f8fafc; transition: all 0.2s; }
+                .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; background: white; outline: none; box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.08); }
+                .auto-generate-box { background: #f8fafc; padding: 16px; border-radius: 16px; border: 2.5px dashed #cbd5e1; display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 0.9rem; }
+                .btn-refresh-token { background: #f1f5f9; border: 1.5px solid #e2e8f0; color: #64748b; padding: 6px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+                .btn-refresh-token:hover { background: #e2e8f0; color: #3b82f6; transform: rotate(180deg); }
+                .modal-footer { display: flex; justify-content: flex-end; gap: 16px; margin-top: 32px; }
+                .btn-secondary { background: #f1f5f9; color: #475569; padding: 14px 28px; border-radius: 14px; font-weight: 700; border: none; cursor: pointer; }
+
+                .back-btn { background: #f8fafc; border: 1.5px solid #e2e8f0; color: #64748b; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+                .back-btn:hover { background: #fff; color: #3b82f6; border-color: #3b82f6; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1); }
 
             /* Questions View Styles (Legacy fallback fallback) */
-            .questions-layout {display: grid; grid-template-columns: 460px 1fr !important; gap: 40px; align-items: start; }
-            .q-type-switcher {display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 6px; border-radius: 16px; margin-bottom: 28px; gap: 6px; }
-            .q-type-btn {border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 0.85rem; color: #475569; background: transparent; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-            .q-type-btn.active {background: white; color: #3b82f6; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); transform: scale(1.02); }
+            .questions-layout { display: grid; grid-template-columns: 460px 1fr!important; gap: 40px; align-items: start; }
+            .q-type-switcher { display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 6px; border-radius: 16px; margin-bottom: 28px; gap: 6px; }
+            .q-type-btn { border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 0.85rem; color: #475569; background: transparent; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+            .q-type-btn.active { background: white; color: #3b82f6; box-shadow: 0 10px 15px-3px rgba(0, 0, 0, 0.1); transform: scale(1.02); }
 
             .form-title { font-size: 1.25rem; color: #0f172a; margin-bottom: 28px; font-weight: 900; border-left: 6px solid #3b82f6; padding-left: 16px; letter-spacing: -0.5px; }
 
-            .question-form-card.form-group {margin-bottom: 24px; display: flex !important; flex-direction: column !important; width: 100%; }
-            .question-form-card label {display: block !important; font-weight: 800; color: #334155; margin-bottom: 10px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-            .question-form-card textarea, .question-form-card input, .question-form-card select {width: 100%; font-family: inherit; border: 2.5px solid #e2e8f0; border-radius: 16px; padding: 16px; font-size: 1rem; color: #1e293b; background: #f8fafc; transition: all 0.2s; }
-            .question-form-card textarea:focus, .question-form-card input:focus {border-color: #3b82f6; background: white; outline: none; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+            .question-form-card.form-group { margin-bottom: 24px; display: flex!important; flex-direction: column!important; width: 100%; }
+            .question-form-card label { display: block!important; font-weight: 800; color: #334155; margin-bottom: 10px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
+            .question-form-card textarea, .question-form-card input, .question-form-card select { width: 100%; font-family: inherit; border: 2.5px solid #e2e8f0; border-radius: 16px; padding: 16px; font-size: 1rem; color: #1e293b; background: #f8fafc; transition: all 0.2s; }
+            .question-form-card textarea:focus, .question-form-card input:focus { border-color: #3b82f6; background: white; outline: none; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 
-            .opt-input-wrapper {display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-            .opt-input-letter {background: #f1f5f9; color: #64748b; font-weight: 900; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1rem; border: 2px solid #e2e8f0; }
-            .opt-input-wrapper input {flex: 1; }
+            .opt-input-wrapper { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+            .opt-input-letter { background: #f1f5f9; color: #64748b; font-weight: 900; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1rem; border: 2px solid #e2e8f0; }
+            .opt-input-wrapper input { flex: 1; }
 
-            .questions-container {display: flex; flex-direction: column; gap: 24px; max-height: calc(100vh - 250px); overflow-y: auto; padding-right: 12px; padding-bottom: 20px; }
-            .question-item {background: #fff; border: 2.5px solid #f1f5f9; border-radius: 24px; padding: 28px; transition: all 0.3s; }
-            .question-item:hover {border-color: #3b82f6; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
-            .question-header {display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+            .questions-container { display: flex; flex-direction: column; gap: 24px; max-height: calc(100vh - 250px); overflow-y: auto; padding-right: 12px; padding-bottom: 20px; }
+            .question-item { background: #fff; border: 2.5px solid #f1f5f9; border-radius: 24px; padding: 28px; transition: all 0.3s; }
+            .question-item:hover { border-color: #3b82f6; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
+            .question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
             .q-number { font-size: 0.8rem; font-weight: 900; color: #3b82f6; text-transform: uppercase; background: #eff6ff; padding: 8px 16px; border-radius: 12px; letter-spacing: 1px; border: 1.5px solid #dbeafe; }
-            .q-type-badge {font-size: 0.75rem; font-weight: 800; color: #64748b; background: #f1f5f9; padding: 4px 12px; border-radius: 50px; margin-left: 10px; }
+            .q-type-badge { font-size: 0.75rem; font-weight: 800; color: #64748b; background: #f1f5f9; padding: 4px 12px; border-radius: 50px; margin-left: 10px; }
 
-            .q-actions {display: flex; gap: 10px; }
-            .q-actions button {background: white; border: 1.5px solid #e2e8f0; cursor: pointer; padding: 10px; border-radius: 12px; transition: all 0.2s; color: #64748b; }
-            .q-actions .edit-btn:hover {color: #3b82f6; border-color: #3b82f6; background: #eff6ff; }
-            .q-actions .delete-btn:hover {color: #ef4444; border-color: #fee2e2; background: #fef2f2; }
+            .q-actions { display: flex; gap: 10px; }
+            .q-actions button { background: white; border: 1.5px solid #e2e8f0; cursor: pointer; padding: 10px; border-radius: 12px; transition: all 0.2s; color: #64748b; }
+            .q-actions.edit-btn:hover { color: #3b82f6; border-color: #3b82f6; background: #eff6ff; }
+            .q-actions.delete-btn:hover { color: #ef4444; border-color: #fee2e2; background: #fef2f2; }
 
-            .q-body {margin-bottom: 24px; }
+            .q-body { margin-bottom: 24px; }
             .q-text { font-size: 1.15rem; color: #0f172a; line-height: 1.6; font-weight: 700; }
-            .q-options {display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+            .q-options { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
             .opt-item { font-size: 0.95rem; padding: 16px; background: #fff; border-radius: 14px; border: 2.5px solid #f1f5f9; display: flex; gap: 12px; align-items: start; transition: all 0.2s; }
-            .opt-item:hover {border-color: #e2e8f0; background: #f8fafc; }
-            .opt-item.kunci {background: #f0fdf4; border-color: #bbf7d0; color: #166534; font-weight: 800; }
-            .opt-letter {color: #94a3b8; font-weight: 900; background: #f1f5f9; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; border: 1.5px solid #e2e8f0; }
-            .opt-item.kunci .opt-letter {background: #22c55e; color: white; border-color: #22c55e; }
+            .opt-item:hover { border-color: #e2e8f0; background: #f8fafc; }
+            .opt-item.kunci { background: #f0fdf4; border-color: #bbf7d0; color: #166534; font-weight: 800; }
+            .opt-letter { color: #94a3b8; font-weight: 900; background: #f1f5f9; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; border: 1.5px solid #e2e8f0; }
+            .opt-item.kunci.opt-letter { background: #22c55e; color: white; border-color: #22c55e; }
 
             .q-kunci { margin-top: 24px; background: #fffbeb; padding: 20px; border-radius: 20px; border-left: 6px solid #f59e0b; }
-            .q-kunci label {display: block; font-size: 0.8rem; font-weight: 900; color: #b45309; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+            .q-kunci label { display: block; font-size: 0.8rem; font-weight: 900; color: #b45309; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
             .q-kunci p { font-size: 1rem; color: #78350f; margin: 0; line-height: 1.6; font-weight: 600; }
 
             .q-footer { border-top: 2.5px solid #f1f5f9; padding-top: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 0.95rem; color: #64748b; font-weight: 800; }
             .total-weight { background: #0f172a; color: white; padding: 10px 20px; border-radius: 50px; font-size: 0.9rem; font-weight: 900; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-            .total-weight.valid {background: #22c55e; }
-            .btn-submit-q { width: 100%; justify-content: center; padding: 20px !important; margin-top: 16px; font-weight: 900 !important; font-size: 1.1rem !important; border-radius: 18px !important; }
-            .btn-cancel-edit {background: white; border: 2.5px solid #e2e8f0; color: #64748b; padding: 16px; border-radius: 18px; font-weight: 800; width: 100%; margin-top: 16px; cursor: pointer; transition: all 0.2s; }
-            .btn-cancel-edit:hover {background: #f8fafc; border-color: #94a3b8; color: #1e293b; }
+            .total-weight.valid { background: #22c55e; }
+            .btn-submit-q { width: 100%; justify-content: center; padding: 20px!important; margin-top: 16px; font-weight: 900!important; font-size: 1.1rem!important; border-radius: 18px!important; }
+            .btn-cancel-edit { background: white; border: 2.5px solid #e2e8f0; color: #64748b; padding: 16px; border-radius: 18px; font-weight: 800; width: 100%; margin-top: 16px; cursor: pointer; transition: all 0.2s; }
+            .btn-cancel-edit:hover { background: #f8fafc; border-color: #94a3b8; color: #1e293b; }
+
+            /* Dark Mode Overrides for Exam Management */
+            [data-theme="dark"] .page-header h1,
+            [data-theme="dark"] .my-assignments-summary h3,
+            [data-theme="dark"] .event-body h3,
+            [data-theme="dark"] .mapel-cell,
+            [data-theme="dark"] .modal-header h3,
+            [data-theme="dark"] .form-title,
+            [data-theme="dark"] .q-text,
+            [data-theme="dark"] .total-weight {
+                color: #f8fafc;
+            }
+
+            [data-theme="dark"] .tabs-container {
+                background: #1e293b;
+            }
+
+            [data-theme="dark"] .nav-tab {
+                color: #94a3b8;
+            }
+
+            [data-theme="dark"] .nav-tab.active {
+                background: #334155;
+                color: #60a5fa;
+            }
+
+            [data-theme="dark"] .my-assignments-summary,
+            [data-theme="dark"] .selection-bar,
+            [data-theme="dark"] .table-card,
+            [data-theme="dark"] .question-item,
+            [data-theme="dark"] .modal-content {
+                background: #1e293b;
+                border-color: #334155;
+            }
+
+            [data-theme="dark"] .assignment-badge {
+                background: #0f172a;
+                border-color: #334155;
+            }
+
+            [data-theme="dark"] .badge-kelas,
+            [data-theme="dark"] .event-footer {
+                background: #0f172a;
+                border-color: #334155;
+            }
+
+            [data-theme="dark"] .event-card {
+                background: #1e293b;
+                border-color: #334155;
+            }
+
+            [data-theme="dark"] .event-card:hover {
+                border-color: #3b82f640;
+            }
+
+            [data-theme="dark"] .event-header,
+            [data-theme="dark"] .exam-table th,
+            [data-theme="dark"] .q-footer {
+                border-color: #334155;
+                background: #0f172a60;
+            }
+
+            [data-theme="dark"] .icon-btn,
+            [data-theme="dark"] .btn-icon-outline,
+            [data-theme="dark"] .back-btn,
+            [data-theme="dark"] .q-actions button {
+                background: #0f172a;
+                border-color: #334155;
+                color: #94a3b8;
+            }
+
+            [data-theme="dark"] .btn-outline {
+                background: #0f172a;
+                border-color: #334155;
+                color: #cbd5e1;
+            }
+
+            [data-theme="dark"] .event-selector,
+            [data-theme="dark"] .form-group input,
+            [data-theme="dark"] .form-group select,
+            [data-theme="dark"] .form-group textarea,
+            [data-theme="dark"] .question-form-card textarea,
+            [data-theme="dark"] .question-form-card input,
+            [data-theme="dark"] .question-form-card select {
+                background: #0f172a;
+                border-color: #334155;
+                color: #f1f5f9;
+            }
+
+            [data-theme="dark"] .time-cell {
+                background: #334155;
+                color: #cbd5e1;
+            }
+
+            [data-theme="dark"] .duration-badge {
+                background: #451a0330;
+                border-color: #78350f40;
+                color: #fbbf24;
+            }
+
+            [data-theme="dark"] .token-badge {
+                background: #1e40af20;
+                border-color: #3b82f660;
+                color: #60a5fa;
+            }
+
+            [data-theme="dark"] .opt-item {
+                background: #0f172a;
+                border-color: #334155;
+                color: #cbd5e1;
+            }
+
+            [data-theme="dark"] .opt-letter {
+                background: #334155;
+                border-color: #475569;
+                color: #94a3b8;
+            }
+
+            [data-theme="dark"] .q-kunci {
+                background: #451a0320;
+                border-left-color: #f59e0b;
+            }
+
+            [data-theme="dark"] .form-group label,
+            [data-theme="dark"] .question-form-card label {
+                color: #94a3b8;
+            }
 `}</style >
         </>
     );

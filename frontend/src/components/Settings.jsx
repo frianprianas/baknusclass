@@ -96,15 +96,11 @@ const Settings = () => {
             </div>
 
             {message && (
-                <div style={{
+                <div className={message.includes('berhasil') ? 'success-msg' : 'error-msg'} style={{
                     padding: '12px 16px',
                     borderRadius: '8px',
                     marginBottom: '20px',
-                    backgroundColor: message.includes('berhasil') ? '#ecfdf5' : '#fef2f2',
-                    color: message.includes('berhasil') ? '#047857' : '#b91c1c',
-                    border: message.includes('berhasil') ? '1px solid #a7f3d0' : '1px solid #fecaca',
-                    fontWeight: '500',
-                    display: message ? 'block' : 'none'
+                    fontWeight: '500'
                 }}>
                     {message}
                 </div>
@@ -201,7 +197,7 @@ const Settings = () => {
                             </div>
                         </div>
 
-                        <div style={{ padding: '15px', backgroundColor: 'var(--primary-light)', borderRadius: '8px', border: '1px solid rgba(26, 115, 232, 0.2)' }}>
+                        <div className="note-box" style={{ padding: '15px', backgroundColor: 'var(--primary-light)', borderRadius: '8px', border: '1px solid rgba(26, 115, 232, 0.2)' }}>
                             <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-dark)', lineHeight: '1.6' }}>
                                 <strong>Catatan:</strong> Pengaturan Tahun Ajaran dan Semester akan menjadi <i>default value</i> saat pembuatan data baru (misal: Ujian Baru) untuk mempermudah alur kerja.
                             </p>
@@ -321,7 +317,7 @@ const Settings = () => {
                             </div>
                         </div>
 
-                        <div style={{ padding: '15px', backgroundColor: 'var(--primary-light)', borderRadius: '8px', border: '1px solid rgba(26, 115, 232, 0.2)' }}>
+                        <div className="note-box" style={{ padding: '15px', backgroundColor: 'var(--primary-light)', borderRadius: '8px', border: '1px solid rgba(26, 115, 232, 0.2)' }}>
                             <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-dark)', lineHeight: '1.6' }}>
                                 <strong>Catatan:</strong> Jika API Key tidak diisi di sini, sistem akan mencoba menggunakan API Key yang ada pada berkas konfigurasi <code>application.yml</code>. Pengisian di form ini akan menimpa (override) pengaturan default sistem.
                                 <br /><br />
@@ -333,13 +329,13 @@ const Settings = () => {
 
                 {/* Zona Berbahaya */}
                 <div className="table-card" style={{ padding: '0', overflow: 'hidden', gridColumn: '1 / -1' }}>
-                    <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 20px', backgroundColor: 'var(--danger-light, #fef2f2)', borderBottom: '1px solid var(--danger-border, #fca5a5)' }}>
+                    <div className="card-header danger-zone-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 20px', backgroundColor: 'var(--danger-light, #fef2f2)', borderBottom: '1px solid var(--danger-border, #fca5a5)' }}>
                         <AlertTriangle size={20} style={{ color: 'var(--danger, #ef4444)' }} />
                         <h2 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--danger-dark, #b91c1c)' }}>Zona Berbahaya (Danger Zone)</h2>
                     </div>
 
                     <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', paddingBottom: '15px', borderBottom: '1px solid var(--border)' }}>
+                        <div className="danger-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', paddingBottom: '15px', borderBottom: '1px solid var(--border)' }}>
                             <div>
                                 <h4 style={{ fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px' }}>Force Logout Semua Siswa</h4>
                                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>Hapus semua sesi login siswa yang aktif dan paksa mereka untuk login kembali.</p>
@@ -350,7 +346,7 @@ const Settings = () => {
                             </button>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', paddingBottom: '15px', borderBottom: '1px solid var(--border)' }}>
+                        <div className="danger-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', paddingBottom: '15px', borderBottom: '1px solid var(--border)' }}>
                             <div>
                                 <h4 style={{ fontWeight: '600', color: 'var(--text-main)', marginBottom: '4px' }}>Clear Cache / Reset Temporary Ujian</h4>
                                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>Menghapus data Cache Redis jika ada masalah sinkronisasi jadwal atau histori ujian sementara.</p>
@@ -375,6 +371,70 @@ const Settings = () => {
                 </div>
 
             </div>
+
+            <style>{`
+            /* Settings Specific Styles */
+            [data-theme="dark"] .table-card {
+                background-color: #1e293b;
+                border: 1px solid #334155 !important;
+            }
+
+            [data-theme="dark"] .card-header {
+                border-bottom: 1px solid #334155 !important;
+                background-color: rgba(255, 255, 255, 0.02) !important;
+            }
+
+            [data-theme="dark"] .form-group label {
+                color: #94a3b8 !important;
+            }
+
+            [data-theme="dark"] input,
+            [data-theme="dark"] select,
+            [data-theme="dark"] textarea {
+                background-color: #0f172a !important;
+                border: 1px solid #334155 !important;
+                color: #f8fafc !important;
+            }
+
+            [data-theme="dark"] .danger-zone-header {
+                background-color: #450a0a !important;
+                border-bottom: 1px solid #7f1d1d !important;
+            }
+
+            [data-theme="dark"] .danger-zone-header h2 {
+                color: #fca5a5 !important;
+            }
+
+            [data-theme="dark"] .note-box {
+                background-color: rgba(59, 130, 246, 0.1) !important;
+                border: 1px solid rgba(59, 130, 246, 0.2) !important;
+                color: #93c5fd !important;
+            }
+
+            [data-theme="dark"] .note-box strong {
+                color: #60a5fa !important;
+            }
+
+            [data-theme="dark"] .danger-item {
+                border-bottom: 1px solid #334155 !important;
+            }
+
+            [data-theme="dark"] .success-msg {
+                background-color: #064e3b !important;
+                color: #a7f3d0 !important;
+                border: 1px solid #065f46 !important;
+            }
+
+            [data-theme="dark"] .error-msg {
+                background-color: #450a0a !important;
+                color: #fca5a5 !important;
+                border: 1px solid #7f1d1d !important;
+            }
+            
+            [data-theme="dark"] h4 {
+                color: #f1f5f9 !important;
+            }
+        `}</style>
         </div>
     );
 };
