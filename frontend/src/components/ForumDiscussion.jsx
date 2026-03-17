@@ -11,10 +11,17 @@ import {
     ChevronLeft,
     Search,
     BookOpen,
-    Pin,
-    PinOff,
+    Pin as PinIcon,
+    PinOff as PinOffIcon,
     Lock,
-    LockOpen
+    LockOpen,
+    Sparkles,
+    Brain,
+    X,
+    Trophy,
+    Activity,
+    Save,
+    RefreshCw
 } from 'lucide-react';
 import SockJS from 'sockjs-client';
 import Stomp from 'stompjs';
@@ -32,6 +39,11 @@ const ForumDiscussion = () => {
     const [guruMapels, setGuruMapels] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [typingUsers, setTypingUsers] = useState({}); // {userId: {name, timestamp}}
+    const [analysis, setAnalysis] = useState(null);
+    const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+    const [savingAnalysis, setSavingAnalysis] = useState(false);
+    const [analyzingTopicId, setAnalyzingTopicId] = useState(null);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
     const stompClientRef = useRef(null);
     const typingTimeoutRef = useRef(null);
 
@@ -300,6 +312,57 @@ const ForumDiscussion = () => {
         }
     };
 
+    const handleGetAnalysis = async (id) => {
+        setLoadingAnalysis(true);
+        setAnalyzingTopicId(id);
+        setShowAnalysisModal(true);
+        try {
+            const res = await axios.get(`/api/forum/topik/${id}/analysis`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAnalysis(res.data);
+        } catch (err) {
+            console.error('Failed to get analysis', err);
+            alert(err.response?.data?.message || 'Gagal mengambil analisis AI');
+            setShowAnalysisModal(false);
+        } finally {
+            setLoadingAnalysis(false);
+        }
+    };
+
+    const handleRefreshAnalysis = async (id) => {
+        setLoadingAnalysis(true);
+        setAnalyzingTopicId(id);
+        try {
+            const res = await axios.get(`/api/forum/topik/${id}/analysis/force`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAnalysis(res.data);
+            alert('Analisis telah diperbarui!');
+        } catch (err) {
+            console.error('Failed to refresh analysis', err);
+            alert('Gagal memperbarui analisis AI');
+        } finally {
+            setLoadingAnalysis(false);
+        }
+    };
+
+    const handleSaveAnalysis = async (id) => {
+        if (!analysis) return;
+        setSavingAnalysis(true);
+        try {
+            const res = await axios.post(`/api/forum/topik/${id}/analysis/save`, analysis, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Analisis berhasil disimpan ke BaknusDrive!');
+        } catch (err) {
+            console.error('Failed to save analysis', err);
+            alert('Gagal menyimpan analisis ke BaknusDrive');
+        } finally {
+            setSavingAnalysis(false);
+        }
+    };
+
     const filteredTopics = topics.filter(t =>
         t.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.namaMapel.toLowerCase().includes(searchQuery.toLowerCase())
@@ -342,7 +405,7 @@ const ForumDiscussion = () => {
                                 <div className="topic-card-header">
                                     <div className="topic-badge">{topic.namaMapel}</div>
                                     <div className="topic-header-badges">
-                                        {topic.isPinned && <div className="pinned-badge"><Pin size={12} fill="currentColor" /> TERSEMAT</div>}
+                                        {topic.isPinned && <div className="pinned-badge"><PinIcon size={12} fill="currentColor" /> TERSEMAT</div>}
                                         {topic.isClosed && <div className="closed-badge"><Lock size={12} /> DITUTUP</div>}
                                     </div>
                                 </div>
@@ -364,7 +427,7 @@ const ForumDiscussion = () => {
                                                 onClick={(e) => handleTogglePin(topic.id, e)}
                                                 title={topic.isPinned ? "Lepas Sematan" : "Sematkan Topik"}
                                             >
-                                                {topic.isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                                                {topic.isPinned ? <PinOffIcon size={14} /> : <PinIcon size={14} />}
                                             </button>
                                             <button
                                                 className={`close-toggle-btn ${topic.isClosed ? 'active' : ''}`}
@@ -379,6 +442,28 @@ const ForumDiscussion = () => {
                                         </div>
                                     )}
                                 </div>
+                                {
+                                    user.role === 'GURU' && (
+                                        <div className="topic-ai-teaser" onClick={(e) => { e.stopPropagation(); handleGetAnalysis(topic.id); }}>
+                                            <div className="ai-teaser-content">
+                                                <div className="ai-sparkle-group">
+                                                    <Sparkles size={16} className="sparkle-primary" />
+                                                    <Brain size={16} className="brain-secondary" />
+                                                </div>
+                                                <div className="ai-teaser-text">
+                                                    <span className="ai-label">BaknusAI Insights</span>
+                                                    <span className="ai-cta">Lihat Analisis Diskusi & Kontribusi</span>
+                                                </div>
+                                            </div>
+                                            {topic.jumlahKomentar > 0 && (
+                                                <div className="ai-status-badge">
+                                                    <Activity size={12} />
+                                                    <span>Analisis Tersedia</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                }
                             </div>
                         )) : (
                             <div className="no-topics">
@@ -480,62 +565,157 @@ const ForumDiscussion = () => {
                         </div>
                     )}
                 </div>
-            )}
+            )
+            }
 
-            {showCreateModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content-forum">
-                        <h2>Buat Topik Diskusi Baru</h2>
-                        <div className="form-group-forum">
-                            <label>Pilih Mata Pelajaran & Kelas</label>
-                            <select
-                                value={newTopic.guruMapelId}
-                                onChange={(e) => setNewTopic({ ...newTopic, guruMapelId: e.target.value })}
-                            >
-                                <option value="">-- Pilih --</option>
-                                {guruMapels.map(gm => (
-                                    <option key={gm.id} value={gm.id}>
-                                        {gm.namaMapel} - {gm.namaKelas || 'Semua'}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="form-group-forum">
-                            <label>Judul Diskusi</label>
-                            <input
-                                type="text"
-                                placeholder="Contoh: Diskusi Bab 1 Eksponen"
-                                value={newTopic.judul}
-                                onChange={(e) => setNewTopic({ ...newTopic, judul: e.target.value })}
-                            />
-                        </div>
-                        <div className="form-group-forum">
-                            <label>Pesan Pemantik / Konten</label>
-                            <textarea
-                                placeholder="Tuliskan pertanyaan atau pengantar diskusi..."
-                                value={newTopic.konten}
-                                onChange={(e) => setNewTopic({ ...newTopic, konten: e.target.value })}
-                            />
-                        </div>
-                        <div className="form-group-forum pin-toggle">
-                            <label className="checkbox-container">
+            {
+                showCreateModal && (
+                    <div className="modal-overlay">
+                        <div className="modal-content-forum">
+                            <h2>Buat Topik Diskusi Baru</h2>
+                            <div className="form-group-forum">
+                                <label>Pilih Mata Pelajaran & Kelas</label>
+                                <select
+                                    value={newTopic.guruMapelId}
+                                    onChange={(e) => setNewTopic({ ...newTopic, guruMapelId: e.target.value })}
+                                >
+                                    <option value="">-- Pilih --</option>
+                                    {guruMapels.map(gm => (
+                                        <option key={gm.id} value={gm.id}>
+                                            {gm.namaMapel} - {gm.namaKelas || 'Semua'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group-forum">
+                                <label>Judul Diskusi</label>
                                 <input
-                                    type="checkbox"
-                                    checked={newTopic.isPinned}
-                                    onChange={(e) => setNewTopic({ ...newTopic, isPinned: e.target.checked })}
+                                    type="text"
+                                    placeholder="Contoh: Diskusi Bab 1 Eksponen"
+                                    value={newTopic.judul}
+                                    onChange={(e) => setNewTopic({ ...newTopic, judul: e.target.value })}
                                 />
-                                <span className="checkmark"></span>
-                                <span className="label-text">Sematkan Topik (Pin to Top)</span>
-                            </label>
-                        </div>
-                        <div className="modal-actions-forum">
-                            <button className="cancel-btn" onClick={() => setShowCreateModal(false)}>Batal</button>
-                            <button className="confirm-btn" onClick={handleCreateTopic}>Terbitkan</button>
+                            </div>
+                            <div className="form-group-forum">
+                                <label>Pesan Pemantik / Konten</label>
+                                <textarea
+                                    placeholder="Tuliskan pertanyaan atau pengantar diskusi..."
+                                    value={newTopic.konten}
+                                    onChange={(e) => setNewTopic({ ...newTopic, konten: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group-forum pin-toggle">
+                                <label className="checkbox-container">
+                                    <input
+                                        type="checkbox"
+                                        checked={newTopic.isPinned}
+                                        onChange={(e) => setNewTopic({ ...newTopic, isPinned: e.target.checked })}
+                                    />
+                                    <span className="checkmark"></span>
+                                    <span className="label-text">Sematkan Topik (Pin to Top)</span>
+                                </label>
+                            </div>
+                            <div className="modal-actions-forum">
+                                <button className="cancel-btn" onClick={() => setShowCreateModal(false)}>Batal</button>
+                                <button className="confirm-btn" onClick={handleCreateTopic}>Terbitkan</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+            {
+                showAnalysisModal && (
+                    <div className="analysis-modal-overlay" onClick={() => setShowAnalysisModal(false)}>
+                        <div className="analysis-modal-content" onClick={e => e.stopPropagation()}>
+                            <div className="analysis-header">
+                                <div className="analysis-title">
+                                    <Sparkles className="sparkles-icon" size={24} />
+                                    <h2>Analisis BaknusAI</h2>
+                                </div>
+                                <button className="close-modal" onClick={() => setShowAnalysisModal(false)}>
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            {loadingAnalysis ? (
+                                <div className="analysis-loading">
+                                    <div className="loading-dots">
+                                        <span></span><span></span><span></span>
+                                    </div>
+                                    <p>BaknusAI sedang membaca seluruh diskusi...</p>
+                                </div>
+                            ) : analysis && (
+                                <div className="analysis-body">
+                                    <div className="analysis-action-bar animate-fade-in">
+                                        <button
+                                            className="refresh-analysis-btn"
+                                            onClick={() => handleRefreshAnalysis(analyzingTopicId || selectedTopic?.id || analysis?.topikId)}
+                                            disabled={loadingAnalysis}
+                                            title="Perbarui Analisis (Sesuai Komentar Terbaru)"
+                                        >
+                                            <RefreshCw size={18} className={loadingAnalysis ? 'spin' : ''} />
+                                            <span>Perbarui</span>
+                                        </button>
+                                        <button
+                                            className="save-drive-btn"
+                                            onClick={() => handleSaveAnalysis(analyzingTopicId || selectedTopic?.id || analysis?.topikId)}
+                                            disabled={savingAnalysis}
+                                        >
+                                            <Save size={18} />
+                                            <span>{savingAnalysis ? 'Menyimpan...' : 'Simpan ke BaknusDrive'}</span>
+                                        </button>
+                                    </div>
+                                    <div className="analysis-section summary-section animate-slide-up">
+                                        <div className="section-title">
+                                            <Brain size={20} />
+                                            <h3>Ikhtisar Diskusi</h3>
+                                        </div>
+                                        <div className="summary-card">
+                                            {analysis.ringkasan}
+                                        </div>
+                                    </div>
+
+                                    <div className="analysis-grid-results">
+                                        <div className="analysis-section active-users-section animate-slide-up" style={{ animationDelay: '0.1s' }}>
+                                            <div className="section-title">
+                                                <Activity size={20} />
+                                                <h3>Siswa Paling Aktif</h3>
+                                            </div>
+                                            <div className="active-users-list">
+                                                {analysis.userPalingAktif.map((u, i) => (
+                                                    <div key={i} className="active-user-item">
+                                                        <span className="user-name">{u.nama}</span>
+                                                        <span className="msg-count">{u.jumlahPesan} Pesan</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="analysis-section top-contributors-section animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                                            <div className="section-title">
+                                                <Trophy size={20} />
+                                                <h3>Kontributor Terbaik</h3>
+                                            </div>
+                                            <div className="contributors-list">
+                                                {analysis.kontributorTerbaik.map((u, i) => (
+                                                    <div key={i} className="contributor-item">
+                                                        <div className="contributor-info-top">
+                                                            <span className="user-name">{u.nama}</span>
+                                                            <Trophy size={14} className="trophy-icon" />
+                                                        </div>
+                                                        <p className="contributor-reason">{u.alasan}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 

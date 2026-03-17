@@ -43,6 +43,9 @@ public class ForumTopik {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(columnDefinition = "CLOB")
+    private String aiAnalysis;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

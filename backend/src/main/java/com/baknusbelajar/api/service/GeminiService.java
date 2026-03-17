@@ -197,7 +197,11 @@ public class GeminiService {
                                 throw new RuntimeException("Konten AI kosong");
                             }
 
-                            return parts.get(0).get("text").trim();
+                            String text = parts.get(0).get("text");
+                            if (text == null || text.trim().isEmpty()) {
+                                throw new RuntimeException("AI memberikan jawaban kosong");
+                            }
+                            return text.trim();
                         } catch (RuntimeException re) {
                             throw re;
                         } catch (Exception e) {
@@ -210,5 +214,45 @@ public class GeminiService {
                     log.error("Gemini API error (Key rotated?): {}", e.getMessage());
                     return Mono.error(e);
                 });
+    }
+
+    public Mono<String> analyzeForum(String topicTitle, String topicContent, String commentsTranscript) {
+        String prompt = String.format(
+                "Anda adalah asisten AI pendidikan yang cerdas. Tugas Anda adalah meringkas hasil diskusi forum dan menganalisis kontribusi siswa.\n\n"
+                        + "Topik Diskusi: %s\n" +
+                        "Isi Topik: %s\n" +
+                        "Daftar Komentar (Transkrip):\n%s\n\n" +
+                        "Berikan analisis dalam format JSON mentah sebagai berikut:\n" +
+                        "{\n" +
+                        "  \"ringkasan\": \"(ringkasan padat dan jelas tentang apa yang didiskusikan dan apa kesimpulannya)\",\n"
+                        +
+                        "  \"userPalingAktif\": [\n" +
+                        "    { \"nama\": \"(nama siswa)\", \"jumlahPesan\": (angka pesan) }\n" +
+                        "  ],\n" +
+                        "  \"kontributorTerbaik\": [\n" +
+                        "    { \"nama\": \"(nama siswa)\", \"alasan\": \"(alasan mengapa dia dipilih sebagai kontributor terbaik, misalnya karena memberikan jawaban yang benar, pendapat yang solutif, dsb)\" }\n"
+                        +
+                        "  ]\n" +
+                        "}\n" +
+                        "Amati dengan seksama mana jawaban yang benar atau pendapat yang paling berbobot. HANYA kembalikan JSON mentah tersebut.",
+                topicTitle, topicContent, commentsTranscript);
+
+        String priority = appSettingService.getSettingValue("ai_priority_provider", "gemini");
+
+        if (priority.equalsIgnoreCase("gemini")) {
+            return callGemini(prompt)
+                    .onErrorResume(e -> {
+                        if (fallbackAiService.isAvailable()) {
+                            return fallbackAiService.analyzeForum(topicTitle, topicContent, commentsTranscript);
+                        }
+                        return Mono.error(e);
+                    });
+        } else {
+            if (fallbackAiService.isAvailable()) {
+                return fallbackAiService.analyzeForum(topicTitle, topicContent, commentsTranscript);
+            } else {
+                return callGemini(prompt);
+            }
+        }
     }
 }

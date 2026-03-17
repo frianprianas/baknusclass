@@ -2,11 +2,14 @@ package com.baknusbelajar.api.controller;
 
 import com.baknusbelajar.api.dto.forum.ForumKomentarDTO;
 import com.baknusbelajar.api.dto.forum.ForumTopikDTO;
+import com.baknusbelajar.api.dto.forum.ForumAnalysisDTO;
 import com.baknusbelajar.api.service.ForumService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+import java.util.HashMap;
 
 import java.util.List;
 
@@ -65,5 +68,27 @@ public class ForumController {
     @PostMapping("/komentar")
     public ResponseEntity<ForumKomentarDTO> postKomentar(@RequestBody ForumKomentarDTO dto) {
         return ResponseEntity.ok(forumService.postKomentar(dto));
+    }
+
+    @GetMapping("/topik/{id}/analysis")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    public ResponseEntity<ForumAnalysisDTO> getAnalysis(@PathVariable Long id) {
+        return ResponseEntity.ok(forumService.analyzeForum(id));
+    }
+
+    @GetMapping("/topik/{id}/analysis/force")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    public ResponseEntity<ForumAnalysisDTO> getForceAnalysis(@PathVariable Long id) {
+        return ResponseEntity.ok(forumService.forceAnalyzeForum(id));
+    }
+
+    @PostMapping("/topik/{id}/analysis/save")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    public ResponseEntity<Map<String, String>> saveAnalysis(@PathVariable Long id,
+            @RequestBody ForumAnalysisDTO analysis) {
+        String result = forumService.saveAnalysisToDrive(id, analysis);
+        Map<String, String> response = new HashMap<>();
+        response.put("message", result);
+        return ResponseEntity.ok(response);
     }
 }

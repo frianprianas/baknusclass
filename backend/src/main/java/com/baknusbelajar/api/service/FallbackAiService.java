@@ -181,4 +181,28 @@ public class FallbackAiService {
                     return Mono.error(e);
                 });
     }
+
+    public Mono<String> analyzeForum(String topicTitle, String topicContent, String commentsTranscript) {
+        String prompt = String.format(
+                "Anda adalah asisten AI pendidikan yang cerdas. Tugas Anda adalah meringkas hasil diskusi forum dan menganalisis kontribusi siswa.\n\n"
+                        + "Topik Diskusi: %s\n" +
+                        "Isi Topik: %s\n" +
+                        "Daftar Komentar (Transkrip):\n%s\n\n" +
+                        "Berikan analisis dalam format JSON mentah sebagai berikut:\n" +
+                        "{\n" +
+                        "  \"ringkasan\": \"(ringkasan padat dan jelas tentang apa yang didiskusikan dan apa kesimpulannya)\",\n"
+                        +
+                        "  \"userPalingAktif\": [\n" +
+                        "    { \"nama\": \"(nama siswa)\", \"jumlahPesan\": (angka pesan) }\n" +
+                        "  ],\n" +
+                        "  \"kontributorTerbaik\": [\n" +
+                        "    { \"nama\": \"(nama siswa)\", \"alasan\": \"(alasan mengapa dia dipilih sebagai kontributor terbaik, misalnya karena memberikan jawaban yang benar, pendapat yang solutif, dsb)\" }\n"
+                        +
+                        "  ]\n" +
+                        "}\n" +
+                        "Amati dengan seksama mana jawaban yang benar atau pendapat yang paling berbobot. HANYA kembalikan JSON mentah tersebut.",
+                topicTitle, topicContent, commentsTranscript);
+
+        return callApi(prompt);
+    }
 }
