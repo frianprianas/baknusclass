@@ -144,11 +144,13 @@ public class AuthService {
         // Get the real name and profile ID from entity or profiles
         String name = user.getNamaLengkap() != null ? user.getNamaLengkap() : user.getUsername();
         Long profileId = null;
+        Long kelasId = null;
 
         if ("SISWA".equalsIgnoreCase(user.getRole())) {
             var s = siswaRepository.findByUserId(user.getId());
             name = s.map(Siswa::getNamaLengkap).orElse(name);
             profileId = s.map(Siswa::getId).orElse(null);
+            kelasId = s.map(siswa -> siswa.getKelas() != null ? siswa.getKelas().getId() : null).orElse(null);
         } else if ("GURU".equalsIgnoreCase(user.getRole()) || "TU".equalsIgnoreCase(user.getRole())
                 || "ADMIN".equalsIgnoreCase(user.getRole())) {
             var g = guruRepository.findByUserId(user.getId());
@@ -156,6 +158,6 @@ public class AuthService {
             profileId = g.map(Guru::getId).orElse(null);
         }
 
-        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId);
+        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId);
     }
 }

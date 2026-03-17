@@ -51,7 +51,7 @@ gemini:
 # Supports: openai, grok (xAI), mistral
 fallback-ai:
   provider: mistral
-  api-key: ${FALLBACK_AI_KEY:ZxLIg6l2lF6mh8T17Je84V9joZw4pgk6}
+  keys: ${FALLBACK_AI_KEYS:ZxLIg6l2lF6mh8T17Je84V9joZw4pgk6,wmnVjrqCL1hDjhhErFZ4q8U9CEBurRaf}
   model: mistral-large-latest
   base-url: https://api.mistral.ai/v1
 

@@ -21,9 +21,10 @@ public class FallbackAiService {
 
     private final WebClient webClient;
     private final AppSettingService appSettingService;
+    private final java.util.concurrent.atomic.AtomicInteger keyIndex = new java.util.concurrent.atomic.AtomicInteger(0);
 
-    @Value("${fallback-ai.api-key:}")
-    private String apiKey;
+    @Value("${fallback-ai.keys:}")
+    private List<String> apiKeys;
 
     @Value("${fallback-ai.model:gpt-4o-mini}")
     private String model;
@@ -38,7 +39,39 @@ public class FallbackAiService {
         String userKey = appSettingService.getSettingValue("ai_api_key", "");
         if (!userKey.trim().isEmpty())
             return true;
-        return apiKey != null && !apiKey.trim().isEmpty();
+        return !getActualKeys().isEmpty();
+    }
+
+    private String getCurrentKey() {
+        String userKey = appSettingService.getSettingValue("ai_api_key", "");
+        if (!userKey.trim().isEmpty()) {
+            return userKey.trim();
+        }
+        List<String> actualKeys = getActualKeys();
+        if (actualKeys.isEmpty()) {
+            throw new RuntimeException("No Fallback AI keys configured");
+        }
+        int index = Math.abs(keyIndex.get()) % actualKeys.size();
+        return actualKeys.get(index);
+    }
+
+    private List<String> getActualKeys() {
+        if (apiKeys == null || apiKeys.isEmpty()) {
+            return List.of();
+        }
+        java.util.List<String> actualKeys = new java.util.ArrayList<>();
+        for (String key : apiKeys) {
+            for (String splitKey : key.split(",")) {
+                if (!splitKey.trim().isEmpty()) {
+                    actualKeys.add(splitKey.trim());
+                }
+            }
+        }
+        return actualKeys;
+    }
+
+    public void rotateKey() {
+        keyIndex.incrementAndGet();
     }
 
     public Mono<String> scoreEssay(String question, String answerKey, String studentAnswer) {
@@ -60,74 +93,91 @@ public class FallbackAiService {
 
     @SuppressWarnings("unchecked")
     private Mono<String> callApi(String prompt) {
-        if (!isAvailable()) {
-            return Mono.error(new RuntimeException("Fallback AI (" + provider + ") API key not configured"));
-        }
+        return Mono.defer(() -> {
+            if (!isAvailable()) {
+                return Mono.error(new RuntimeException("Fallback AI (" + provider + ") API key not configured"));
+            }
 
-        // Check for user settings
-        String userKey = appSettingService.getSettingValue("ai_api_key", "");
-        String userProvider = appSettingService.getSettingValue("ai_priority_provider", provider);
-        String userModel = appSettingService.getSettingValue("ai_model", model);
+            // Check for user settings
+            String userProvider = appSettingService.getSettingValue("ai_priority_provider", provider);
+            String userModel = appSettingService.getSettingValue("ai_model", model);
 
-        String activeKey = (userKey == null || userKey.trim().isEmpty()) ? apiKey : userKey;
+            String activeKey = getCurrentKey();
 
-        // If we got here from Gemini falling back, we should check what's configured in
-        // settings
-        String activeProvider = (userProvider == null || userProvider.equalsIgnoreCase("gemini")) ? provider
-                : userProvider;
-        String activeModel = (userModel == null || userModel.trim().isEmpty()) ? model : userModel;
-        String activeBaseUrl = baseUrl;
+            // If we got here from Gemini falling back, we should check what's configured in
+            // settings
+            String activeProvider = (userProvider == null || userProvider.equalsIgnoreCase("gemini")) ? provider
+                    : userProvider;
+            String activeModel = userModel;
+            String activeBaseUrl = baseUrl;
 
-        if (activeProvider.equalsIgnoreCase("openai")) {
-            activeBaseUrl = "https://api.openai.com/v1";
-        } else if (activeProvider.equalsIgnoreCase("grok")) {
-            activeBaseUrl = "https://api.x.ai/v1";
-        } else if (activeProvider.equalsIgnoreCase("mistral")) {
-            activeBaseUrl = "https://api.mistral.ai/v1";
-        }
+            if (activeProvider.equalsIgnoreCase("openai")) {
+                activeBaseUrl = "https://api.openai.com/v1";
+                if (activeModel == null || activeModel.trim().isEmpty())
+                    activeModel = "gpt-4o-mini";
+            } else if (activeProvider.equalsIgnoreCase("grok")) {
+                activeBaseUrl = "https://api.x.ai/v1";
+                if (activeModel == null || activeModel.trim().isEmpty())
+                    activeModel = "grok-beta";
+            } else if (activeProvider.equalsIgnoreCase("mistral") || activeProvider.equalsIgnoreCase("mistral ai")) {
+                activeBaseUrl = "https://api.mistral.ai/v1";
+                if (activeModel == null || activeModel.trim().isEmpty())
+                    activeModel = "mistral-large-latest";
+            }
 
-        String url = activeBaseUrl + "/chat/completions";
+            if (activeModel == null || activeModel.trim().isEmpty()) {
+                activeModel = model;
+            }
 
-        Map<String, Object> body = Map.of(
-                "model", activeModel,
-                "messages", List.of(
-                        Map.of("role", "user", "content", prompt)),
-                "temperature", 0.3);
+            String url = activeBaseUrl + "/chat/completions";
 
-        log.info("Calling fallback AI provider: {} with model: {}", activeProvider, activeModel);
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("model", activeModel);
+            body.put("messages", java.util.List.of(
+                    java.util.Map.of("role", "user", "content", prompt)));
+            body.put("temperature", 0.3);
 
-        return webClient.post()
-                .uri(url)
-                .header("Authorization", "Bearer " + activeKey)
-                .header("Content-Type", "application/json")
-                .header("User-Agent",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                .bodyValue(body)
-                .retrieve()
-                .onStatus(status -> status.isError(), response -> {
-                    return response.bodyToMono(String.class)
-                            .flatMap(errorBody -> {
-                                log.error("Fallback AI Provider API Error Body: {}", errorBody);
-                                return Mono.error(new RuntimeException(
-                                        "Fallback AI returned " + response.statusCode() + ": " + errorBody));
-                            });
-                })
-                .bodyToMono(Map.class)
-                .map(response -> {
-                    try {
-                        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-                        String content = ((String) message.get("content")).trim();
-                        log.info("Fallback AI ({}) response received successfully", activeProvider);
-                        return content;
-                    } catch (Exception e) {
-                        log.error("Error parsing {} response: {}", activeProvider, response, e);
-                        throw new RuntimeException(
-                                "Failed to parse " + activeProvider + " AI response: " + e.getMessage());
-                    }
-                })
+            log.info("Calling fallback AI provider: {} with model: {} via URL: {}", activeProvider, activeModel, url);
+
+            return webClient.post()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + activeKey)
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent",
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .bodyValue(body)
+                    .retrieve()
+                    .onStatus(status -> status.isError(), response -> {
+                        return response.bodyToMono(String.class)
+                                .flatMap(errorBody -> {
+                                    log.error("Fallback AI Provider API Error Body: {}", errorBody);
+                                    return Mono.error(new RuntimeException(
+                                            "Fallback AI returned " + response.statusCode() + ": " + errorBody));
+                                });
+                    })
+                    .bodyToMono(Map.class)
+                    .map(response -> {
+                        try {
+                            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+                            String content = ((String) message.get("content")).trim();
+                            log.info("Fallback AI ({}) response received successfully", activeProvider);
+                            return content;
+                        } catch (Exception e) {
+                            log.error("Error parsing {} response: {}", activeProvider, response, e);
+                            throw new RuntimeException(
+                                    "Failed to parse " + activeProvider + " AI response: " + e.getMessage());
+                        }
+                    });
+        })
+                .retryWhen(reactor.util.retry.Retry.max(1).filter(throwable -> {
+                    rotateKey();
+                    log.warn("Fallback AI API call failed. Rotating key and retrying... Error: {}",
+                            throwable.getMessage());
+                    return true;
+                }))
                 .onErrorResume(e -> {
-                    log.error("{} API error: {}", activeProvider, e.getMessage());
+                    log.error("Fallback AI error: {}", e.getMessage());
                     return Mono.error(e);
                 });
     }

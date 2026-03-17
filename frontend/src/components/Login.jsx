@@ -25,9 +25,9 @@ const Login = () => {
         email: loginIdentifier,
         password
       });
-      const { token, role, name, profileId, email } = response.data;
+      const { token, role, name, profileId, email, kelasId, userId } = response.data;
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({ role, name, profileId, email }));
+      localStorage.setItem('user', JSON.stringify({ role, name, profileId, email, kelasId, userId }));
 
       window.location.href = '/dashboard';
     } catch (err) {

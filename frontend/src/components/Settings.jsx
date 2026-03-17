@@ -283,7 +283,7 @@ const Settings = () => {
                                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none', backgroundColor: 'transparent' }}
                                 >
                                     <option value="gemini">Google Gemini (Default)</option>
-                                    <option value="grok">xAI Grok</option>
+                                    <option value="mistral">Mistral AI</option>
                                     <option value="openai">OpenAI (GPT)</option>
                                 </select>
                             </div>
@@ -297,7 +297,7 @@ const Settings = () => {
                                     name="ai_model"
                                     value={settings.ai_model || ''}
                                     onChange={handleChange}
-                                    placeholder="Contoh: gemini-1.5-flash, grok-beta, gpt-4o-mini"
+                                    placeholder="Contoh: gemini-2.0-flash, mistral-large-latest, gpt-4o-mini"
                                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none' }}
                                 />
                             </div>
@@ -311,7 +311,7 @@ const Settings = () => {
                                     name="ai_api_key"
                                     value={settings.ai_api_key || ''}
                                     onChange={handleChange}
-                                    placeholder="Masukkan API Key (Opsional jika via environment)"
+                                    placeholder="Masukkan API Key (Gemini/Mistral/OpenAI)"
                                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none' }}
                                 />
                             </div>
@@ -321,7 +321,7 @@ const Settings = () => {
                             <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-dark)', lineHeight: '1.6' }}>
                                 <strong>Catatan:</strong> Jika API Key tidak diisi di sini, sistem akan mencoba menggunakan API Key yang ada pada berkas konfigurasi <code>application.yml</code>. Pengisian di form ini akan menimpa (override) pengaturan default sistem.
                                 <br /><br />
-                                <strong>Model AI:</strong> Biarkan kosong untuk menggunakan model default (Gemini: <code>gemini-2.0-flash</code>, Grok: <code>grok-beta</code>, OpenAI: <code>gpt-4o-mini</code>).
+                                <strong>Model AI:</strong> Biarkan kosong untuk menggunakan model default (Gemini: <code>gemini-2.0-flash</code>, Mistral: <code>mistral-large-latest</code>, OpenAI: <code>gpt-4o-mini</code>).
                             </p>
                         </div>
                     </div>

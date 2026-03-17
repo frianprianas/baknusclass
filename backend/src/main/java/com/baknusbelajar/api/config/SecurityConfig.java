@@ -59,7 +59,7 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/materi/view/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/materi/view/**", "/ws-forum/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated());
 

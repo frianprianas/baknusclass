@@ -11,6 +11,7 @@ import SecurityToken from './components/SecurityToken'
 import Settings from './components/Settings'
 import SubjectManagement from './components/SubjectManagement'
 import StudentMaterials from './components/StudentMaterials'
+import ForumDiscussion from './components/ForumDiscussion'
 import DashboardLayout from './components/DashboardLayout'
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/subject-management" element={<SubjectManagement />} />
           <Route path="/student-materi" element={<StudentMaterials />} />
+          <Route path="/forum" element={<ForumDiscussion />} />
         </Route>
       </Routes>
     </Router>

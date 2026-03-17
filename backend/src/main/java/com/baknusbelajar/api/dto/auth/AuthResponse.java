@@ -13,4 +13,6 @@ public class AuthResponse {
     private String email;
     private String name;
     private Long profileId;
+    private Long userId;
+    private Long kelasId;
 }

@@ -96,26 +96,27 @@ public class JawabanSiswaService {
                     .scoreEssay(soal.getPertanyaan(), soal.getKunciJawaban(), jawaban.getTeksJawaban())
                     .block(); // Wait for AI Result
 
-            if (aiResponse == null) {
-                throw new RuntimeException("AI tidak memberikan respon (NULL)");
+            if (aiResponse == null || aiResponse.trim().isEmpty()) {
+                throw new RuntimeException("AI tidak memberikan respon (NULL atau Kosong)");
             }
 
-            String cleanResponse = aiResponse;
-            if (aiResponse.contains("```json")) {
-                cleanResponse = aiResponse.substring(aiResponse.indexOf("```json") + 7);
+            log.debug("AI Raw Response: {}", aiResponse);
+            String cleanResponse = aiResponse.trim();
+
+            // Extract JSON from markdown
+            if (cleanResponse.contains("```json")) {
+                cleanResponse = cleanResponse.substring(cleanResponse.indexOf("```json") + 7);
                 if (cleanResponse.contains("```")) {
                     cleanResponse = cleanResponse.substring(0, cleanResponse.indexOf("```"));
                 }
-            } else if (aiResponse.contains("```")) {
-                cleanResponse = aiResponse.substring(aiResponse.indexOf("```") + 3);
+            } else if (cleanResponse.contains("```")) {
+                cleanResponse = cleanResponse.substring(cleanResponse.indexOf("```") + 3);
                 if (cleanResponse.contains("```")) {
                     cleanResponse = cleanResponse.substring(0, cleanResponse.indexOf("```"));
                 }
             }
-
             cleanResponse = cleanResponse.trim();
 
-            // If still not starting with {, try to find the first {
             if (!cleanResponse.startsWith("{") && cleanResponse.contains("{")) {
                 cleanResponse = cleanResponse.substring(cleanResponse.indexOf("{"));
                 if (cleanResponse.contains("}")) {
@@ -123,26 +124,31 @@ public class JawabanSiswaService {
                 }
             }
 
-            JsonNode root = objectMapper.readTree(cleanResponse);
-            double skor = 0;
-            if (root.has("skor")) {
-                skor = root.get("skor").asDouble();
-            } else if (root.has("score")) {
-                skor = root.get("score").asDouble();
-            }
+            try {
+                JsonNode root = objectMapper.readTree(cleanResponse);
+                double skor = 0;
+                if (root.has("skor")) {
+                    skor = root.get("skor").asDouble();
+                } else if (root.has("score")) {
+                    skor = root.get("score").asDouble();
+                }
 
-            String alasan = "";
-            if (root.has("alasan")) {
-                alasan = root.get("alasan").asText();
-            } else if (root.has("reason")) {
-                alasan = root.get("reason").asText();
-            }
+                String alasan = "";
+                if (root.has("alasan")) {
+                    alasan = root.get("alasan").asText();
+                } else if (root.has("reason")) {
+                    alasan = root.get("reason").asText();
+                }
 
-            log.info("Synchronous AI Scoring completed for ID: {}, Skor: {}", jawabanId, skor);
-            return updateNilai(jawabanId, skor, alasan, null);
+                log.info("Synchronous AI Scoring completed for ID: {}, Skor: {}", jawabanId, skor);
+                return updateNilai(jawabanId, skor, alasan, null);
+            } catch (Exception jsonEx) {
+                log.error("JSON Parsing failed. Cleaned response: {}", cleanResponse);
+                throw new RuntimeException("Format jawaban dari AI tidak valid (Bukan JSON). Respon: " +
+                        (cleanResponse.length() > 50 ? cleanResponse.substring(0, 50) + "..." : cleanResponse));
+            }
         } catch (Exception e) {
-            log.error("Failed to process synchronous AI scoring for ID: {}. AI Response was: {}", jawabanId, aiResponse,
-                    e);
+            log.error("Failed to process synchronous AI scoring for ID: {}. Error: {}", jawabanId, e.getMessage(), e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
             throw new RuntimeException("Gagal menganalisis jawaban: " + errorMessage);
         }

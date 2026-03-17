@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronRight,
   ShieldCheck,
+  MessageCircle,
   Moon,
   Sun
 } from 'lucide-react';
@@ -62,6 +63,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     if (id === 'settings') navigate('/settings');
     if (id === 'subject_management') navigate('/subject-management');
     if (id === 'materi_student') navigate('/student-materi');
+    if (id === 'forum') navigate('/forum');
   };
 
   const toggleTheme = () => {
@@ -78,6 +80,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: 'subject_management', label: 'Manajemen Mapel', icon: BookOpen, roles: ['GURU'] },
     { id: 'materi_student', label: 'Materi Pelajaran', icon: BookOpen, roles: ['SISWA'] },
     { id: 'exam_scoring', label: 'Koreksi & Nilai', icon: FileText, roles: ['ADMIN', 'TU', 'GURU'] },
+    { id: 'forum', label: 'Forum Diskusi', icon: MessageCircle, roles: ['ADMIN', 'GURU', 'SISWA'] },
     { id: 'student_exams', label: 'Daftar Ujian', icon: FileText, roles: ['ADMIN', 'SISWA'] },
     { id: 'master_data', label: 'Data Master', icon: Layout, roles: ['ADMIN', 'TU'] },
     { id: 'users', label: 'Manajemen User', icon: Users, roles: ['ADMIN', 'TU'] },
