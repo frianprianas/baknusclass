@@ -10,17 +10,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MateriDTO {
+public class TugasSiswaDTO {
     private Long id;
-    private String namaMateri;
+    private String studentName;
+    private String studentEmail;
+    private String subjectName;
     private String fileName;
-    private String fileType;
     private String driveLink;
-    private Long guruMapelId;
-    private String namaMapel;
-    private String namaKelas;
-    private LocalDateTime uploadedAt;
-    private Boolean isViewed; // New field for student dashboard
+    private LocalDateTime submittedAt;
     private Long babId;
-    private String emailGuru;
+    private String babName;
 }

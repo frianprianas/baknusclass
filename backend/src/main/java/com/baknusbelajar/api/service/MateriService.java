@@ -10,6 +10,11 @@ import com.baknusbelajar.api.repository.GuruMapelRepository;
 import com.baknusbelajar.api.repository.MateriRepository;
 import com.baknusbelajar.api.repository.SiswaRepository;
 import com.baknusbelajar.api.repository.MateriViewLogRepository;
+import com.baknusbelajar.api.repository.TugasSiswaRepository;
+import com.baknusbelajar.api.repository.UserRepository;
+import com.baknusbelajar.api.entity.Users;
+import com.baknusbelajar.api.entity.TugasSiswa;
+import com.baknusbelajar.api.dto.materi.TugasSiswaDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -36,6 +41,8 @@ public class MateriService {
     private final BaknusDriveService driveService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final com.baknusbelajar.api.repository.BabRepository babRepository;
+    private final TugasSiswaRepository tugasSiswaRepository;
+    private final UserRepository userRepository;
 
     public List<MateriDTO> getMyMateri(String username) {
         return materiRepository.findByGuruMapelGuruUserUsername(username).stream()
@@ -137,18 +144,107 @@ public class MateriService {
         return convertToDTO(saved);
     }
 
-    public ResponseEntity<byte[]> proxyDownload(Long driveFileId) {
-        log.info("Proxying download for drive file ID: {}", driveFileId);
+    public ResponseEntity<byte[]> proxyDownload(Long driveFileId, boolean isDownload) {
+        log.info("Proxying request (isDownload={}) for drive file ID: {}", isDownload, driveFileId);
 
-        // Security check: Only allow download if this drive file is associated with a
-        // Materi in our system
-        boolean exists = materiRepository.existsByDriveLinkContaining("/" + driveFileId);
-        if (!exists) {
+        java.util.Optional<com.baknusbelajar.api.entity.Materi> materiOpt = materiRepository.findAll().stream()
+                .filter(m -> m.getDriveLink() != null && m.getDriveLink().endsWith("/" + driveFileId))
+                .findFirst();
+
+        if (materiOpt.isEmpty()) {
             log.warn("Security alert: Attempt to download unauthorized drive file ID: {}", driveFileId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        return driveService.downloadFile(driveFileId);
+        String actualFileName = materiOpt.get().getFileName();
+        return driveService.downloadFileWithFilename(driveFileId, actualFileName, isDownload);
+    }
+
+    @Transactional
+    public String uploadTugasSiswa(String studentUsername, String teacherEmail, String subjectName,
+            Long babId, MultipartFile file) {
+        String cleanEmail = teacherEmail != null ? teacherEmail.trim().toLowerCase() : "";
+        String cleanSubject = subjectName != null ? subjectName.trim() : "";
+
+        log.info("Processing task upload: student={}, target_teacher={}, subject={}",
+                studentUsername, cleanEmail, cleanSubject);
+
+        Siswa siswa = siswaRepository.findByUserUsername(studentUsername)
+                .orElseThrow(() -> new RuntimeException("Data Siswa tidak ditemukan: " + studentUsername));
+
+        com.baknusbelajar.api.entity.Bab bab = null;
+        if (babId != null) {
+            bab = babRepository.findById(babId)
+                    .orElseThrow(() -> new RuntimeException("Bab tidak ditemukan"));
+
+            // Check Deadline
+            if (Boolean.TRUE.equals(bab.getIsDeadlineActive()) && bab.getDeadlineTugas() != null) {
+                if (java.time.LocalDateTime.now().isAfter(bab.getDeadlineTugas())) {
+                    throw new RuntimeException("Gagal: Batas waktu pengumpulan tugas untuk Bab ini (" +
+                            bab.getDeadlineTugas()
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"))
+                            + ") telah berakhir.");
+                }
+            }
+        }
+
+        String link = driveService.uploadTugas(siswa.getUser().getEmail(), cleanEmail, cleanSubject, file);
+
+        TugasSiswa tugas = TugasSiswa.builder()
+                .siswa(siswa)
+                .teacherEmail(cleanEmail)
+                .subjectName(cleanSubject)
+                .fileName(file.getOriginalFilename())
+                .driveLink(link)
+                .bab(bab)
+                .build();
+        tugasSiswaRepository.save(tugas);
+        log.info("Successfully persisted assignment to DB for student: {}", siswa.getNamaLengkap());
+
+        return link;
+    }
+
+    public List<TugasSiswaDTO> getStudentSubmissions(String teacherUsername, String subjectName) {
+        Users teacher = userRepository.findByUsername(teacherUsername)
+                .orElseThrow(() -> new RuntimeException("Data Guru tidak ditemukan: " + teacherUsername));
+
+        String cleanEmail = teacher.getEmail() != null ? teacher.getEmail().trim().toLowerCase() : "";
+        String cleanSubject = subjectName != null ? subjectName.trim() : "";
+
+        log.debug("Querying submissions for email={} and subject={}", cleanEmail, cleanSubject);
+
+        List<TugasSiswa> list;
+        if (!cleanSubject.isEmpty()) {
+            list = tugasSiswaRepository.findByTeacherEmailIgnoreCaseAndSubjectNameIgnoreCaseOrderBySubmittedAtDesc(
+                    cleanEmail, cleanSubject);
+        } else {
+            list = tugasSiswaRepository.findByTeacherEmailIgnoreCaseOrderBySubmittedAtDesc(cleanEmail);
+        }
+
+        return list.stream().map(this::convertToTugasDTO).collect(Collectors.toList());
+    }
+
+    public List<TugasSiswaDTO> getStudentSubmissionsBySiswa(String studentUsername) {
+        log.info("Fetching my-submissions for student: {}", studentUsername);
+        List<TugasSiswa> list = tugasSiswaRepository.findBySiswaUserUsernameOrderBySubmittedAtDesc(studentUsername);
+        log.info("Found {} submissions for student: {}", list.size(), studentUsername);
+        return list.stream()
+                .map(this::convertToTugasDTO)
+                .collect(Collectors.toList());
+    }
+
+    private TugasSiswaDTO convertToTugasDTO(TugasSiswa t) {
+        return TugasSiswaDTO.builder()
+                .id(t.getId())
+                .studentName(t.getSiswa().getNamaLengkap())
+                .studentEmail(t.getSiswa().getUser().getEmail())
+                .subjectName(t.getSubjectName())
+                .fileName(t.getFileName())
+                .driveLink(t.getDriveLink())
+                .submittedAt(t.getSubmittedAt())
+                .babId(t.getBab() != null ? t.getBab().getId() : null)
+                .babName(t.getBab() != null ? t.getBab().getNamaBab() : "Lainnya")
+                .build();
     }
 
     @Transactional
@@ -180,6 +276,7 @@ public class MateriService {
                 .namaKelas(m.getGuruMapel().getKelas() != null ? m.getGuruMapel().getKelas().getNamaKelas() : "-")
                 .uploadedAt(m.getUploadedAt())
                 .babId(m.getBab() != null ? m.getBab().getId() : null)
+                .emailGuru(m.getGuruMapel().getGuru().getUser().getEmail())
                 .build();
     }
 }

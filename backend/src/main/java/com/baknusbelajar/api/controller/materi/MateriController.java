@@ -3,6 +3,7 @@ package com.baknusbelajar.api.controller.materi;
 import com.baknusbelajar.api.dto.materi.MateriDTO;
 import com.baknusbelajar.api.service.MateriService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/materi")
 @RequiredArgsConstructor
+@Slf4j
 public class MateriController {
 
     private final MateriService materiService;
@@ -60,6 +62,18 @@ public class MateriController {
         return ResponseEntity.ok(materiService.uploadMateri(guruMapelId, babId, namaMateri, file));
     }
 
+    @PostMapping("/student/upload-tugas")
+    @PreAuthorize("hasRole('SISWA')")
+    public ResponseEntity<String> uploadTugas(
+            @RequestParam("teacherEmail") String teacherEmail,
+            @RequestParam("subjectName") String subjectName,
+            @RequestParam(value = "babId", required = false) Long babId,
+            @RequestParam("file") MultipartFile file,
+            Authentication auth) {
+        return ResponseEntity
+                .ok(materiService.uploadTugasSiswa(auth.getName(), teacherEmail, subjectName, babId, file));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('GURU')")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication auth) {
@@ -67,8 +81,38 @@ public class MateriController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/view/{id}")
-    public ResponseEntity<byte[]> viewMateri(@PathVariable Long id) {
-        return materiService.proxyDownload(id);
+    @GetMapping({ "/view/{id}", "/view/{id}/{fileName}" })
+    public ResponseEntity<byte[]> viewMateri(
+            @PathVariable Long id,
+            @PathVariable(required = false) String fileName,
+            @RequestParam(value = "download", defaultValue = "false") boolean isDownload,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent) {
+        log.info(">>> View Request for ID: {}, name: {}, isDownload: {}, User-Agent: {}", id, fileName, isDownload,
+                userAgent);
+        return materiService.proxyDownload(id, isDownload);
+    }
+
+    @GetMapping("/view/collabora/{id}")
+    public ResponseEntity<java.util.Map<String, String>> getCollaboraUrl(@PathVariable Long id) {
+        String viewerUrl = driveService.getCollaboraViewerUrl(id);
+        if (viewerUrl != null) {
+            return ResponseEntity.ok(java.util.Map.of("url", viewerUrl));
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+
+    @GetMapping("/student/submissions")
+    @PreAuthorize("hasRole('GURU')")
+    public ResponseEntity<List<com.baknusbelajar.api.dto.materi.TugasSiswaDTO>> getSubmissions(
+            @RequestParam(value = "subjectName", required = false) String subjectName,
+            Authentication auth) {
+        return ResponseEntity.ok(materiService.getStudentSubmissions(auth.getName(), subjectName));
+    }
+
+    @GetMapping("/student/my-submissions")
+    @PreAuthorize("hasRole('SISWA')")
+    public ResponseEntity<List<com.baknusbelajar.api.dto.materi.TugasSiswaDTO>> getMySubmissions(Authentication auth) {
+        log.info("API Request: getMySubmissions for user: {}", auth.getName());
+        return ResponseEntity.ok(materiService.getStudentSubmissionsBySiswa(auth.getName()));
     }
 }

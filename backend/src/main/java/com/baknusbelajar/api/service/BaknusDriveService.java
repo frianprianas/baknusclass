@@ -266,19 +266,114 @@ public class BaknusDriveService {
         }
     }
 
+    public String uploadTugas(String studentEmail, String teacherEmail, String subjectName, MultipartFile file) {
+        String url = driveApiUrl + "/class/upload-tugas";
+        log.info(">>> BaknusDrive: Uploading assignment for student '{}' shared with teacher '{}' subject '{}'",
+                studentEmail, teacherEmail, subjectName);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.set("X-Class-API-Key", apiKey);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("student_email", studentEmail);
+        body.add("teacher_email", teacherEmail);
+        body.add("subject_name", subjectName);
+        body.add("file", file.getResource());
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
+            log.info("BaknusDrive Task Upload Response: {} - {}", response.getStatusCode(), response.getBody());
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error uploading task to BaknusDrive: {}", e.getMessage());
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    // 4. Get Collabora Viewer URL for Materials (Integration)
+    public String getCollaboraViewerUrl(Long fileId) {
+        String url = driveApiUrl + "/class/doc/open/" + fileId;
+        log.info(">>> BaknusDrive: Requesting Collabora viewer URL for fileId: {}", fileId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Class-API-Key", apiKey);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return (String) response.getBody().get("url");
+            }
+        } catch (Exception e) {
+            log.error("Error getting Collabora viewer URL from BaknusDrive: {}", e.getMessage());
+        }
+        return null; // Fallback handled in MateriService
+    }
+
     public ResponseEntity<byte[]> downloadFile(Long driveFileId) {
-        // Construct WOPI download URL (internal trust)
-        // driveApiUrl is https://baknusdrive.smkbn666.sch.id/api
+        return downloadFileWithFilename(driveFileId, "file_" + driveFileId, false);
+    }
+
+    public ResponseEntity<byte[]> downloadFileWithFilename(Long driveFileId, String actualFileName,
+            boolean isDownload) {
+        // Construct WOPI download URL (internal trust) using server base URL
         String baseUrl = driveApiUrl.replace("/api", "");
         String internalToken = "BAKNUS_SECRET_INTERNAL_KEY_999";
         String url = baseUrl + "/wopi/files/" + driveFileId + "/contents?access_token=" + internalToken;
 
-        log.info(">>> BaknusDrive: Proxying download from internal WOPI URL: {}", url);
         try {
             ResponseEntity<byte[]> response = restTemplate.getForEntity(url, byte[].class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                // Try to preserve Content-Type if present, otherwise detect from filename
+                MediaType contentType = response.getHeaders().getContentType();
+                if (contentType == null || contentType.equals(MediaType.APPLICATION_OCTET_STREAM)) {
+                    int lastDot = actualFileName.lastIndexOf(".");
+                    String extension = lastDot != -1 ? actualFileName.substring(lastDot + 1).toLowerCase() : "";
+                    switch (extension) {
+                        case "pdf":
+                            contentType = MediaType.APPLICATION_PDF;
+                            break;
+                        case "jpg":
+                        case "jpeg":
+                            contentType = MediaType.IMAGE_JPEG;
+                            break;
+                        case "png":
+                            contentType = MediaType.IMAGE_PNG;
+                            break;
+                        case "gif":
+                            contentType = MediaType.IMAGE_GIF;
+                            break;
+                        case "webp":
+                            contentType = MediaType.valueOf("image/webp");
+                            break;
+                        case "docx":
+                            contentType = MediaType
+                                    .valueOf("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+                            break;
+                        case "pptx":
+                            contentType = MediaType.valueOf(
+                                    "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+                            break;
+                        case "xlsx":
+                            contentType = MediaType
+                                    .valueOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                            break;
+                        default:
+                            contentType = MediaType.APPLICATION_OCTET_STREAM;
+                    }
+                }
+
+                String disposition = isDownload ? "attachment" : "inline";
+                return ResponseEntity.ok()
+                        .contentType(contentType)
+                        .header(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"" + actualFileName + "\"")
+                        .body(response.getBody());
+            }
             return response;
         } catch (Exception e) {
-            log.error("Error proxying download from BaknusDrive: {}", e.getMessage());
+            log.error("Error proxying download from BaknusDrive for file ID {}: {}", driveFileId, e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }

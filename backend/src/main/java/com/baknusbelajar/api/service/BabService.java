@@ -57,6 +57,8 @@ public class BabService {
                 .prolog(dto.getProlog())
                 .urutan(dto.getUrutan())
                 .guruMapel(gm)
+                .deadlineTugas(dto.getDeadlineTugas())
+                .isDeadlineActive(dto.getIsDeadlineActive())
                 .build();
 
         Bab saved = babRepository.save(bab);
@@ -71,6 +73,8 @@ public class BabService {
         bab.setNamaBab(dto.getNamaBab());
         bab.setProlog(dto.getProlog());
         bab.setUrutan(dto.getUrutan());
+        bab.setDeadlineTugas(dto.getDeadlineTugas());
+        bab.setIsDeadlineActive(dto.getIsDeadlineActive());
 
         Bab saved = babRepository.save(bab);
         return convertToDTO(saved);
@@ -104,6 +108,8 @@ public class BabService {
                 .prolog(bab.getProlog())
                 .urutan(bab.getUrutan())
                 .guruMapelId(bab.getGuruMapel().getId())
+                .deadlineTugas(bab.getDeadlineTugas())
+                .isDeadlineActive(bab.getIsDeadlineActive())
                 .build();
     }
 }

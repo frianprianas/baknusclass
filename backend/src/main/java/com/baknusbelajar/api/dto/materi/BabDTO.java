@@ -17,4 +17,6 @@ public class BabDTO {
     private Integer urutan;
     private Long guruMapelId;
     private List<MateriDTO> materials;
+    private java.time.LocalDateTime deadlineTugas;
+    private Boolean isDeadlineActive;
 }

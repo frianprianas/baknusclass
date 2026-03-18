@@ -32,6 +32,7 @@ const SubjectManagement = () => {
     const [selectedAssignment, setSelectedAssignment] = useState(null);
     const [materials, setMaterials] = useState([]);
     const [viewLogs, setViewLogs] = useState([]);
+    const [studentTasks, setStudentTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -43,7 +44,9 @@ const SubjectManagement = () => {
         id: null,
         namaBab: '',
         prolog: '',
-        urutan: 1
+        urutan: 1,
+        deadlineTugas: '',
+        isDeadlineActive: false
     });
 
     // Q&A state
@@ -98,6 +101,15 @@ const SubjectManagement = () => {
             setViewLogs(res.data);
         } catch (err) {
             console.error('Failed to fetch notifications:', err);
+        }
+    };
+
+    const fetchStudentTasks = async (subjectName) => {
+        try {
+            const res = await axios.get(`/api/materi/student/submissions?subjectName=${subjectName}`, { headers });
+            setStudentTasks(res.data);
+        } catch (err) {
+            console.error('Failed to fetch student tasks:', err);
         }
     };
 
@@ -158,6 +170,7 @@ const SubjectManagement = () => {
         setSelectedAssignment(assignment);
         fetchMaterials(assignment.id);
         fetchBabs(assignment.id);
+        fetchStudentTasks(assignment.namaMapel);
     };
 
     const handleSaveBab = async (e) => {
@@ -169,7 +182,7 @@ const SubjectManagement = () => {
                 await axios.post('/api/bab', { ...babForm, guruMapelId: selectedAssignment.id }, { headers });
             }
             setShowBabModal(false);
-            setBabForm({ id: null, namaBab: '', prolog: '', urutan: babs.length + 1 });
+            setBabForm({ id: null, namaBab: '', prolog: '', urutan: babs.length + 1, deadlineTugas: '', isDeadlineActive: false });
             fetchBabs(selectedAssignment.id);
         } catch (err) {
             alert('Gagal menyimpan bab');
@@ -315,7 +328,7 @@ const SubjectManagement = () => {
                                 <div className="section-header-bab">
                                     <h3>Struktur Materi & Bab</h3>
                                     <button className="btn-manage-bab" onClick={() => {
-                                        setBabForm({ id: null, namaBab: '', prolog: '', urutan: babs.length + 1 });
+                                        setBabForm({ id: null, namaBab: '', prolog: '', urutan: babs.length + 1, deadlineTugas: '', isDeadlineActive: false });
                                         setShowBabModal(true);
                                     }}>
                                         <Plus size={16} />
@@ -340,7 +353,10 @@ const SubjectManagement = () => {
                                                     </div>
                                                     <div className="bab-actions">
                                                         <button className="btn-edit-bab" onClick={() => {
-                                                            setBabForm(bab);
+                                                            setBabForm({
+                                                                ...bab,
+                                                                deadlineTugas: bab.deadlineTugas ? bab.deadlineTugas.substring(0, 16) : ''
+                                                            });
                                                             setShowBabModal(true);
                                                         }}>
                                                             Edit
@@ -593,6 +609,71 @@ const SubjectManagement = () => {
                                 )}
                             </div>
 
+                            <div className="student-tasks-section">
+                                <div className="section-header">
+                                    <div className="header-title">
+                                        <div className="icon-pill primary">
+                                            <Upload size={20} />
+                                        </div>
+                                        <h3>Tugas & Resume Siswa</h3>
+                                    </div>
+                                    <div className="view-stats">
+                                        <span>Total {studentTasks.length} Pengiriman</span>
+                                    </div>
+                                </div>
+
+                                {studentTasks.length === 0 ? (
+                                    <div className="empty-history">
+                                        <div className="empty-icon-wrapper blue">
+                                            <FileText size={40} />
+                                        </div>
+                                        <p>Belum ada siswa yang mengumpulkan tugas.</p>
+                                        <span>Daftar tugas akan muncul di sini setelah siswa mengunggah file.</span>
+                                    </div>
+                                ) : (
+                                    <div className="tasks-grid">
+                                        {studentTasks.map((task, idx) => (
+                                            <div key={idx} className="task-card-premium">
+                                                <div className="card-top">
+                                                    <div className={`student-avatar color-${idx % 5}`}>
+                                                        {task.studentName.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="student-info">
+                                                        <span className="student-name">{task.studentName}</span>
+                                                        <span className="student-email">{task.studentEmail}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="file-info-box">
+                                                    <div className="file-icon-mini">
+                                                        <FileText size={16} />
+                                                    </div>
+                                                    <div className="file-meta">
+                                                        <span className="file-name" title={task.fileName}>{task.fileName}</span>
+                                                        <span className="submitted-at">
+                                                            {new Date(task.submittedAt).toLocaleString('id-ID', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <a
+                                                    href={task.driveLink}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="btn-review-task"
+                                                >
+                                                    <ExternalLink size={14} />
+                                                    <span>Buka di BaknusDrive</span>
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div id="upload-section" className="upload-section">
                                 <h3>Tambah Materi Baru</h3>
                                 <form onSubmit={handleUpload} className="upload-form">
@@ -686,7 +767,7 @@ const SubjectManagement = () => {
                                     rows="4"
                                 />
                             </div>
-                            <div className="form-group-bab">
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
                                 <label>Urutan Tampil</label>
                                 <input
                                     type="number"
@@ -694,11 +775,44 @@ const SubjectManagement = () => {
                                     onChange={(e) => setBabForm({ ...babForm, urutan: parseInt(e.target.value) })}
                                     min="1"
                                     required
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
                                 />
                             </div>
+
+                            <div className="form-group-deadline" style={{ marginTop: '20px', marginBottom: '20px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="isDeadlineActive"
+                                        checked={babForm.isDeadlineActive}
+                                        onChange={(e) => setBabForm({ ...babForm, isDeadlineActive: e.target.checked })}
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                    />
+                                    <label htmlFor="isDeadlineActive" style={{ margin: 0, fontWeight: '700', color: '#1e293b', cursor: 'pointer' }}>
+                                        Batasi Pengumpulan Tugas Untuk Bab Ini
+                                    </label>
+                                </div>
+
+                                {babForm.isDeadlineActive && (
+                                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                        <label style={{ fontSize: '0.85rem', color: '#64748b', display: 'block', marginBottom: '5px' }}>Tentukan Deadline</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={babForm.deadlineTugas || ''}
+                                            onChange={(e) => setBabForm({ ...babForm, deadlineTugas: e.target.value })}
+                                            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                                            required={babForm.isDeadlineActive}
+                                        />
+                                        <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '8px', fontWeight: '500' }}>
+                                            * Siswa tidak dapat mengunggah tugas setelah waktu ini berakhir.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="modal-footer">
                                 <button type="button" className="btn-cancel" onClick={() => setShowBabModal(false)}>Batal</button>
-                                <button type="submit" className="btn-save">Simpan Bab</button>
+                                <button type="submit" className="btn-save">Simpan Perubahan Bab</button>
                             </div>
                         </form>
                     </div>
@@ -794,6 +908,92 @@ const SubjectManagement = () => {
                 .arrow { margin-left: auto; color: #cbd5e1; opacity: 0; transition: all 0.2s; }
                 .assignment-card:hover .arrow { opacity: 1; transform: translateX(4px); }
                 .active .arrow { opacity: 1; color: #3b82f6; }
+
+                /* Student Tasks Styles */
+                .student-tasks-section {
+                    margin-top: 40px;
+                    padding: 30px;
+                    background: #f8fafc;
+                    border-radius: 28px;
+                    border: 1px solid #e2e8f0;
+                }
+                .icon-pill.primary { background: #3b82f6; color: white; }
+                .empty-icon-wrapper.blue { background: #eff6ff; color: #3b82f6; }
+                
+                .tasks-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 20px;
+                    margin-top: 20px;
+                }
+                .task-card-premium {
+                    background: white;
+                    border-radius: 20px;
+                    padding: 20px;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
+                    transition: all 0.2s;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                }
+                .task-card-premium:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
+                    border-color: #3b82f650;
+                }
+                .card-top { display: flex; align-items: center; gap: 12px; }
+                .student-email { font-size: 0.75rem; color: #94a3b8; display: block; }
+                
+                .file-info-box {
+                    background: #f1f5f9;
+                    border-radius: 12px;
+                    padding: 12px;
+                    display: flex;
+                    gap: 10px;
+                    align-items: flex-start;
+                }
+                .file-icon-mini {
+                    width: 32px; height: 32px;
+                    background: white;
+                    border-radius: 8px;
+                    display: flex; align-items: center; justify-content: center;
+                    color: #64748b;
+                    flex-shrink: 0;
+                }
+                .file-meta { overflow: hidden; }
+                .file-name {
+                    font-size: 0.85rem;
+                    font-weight: 700;
+                    color: #1e293b;
+                    display: block;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .submitted-at { font-size: 0.7rem; color: #64748b; font-weight: 500; }
+                
+                .btn-review-task {
+                    margin-top: auto;
+                    display: flex; align-items: center; justify-content: center; gap: 8px;
+                    padding: 10px;
+                    background: #f1f5f9;
+                    color: #3b82f6;
+                    border-radius: 10px;
+                    font-size: 0.85rem;
+                    font-weight: 700;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                }
+                .btn-review-task:hover { background: #3b82f6; color: white; }
+
+                [data-theme="dark"] .student-tasks-section { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .task-card-premium { background: #1e293b; border-color: #334155; }
+                [data-theme="dark"] .file-info-box { background: #0f172a; }
+                [data-theme="dark"] .file-icon-mini { background: #1e293b; }
+                [data-theme="dark"] .file-name { color: #f1f5f9; }
+                [data-theme="dark"] .btn-review-task { background: #0f172a; color: #60a5fa; }
+                [data-theme="dark"] .btn-review-task:hover { background: #3b82f6; color: white; }
 
                 /* Main Panel */
                 .main-panel {
@@ -1734,7 +1934,7 @@ const SubjectManagement = () => {
                 [data-theme="dark"] .att-pill-class { color: #94a3b8; }
             `}
             </style>
-        </div>
+        </div >
     );
 };
 

@@ -9,11 +9,17 @@ import {
     Bell,
     CheckCircle,
     Clock,
+    History,
     ChevronRight,
     ArrowLeft,
     MessageSquare,
     Send,
-    MessageCircle
+    MessageCircle,
+    Upload,
+    X,
+    Eye,
+    Download,
+    EyeOff
 } from 'lucide-react';
 
 const StudentMaterials = () => {
@@ -26,17 +32,43 @@ const StudentMaterials = () => {
     // Q&A State
     const [questions, setQuestions] = useState({}); // { babId: [questions] }
     const [newQuestion, setNewQuestion] = useState('');
+
+    // Preview State
+    const [previewFile, setPreviewFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState('');
     const [askingBabId, setAskingBabId] = useState(null);
 
     // Attendance State
     const [attendedBabs, setAttendedBabs] = useState({}); // { babId: boolean }
 
+    // Upload Task State
+    const [isUploading, setIsUploading] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [selectedBabId, setSelectedBabId] = useState('');
+    const [mySubmissions, setMySubmissions] = useState([]);
+
     const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = React.useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
     useEffect(() => {
         fetchMaterials();
+        fetchMySubmissions();
     }, []);
+
+    const fetchMySubmissions = async () => {
+        try {
+            const res = await axios.get('/api/materi/student/my-submissions', { headers });
+            console.log('Submissions fetched:', res.data.length);
+            // Case-insensitive filtering for submissions
+            const filtered = res.data.filter(s =>
+                s.subjectName?.trim().toLowerCase() === selectedSubject?.trim().toLowerCase()
+            );
+            console.log(`Fetched ${res.data.length} submissions total, ${filtered.length} for ${selectedSubject}`);
+            setMySubmissions(res.data);
+        } catch (err) {
+            console.error('Failed to fetch my submissions:', err);
+        }
+    };
 
     const fetchMaterials = async () => {
         try {
@@ -94,6 +126,7 @@ const StudentMaterials = () => {
                 fetchQuestionsForBab(bab.id);
                 fetchAttendanceStatus(bab.id);
             });
+            fetchMySubmissions(); // Also fetch submissions whenever subject changes
         }
     }, [selectedSubject]);
 
@@ -116,6 +149,39 @@ const StudentMaterials = () => {
         }
     };
 
+    const handleUploadTask = async (teacherEmail, subjectName) => {
+        if (!selectedFile) {
+            alert('Silakan pilih file terlebih dahulu');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('teacherEmail', teacherEmail);
+        formData.append('subjectName', subjectName);
+        if (selectedBabId) formData.append('babId', selectedBabId);
+
+        setIsUploading(true);
+        try {
+            await axios.post('/api/materi/student/upload-tugas', formData, {
+                headers: {
+                    ...headers,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            alert('Tugas berhasil diunggah ke BaknusDrive Anda dan dibagikan ke Guru!');
+            setSelectedFile(null);
+            setSelectedBabId('');
+            fetchMySubmissions();
+            // Reset input file if possible or just rely on state
+        } catch (err) {
+            console.error('Upload failed:', err);
+            alert('Gagal mengunggah tugas. Silakan coba lagi.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleViewMateri = async (materi) => {
         // Mark as viewed in backend
         if (!materi.isViewed) {
@@ -130,12 +196,51 @@ const StudentMaterials = () => {
             }
         }
 
-        // Open the link (if it exists) or handle as needed
-        if (materi.driveLink) {
-            window.open(materi.driveLink, '_blank');
-        } else {
-            alert('Tautan file tidak tersedia.');
+        // Extract file ID properly (handles both /view/ID and /file/ID/download)
+        const getFileId = (link) => {
+            if (!link) return null;
+            const segs = link.split('/');
+            // Try to find a pure numeric segment
+            for (let i = segs.length - 1; i >= 0; i--) {
+                if (/^\d+$/.test(segs[i])) return segs[i];
+            }
+            // Fallback for simple local relative paths
+            const match = link.match(/\/view\/(\d+)/);
+            return match ? match[1] : null;
+        };
+
+        const fileId = getFileId(materi.driveLink);
+        if (!fileId) {
+            console.warn("Could not extract file ID from:", materi.driveLink);
+            return;
         }
+
+        // Default: use proxy URL
+        const publicUrl = window.location.origin + `/api/materi/view/${fileId}/${encodeURIComponent(materi.fileName)}`;
+        let viewerUrl = publicUrl;
+
+        // For Office Docs, use our new internal Collabora endpoint from BaknusClass backend
+        if (/\.(docx|doc|pptx|ppt|xlsx|xls)$/i.test(materi.fileName)) {
+            try {
+                // We useaxios with the existing headers if they exist, or just fetch
+                const response = await fetch(`/api/materi/view/collabora/${fileId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.url) {
+                        viewerUrl = data.url;
+                    }
+                } else {
+                    // Fallback to Google if internal backend fails
+                    viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(publicUrl)}&embedded=true`;
+                }
+            } catch (error) {
+                console.error("Failed to fetch internal viewer URL:", error);
+                viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(publicUrl)}&embedded=true`;
+            }
+        }
+
+        setPreviewUrl(viewerUrl);
+        setPreviewFile({ ...materi, extractedId: fileId });
     };
 
     // Group materials by subject for the main list
@@ -239,6 +344,158 @@ const StudentMaterials = () => {
                         <p>Struktur materi pelajaran dan bimbingan guru</p>
                     </div>
 
+                    {/* Task Submission Section */}
+                    {materials.find(m => m.namaMapel === selectedSubject) && (
+                        <div className="task-upload-section animate-fade-in">
+                            <div className="section-gradient-bg"></div>
+                            <div className="upload-content">
+                                <div className="upload-info">
+                                    <div className="upload-icon-wrapper">
+                                        <Upload className="upload-icon" size={18} />
+                                    </div>
+                                    <div className="upload-text">
+                                        <h3>Pengumpulan Tugas & Resume</h3>
+                                        <p>File akan tersimpan di BaknusDrive Anda dan otomatis dibagikan ke guru mata pelajaran.</p>
+                                    </div>
+                                </div>
+                                <div className="upload-controls" style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 1.5fr auto', gap: '15px', alignItems: 'center' }}>
+                                    <div className="bab-selector-wrapper">
+                                        <select
+                                            className="bab-dropdown-pro"
+                                            value={selectedBabId}
+                                            onChange={(e) => setSelectedBabId(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 16px',
+                                                borderRadius: '16px',
+                                                border: '2px solid #e2e8f0',
+                                                background: 'white',
+                                                fontSize: '0.85rem',
+                                                fontWeight: '800',
+                                                color: '#1e293b',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <option value="">-- Pilih Bab (Opsional) --</option>
+                                            {babs.filter(b => materials.some(m => m.namaMapel === selectedSubject && m.babId === b.id))
+                                                .sort((a, b) => a.urutan - b.urutan)
+                                                .map(b => (
+                                                    <option
+                                                        key={b.id}
+                                                        value={b.id}
+                                                        disabled={b.isDeadlineActive && new Date(b.deadlineTugas) < new Date()}
+                                                    >
+                                                        {b.namaBab} {b.isDeadlineActive && new Date(b.deadlineTugas) < new Date() ? ' (Deadline Lewat)' : ''}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        id="task-file-input"
+                                        className="hidden"
+                                        onChange={(e) => setSelectedFile(e.target.files[0])}
+                                    />
+                                    <label htmlFor="task-file-input" className={`file-label ${selectedFile ? 'file-selected' : ''}`}>
+                                        <div className="file-label-content">
+                                            {selectedFile ? (
+                                                <>
+                                                    <div className="check-icon-bg">
+                                                        <CheckCircle size={12} />
+                                                    </div>
+                                                    <div className="file-info-compact">
+                                                        <span className="file-name-text">{selectedFile.name}</span>
+                                                        <span className="file-ready-text">File siap dikirim</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="upload-placeholder-icon">
+                                                        <Upload size={15} />
+                                                    </div>
+                                                    <div className="file-info-compact">
+                                                        <span className="placeholder-text">Klik untuk pilih file</span>
+                                                        <span className="format-text">PDF, DOCX, ZIP (Maks 10MB)</span>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </label>
+                                    <button
+                                        className={`upload-submit-btn ${!selectedFile || isUploading ? 'disabled' : ''}`}
+                                        disabled={!selectedFile || isUploading}
+                                        onClick={() => {
+                                            const mat = materials.find(m => m.namaMapel === selectedSubject);
+                                            handleUploadTask(mat?.emailGuru || '', selectedSubject);
+                                        }}
+                                    >
+                                        {isUploading ? (
+                                            <div className="btn-loading">
+                                                <Loader2 className="animate-spin" size={15} />
+                                                <span>Mengirim...</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Send size={15} />
+                                                <span>Kirim Tugas</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Submission History Sub-section */}
+                    {mySubmissions.filter(s => {
+                        const match = s.subjectName?.trim().toLowerCase() === selectedSubject?.trim().toLowerCase();
+                        if (!match && s.subjectName) {
+                            console.log(`Mismatch: '${s.subjectName}' vs '${selectedSubject}'`);
+                        }
+                        return match;
+                    }).length > 0 && (
+                            <div className="submission-history-section animate-fade-in">
+                                <div className="history-header">
+                                    <div className="header-label">
+                                        <History size={18} />
+                                        <span>Track Your Progress</span>
+                                    </div>
+                                </div>
+                                <div className="submissions-compact-grid">
+                                    {mySubmissions.filter(s =>
+                                        s.subjectName?.trim().toLowerCase() === selectedSubject?.trim().toLowerCase()
+                                    ).map((sub, idx) => (
+                                        <div key={idx} className="submission-row">
+                                            <div className="sub-icon">
+                                                <div className="status-dot-absolute pulse-green"></div>
+                                                <FileText size={16} />
+                                            </div>
+                                            <div className="sub-details">
+                                                <span className="sub-filename" title={sub.fileName}>{sub.fileName}</span>
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span className="sub-time" style={{ fontSize: '0.7rem', color: '#6366f1', fontWeight: '800' }}>
+                                                        {sub.babName || 'Tugas Umum'}
+                                                    </span>
+                                                    <span className="sub-time">
+                                                        {new Date(sub.submittedAt).toLocaleString('id-ID', {
+                                                            day: '2-digit',
+                                                            month: 'long',
+                                                            year: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })} WIB
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <a href={sub.driveLink} target="_blank" rel="noopener noreferrer" className="sub-link">
+                                                <ExternalLink size={14} />
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                     <div className="babs-list">
                         {/* Chapters for this subject */}
                         {babs.filter(b => materials.some(m => m.namaMapel === selectedSubject && m.babId === b.id))
@@ -248,6 +505,26 @@ const StudentMaterials = () => {
                                     <div className="bab-header">
                                         <div className="bab-header-top">
                                             <h2>{bab.namaBab}</h2>
+                                            {bab.isDeadlineActive && bab.deadlineTugas && (
+                                                <div className={`deadline-tag ${new Date(bab.deadlineTugas) < new Date() ? 'expired' : ''}`} style={{
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '800',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '50px',
+                                                    background: new Date(bab.deadlineTugas) < new Date() ? '#fef2f2' : '#f5f3ff',
+                                                    color: new Date(bab.deadlineTugas) < new Date() ? '#ef4444' : '#6366f1',
+                                                    border: `1px solid ${new Date(bab.deadlineTugas) < new Date() ? '#fee2e2' : '#e0e7ff'}`,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    <Clock size={12} />
+                                                    <span>Batas: {new Date(bab.deadlineTugas).toLocaleString('id-ID', {
+                                                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                                    })}</span>
+                                                    {new Date(bab.deadlineTugas) < new Date() && <span style={{ textTransform: 'uppercase' }}>• Berakhir</span>}
+                                                </div>
+                                            )}
                                             {attendedBabs[bab.id] ? (
                                                 <div className="attendance-badge success">
                                                     <CheckCircle size={14} />
@@ -371,6 +648,52 @@ const StudentMaterials = () => {
                                     <p>Belum ada materi yang diunggah untuk mata pelajaran ini.</p>
                                 </div>
                             )}
+                    </div>
+                </div>
+            )}
+
+            {/* Aether-Premium Preview Modal */}
+            {previewFile && (
+                <div className="preview-overlay" onClick={() => setPreviewFile(null)}>
+                    <div className="preview-container animate-aether-zoom" onClick={e => e.stopPropagation()}>
+                        <div className="preview-header">
+                            <div className="preview-title">
+                                <div className="p-icon-bg">
+                                    <FileText size={16} />
+                                </div>
+                                <div className="p-text">
+                                    <h4>{previewFile.namaMateri}</h4>
+                                    <span>{previewFile.fileName}</span>
+                                </div>
+                            </div>
+                            <div className="preview-actions">
+                                <a
+                                    href={`/api/materi/view/${previewFile.extractedId}?download=true`}
+                                    download={previewFile.fileName}
+                                    className="p-btn download"
+                                    title="Download File"
+                                >
+                                    <Download size={18} />
+                                </a>
+                                <button className="p-btn close" onClick={() => setPreviewFile(null)} title="Close">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="preview-content">
+                            {/\.(jpg|jpeg|png|gif|webp)$/i.test(previewFile.fileName) ? (
+                                <div className="image-preview">
+                                    <img src={previewUrl} alt={previewFile.fileName} />
+                                </div>
+                            ) : (
+                                <iframe
+                                    src={previewUrl}
+                                    title={previewFile.fileName}
+                                    className="preview-iframe"
+                                    frameBorder="0"
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -504,21 +827,21 @@ const StudentMaterials = () => {
                 }
                 .back-btn:hover { background: #f8fafc; color: #1e293b; }
                 
-                .detail-header { margin-bottom: 40px; }
-                .detail-header h1 { font-size: 2.5rem; font-weight: 900; color: #0f172a; margin-bottom: 8px; }
-                .detail-header p { font-size: 1.1rem; color: #64748b; }
+                .detail-header { margin-bottom: 25px; }
+                .detail-header h1 { font-size: 1.8rem; font-weight: 950; color: #0f172a; margin-bottom: 5px; letter-spacing: -0.04em; }
+                .detail-header p { font-size: 0.95rem; color: #64748b; font-weight: 500; }
 
                 .bab-container {
                     background: white;
-                    border-radius: 32px;
-                    padding: 35px;
-                    margin-bottom: 40px;
+                    border-radius: 24px;
+                    padding: 25px;
+                    margin-bottom: 30px;
                     border: 1px solid #e2e8f0;
                     box-shadow: 0 10px 15px -3px rgba(0,0,0,0.03);
                 }
-                .bab-header { margin-bottom: 25px; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px; }
-                .bab-header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-                .bab-header h2 { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin: 0; }
+                .bab-header { margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px; }
+                .bab-header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+                .bab-header h2 { font-size: 1.25rem; font-weight: 850; color: #1e293b; margin: 0; }
                 
                 .attendance-badge {
                     display: flex;
@@ -548,16 +871,16 @@ const StudentMaterials = () => {
                 }
                 .attendance-btn:hover { background: #4f46e5; transform: translateY(-2px); box-shadow: 0 8px 16px rgba(99, 102, 241, 0.4); }
 
-                .prolog-text { font-size: 1rem; color: #64748b; line-height: 1.6; }
+                .prolog-text { font-size: 0.9rem; color: #64748b; line-height: 1.6; }
 
-                .materi-items { display: flex; flex-direction: column; gap: 12px; }
+                .materi-items { display: flex; flex-direction: column; gap: 10px; }
                 .materi-row {
                     display: flex;
                     align-items: center;
-                    gap: 16px;
-                    padding: 18px 24px;
+                    gap: 14px;
+                    padding: 14px 20px;
                     background: #f8fafc;
-                    border-radius: 18px;
+                    border-radius: 16px;
                     border: 1px solid transparent;
                     cursor: pointer;
                     transition: all 0.2s;
@@ -570,8 +893,8 @@ const StudentMaterials = () => {
                 }
                 .materi-row.is-new { border-left: 5px solid #6366f1; }
                 .materi-icon { color: #6366f1; }
-                .materi-name h4 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #1e293b; }
-                .materi-name span { font-size: 0.85rem; color: #94a3b8; }
+                .materi-name h4 { margin: 0; font-size: 0.95rem; font-weight: 750; color: #1e293b; }
+                .materi-name span { font-size: 0.8rem; color: #94a3b8; }
                 .materi-status { margin-left: auto; display: flex; align-items: center; gap: 12px; color: #cbd5e1; }
                 .badge-new { background: #fee2e2; color: #ef4444; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; }
                 .viewed-icon { color: #10b981; }
@@ -646,14 +969,335 @@ const StudentMaterials = () => {
 
                 /* Original Animations and Styles below...
 
+                /* Aether-Premium UI - The New Standard */
+                /* Aether-Premium UI - Ultra Compact */
+                .task-upload-section {
+                    background: rgba(255, 255, 255, 0.05);
+                    backdrop-filter: blur(40px) saturate(220%);
+                    -webkit-backdrop-filter: blur(40px) saturate(220%);
+                    border-radius: 24px;
+                    padding: 25px;
+                    margin-bottom: 30px;
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    position: relative;
+                    overflow: hidden;
+                    box-shadow: 
+                        0 20px 60px -15px rgba(0, 0, 0, 0.08),
+                        0 10px 30px -20px rgba(0, 0, 0, 0.08),
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+                    animation: aetherEntrance 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+                }
+                @keyframes aetherEntrance { 
+                    from { opacity: 0; transform: translateY(20px) scale(0.99); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                
+                .section-gradient-bg {
+                    position: absolute;
+                    top: -50%; left: -50%; width: 220%; height: 220%;
+                    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
+                                radial-gradient(circle at 80% 20%, rgba(167, 139, 250, 0.1) 0%, transparent 40%),
+                                radial-gradient(circle at 20% 80%, rgba(244, 114, 182, 0.1) 0%, transparent 40%);
+                    animation: auroraMotion 20s linear infinite;
+                    pointer-events: none;
+                }
+                @keyframes auroraMotion { 
+                    0% { transform: translate(0, 0) rotate(0deg); }
+                    50% { transform: translate(-2%, -2%) rotate(2deg); }
+                    100% { transform: translate(0, 0) rotate(360deg); } 
+                }
+
+                .task-upload-section::before {
+                    content: '';
+                    position: absolute;
+                    top: 0; left: 0; width: 100%; height: 6px;
+                    background: linear-gradient(90deg, #6366f1, #a78bfa, #f472b6, #6366f1);
+                    background-size: 300% 100%;
+                    animation: glowBar 5s linear infinite;
+                }
+                @keyframes glowBar { 0% { background-position: 100% 0%; } 100% { background-position: 0% 0%; } }
+
+                .upload-content { display: flex; flex-direction: column; gap: 20px; z-index: 20; position: relative; }
+                .upload-info { display: flex; align-items: center; gap: 18px; }
+                .upload-icon-wrapper {
+                    width: 52px; height: 52px;
+                    background: linear-gradient(135deg, #6366f1 0%, #4438ca 100%);
+                    border-radius: 16px;
+                    display: flex; align-items: center; justify-content: center;
+                    color: white;
+                    box-shadow: 0 10px 25px -10px rgba(99, 102, 241, 0.4);
+                    transform: rotate(-3deg);
+                    transition: all 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+                }
+                .upload-icon-wrapper:hover { transform: rotate(0deg) scale(1.1); }
+                
+                .upload-text h3 { margin: 0; font-size: 1.4rem; font-weight: 1000; color: #0f172a; letter-spacing: -0.04em; line-height: 1.1; }
+                .upload-text p { margin: 5px 0 0 0; font-size: 0.9rem; color: #475569; font-weight: 500; line-height: 1.4; max-width: 450px; }
+
+                .upload-controls { 
+                    display: grid; 
+                    grid-template-columns: 1fr auto;
+                    gap: 15px; 
+                    padding: 15px;
+                    background: rgba(255, 255, 255, 0.45);
+                    backdrop-filter: blur(15px);
+                    border-radius: 20px;
+                    border: 1px solid rgba(255, 255, 255, 0.8);
+                    box-shadow: inset 0 2px 8px rgba(0,0,0,0.02);
+                }
+                .file-label {
+                    background: white;
+                    padding: 0 18px;
+                    min-height: 52px;
+                    border: 2px dashed #e2e8f0;
+                    border-radius: 16px;
+                    cursor: pointer;
+                    transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+                    display: flex; align-items: center; justify-content: flex-start;
+                }
+                .file-label-content { display: flex; align-items: center; gap: 15px; flex: 1; }
+                .upload-placeholder-icon { 
+                    width: 34px; height: 34px; 
+                    background: #f8fafc; 
+                    border-radius: 10px; 
+                    display: flex; align-items: center; justify-content: center; 
+                    color: #94a3b8;
+                    transition: all 0.3s;
+                }
+                .file-label:hover .upload-placeholder-icon { background: #eef2ff; color: #6366f1; transform: translateY(-2px); }
+                
+                .placeholder-text { font-size: 0.95rem; font-weight: 1000; color: #1e293b; letter-spacing: -0.02em; }
+                .format-text { font-size: 0.75rem; color: #94a3b8; font-weight: 600; margin-top: 1px; }
+
+                .file-selected {
+                    background: linear-gradient(to right, #fafff8, #ffffff);
+                    border-color: #10b981;
+                    border-style: solid;
+                    box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.15);
+                }
+                .file-ready-text { font-size: 0.75rem; color: #059669; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+                .check-icon-bg { 
+                    width: 32px; height: 32px; 
+                    background: #10b981; 
+                    color: white; 
+                    border-radius: 8px; 
+                    display: flex; align-items: center; justify-content: center; 
+                    box-shadow: 0 5px 10px rgba(16, 185, 129, 0.25);
+                    animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                }
+                @keyframes bounceIn { 0% { transform: scale(0.5); } 80% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+                .upload-submit-btn {
+                    padding: 0 24px;
+                    min-height: 52px;
+                    background: #0f172a;
+                    color: white;
+                    border-radius: 16px;
+                    border: none;
+                    font-size: 1rem;
+                    font-weight: 1000;
+                    cursor: pointer;
+                    transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+                    display: flex; align-items: center; justify-content: center; gap: 12px;
+                }
+                .upload-submit-btn:not(.disabled) {
+                    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+                    box-shadow: 0 15px 35px -10px rgba(99, 102, 241, 0.4);
+                }
+                .upload-submit-btn:hover:not(.disabled) { transform: translateY(-3px); box-shadow: 0 15px 30px -10px rgba(99, 102, 241, 0.45); }
+
+                /* Aether Submission History - Compact */
+                .submission-history-section {
+                    background: rgba(255, 255, 255, 0.4);
+                    backdrop-filter: blur(25px);
+                    border-radius: 24px;
+                    padding: 28px;
+                    margin-bottom: 40px;
+                    border: 1px solid rgba(255, 255, 255, 0.6);
+                    box-shadow: 0 12px 30px -15px rgba(0,0,0,0.06);
+                }
+                .history-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+                .header-label { 
+                    font-size: 1.3rem; font-weight: 1000; color: #0f172a; letter-spacing: -0.04em; 
+                    background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                }
+
+                .submissions-compact-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 15px;
+                }
+                .submission-row {
+                    background: white;
+                    border-radius: 18px;
+                    padding: 15px;
+                    display: flex; align-items: center; gap: 14px;
+                    border: 1px solid #f8fafc;
+                    transition: all 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+                    position: relative;
+                }
+                .submission-row:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.15);
+                    border-color: rgba(99, 102, 241, 0.15);
+                }
+                .sub-icon { 
+                    width: 44px; height: 44px; 
+                    background: #f5f3ff; color: #6366f1; 
+                    border-radius: 10px; 
+                    display: flex; align-items: center; justify-content: center;
+                }
+                .sub-filename { font-size: 1rem; font-weight: 1000; color: #1e293b; margin-bottom: 2px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .sub-time { font-size: 0.8rem; color: #94a3b8; font-weight: 750; }
+                
+                .sub-link {
+                    width: 40px; height: 40px; 
+                    background: #f1f5f9; color: #475569; 
+                    border-radius: 10px; 
+                    display: flex; align-items: center; justify-content: center; 
+                    transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+                    border: 1px solid #e2e8f0;
+                }
+                .sub-link:hover { 
+                    background: #6366f1; color: white; border-color: #6366f1; 
+                    transform: rotate(90deg) scale(1.1);
+                    box-shadow: 0 8px 15px rgba(99, 102, 241, 0.25);
+                }
+
+                [data-theme="dark"] .task-upload-section { background: rgba(15, 23, 42, 0.85); border-color: rgba(99, 102, 241, 0.4); }
+                [data-theme="dark"] .upload-text h3 { color: #f8fafc; }
+                [data-theme="dark"] .upload-text p { color: #cbd5e1; }
+                [data-theme="dark"] .upload-controls { background: rgba(31, 41, 55, 0.8); }
+                [data-theme="dark"] .file-label { background: #0f172a; border-color: #1e293b; }
+                [data-theme="dark"] .placeholder-text { color: #f1f5f9; }
+                [data-theme="dark"] .submission-history-section { background: rgba(31, 41, 55, 0.6); }
+                [data-theme="dark"] .submission-row { background: #111827; border-color: #1f2937; }
+                [data-theme="dark"] .sub-filename { color: #f9fafb; }
+                [data-theme="dark"] .header-label { background: linear-gradient(135deg, #f9fafb 0%, #9ca3af 100%); -webkit-background-clip: text; }
+                [data-theme="dark"] .sub-icon { background: #0f172a; color: #818cf8; }
+                [data-theme="dark"] .sub-link { background: #0f172a; border-color: #1f2937; color: #9ca3af; }
+
+                .hidden { display: none; }
+                .animate-fade-in { animation: fadeIn 1.5s cubic-bezier(0.19, 1, 0.22, 1); }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+                .status-dot-absolute {
+                    position: absolute;
+                    top: -5px; right: -5px;
+                    width: 14px; height: 14px;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    z-index: 10;
+                }
+                .pulse-green { 
+                    background: #10b981; 
+                    box-shadow: 0 0 10px #10b981;
+                    animation: statusPulse 2s infinite; 
+                }
+                @keyframes statusPulse { 
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.3); opacity: 0.7; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                [data-theme="dark"] .status-dot-absolute { border-color: #111827; }
+
                 .empty-state {
                     text-align: center;
-                    padding: 80px 20px;
-                    background: #f8fafc;
+                    padding: 80px 40px;
+                    background: rgba(248, 250, 252, 0.6);
                     border-radius: 32px;
-                    border: 2px dashed #e2e8f0;
+                    border: 3px dashed #e2e8f0;
                     color: #94a3b8;
+                    font-size: 1.2rem;
+                    font-weight: 1000;
+                    letter-spacing: -0.02em;
                 }
+                [data-theme="dark"] .empty-state { background: rgba(17, 24, 39, 0.6); border-color: #1f2937; }
+
+                /* Aether Preview Modal Styles */
+                .preview-overlay {
+                    position: fixed;
+                    top: 0; left: 0; width: 100vw; height: 100vh;
+                    background: rgba(15, 23, 42, 0.6);
+                    backdrop-filter: blur(20px) saturate(180%);
+                    -webkit-backdrop-filter: blur(20px) saturate(180%);
+                    display: flex; align-items: center; justify-content: center;
+                    z-index: 10000;
+                    padding: 40px;
+                    animation: aetherFadeIn 0.3s ease;
+                }
+                @keyframes aetherFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                
+                .preview-container {
+                    background: rgba(255, 255, 255, 0.9);
+                    backdrop-filter: blur(40px);
+                    width: 100%; height: 100%;
+                    max-width: 1400px; max-height: 900px;
+                    border-radius: 32px;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.3);
+                    display: flex; flex-direction: column;
+                    overflow: hidden;
+                    position: relative;
+                }
+                .animate-aether-zoom { animation: aetherZoom 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
+                @keyframes aetherZoom { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+                .preview-header {
+                    padding: 20px 30px;
+                    background: rgba(255, 255, 255, 0.8);
+                    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+                    display: flex; align-items: center; justify-content: space-between;
+                    backdrop-filter: blur(10px);
+                    z-index: 20;
+                }
+                .preview-title { display: flex; align-items: center; gap: 16px; }
+                .p-icon-bg { 
+                    width: 40px; height: 40px; background: #6366f1; color: white; border-radius: 12px;
+                    display: flex; align-items: center; justify-content: center;
+                }
+                .p-text h4 { margin: 0; font-size: 1.1rem; font-weight: 850; color: #0f172a; }
+                .p-text span { font-size: 0.85rem; color: #64748b; font-weight: 500; }
+
+                .preview-actions { display: flex; align-items: center; gap: 12px; }
+                .p-btn {
+                    width: 44px; height: 44px; border-radius: 12px;
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid #e2e8f0; background: white; color: #475569;
+                    cursor: pointer; transition: all 0.3s;
+                }
+                .p-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                .p-btn.close:hover { background: #fee2e2; color: #ef4444; border-color: #fee2e2; }
+                .p-btn.download:hover { background: #f0fdf4; color: #10b981; border-color: #f0fdf4; }
+
+                .preview-content { flex: 1; background: #f8fafc; position: relative; overflow: hidden; }
+                .preview-iframe { width: 100%; height: 100%; border: none; }
+                
+                .image-preview {
+                    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+                    padding: 40px; overflow: auto;
+                }
+                .image-preview img {
+                    max-width: 100%; max-height: 100%; object-fit: contain;
+                    border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+                    animation: imgEntrance 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+                }
+                @keyframes imgEntrance { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+                [data-theme="dark"] .preview-container { background: rgba(15, 23, 42, 0.95); border-color: rgba(99, 102, 241, 0.2); }
+                [data-theme="dark"] .preview-header { background: rgba(30, 41, 59, 0.8); border-bottom-color: rgba(99, 102, 241, 0.2); }
+                [data-theme="dark"] .p-text h4 { color: #f1f5f9; }
+                [data-theme="dark"] .p-text span { color: #94a3b8; }
+                [data-theme="dark"] .p-btn { background: #0f172a; border-color: #1e293b; color: #cbd5e1; }
+                [data-theme="dark"] .preview-content { background: #020617; }
+                
+                @media (max-width: 768px) {
+                    .preview-overlay { padding: 0; }
+                    .preview-container { border-radius: 0; max-height: 100vh; }
+                }
+
             `}
             </style>
         </div>

@@ -30,4 +30,11 @@ public class Bab {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guru_mapel_id", nullable = false)
     private GuruMapel guruMapel;
+
+    @Column(name = "deadline_tugas")
+    private java.time.LocalDateTime deadlineTugas;
+
+    @Column(name = "is_deadline_active")
+    @Builder.Default
+    private Boolean isDeadlineActive = false;
 }
