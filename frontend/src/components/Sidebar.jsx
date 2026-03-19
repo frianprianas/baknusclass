@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BAKNUS_MAIL_URL } from '../config';
 import {
   Home,
   BookOpen,
@@ -130,7 +131,17 @@ const Sidebar = ({ activePage, setActivePage }) => {
 
       <div className="sidebar-footer">
         <div className="user-info">
-          <div className="user-avatar">{user.name?.charAt(0) || 'U'}</div>
+          <div className="user-avatar" style={{ position: 'relative', overflow: 'hidden' }}>
+            <img
+              src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${userEmail}`}
+              alt=""
+              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerText = user.name?.charAt(0) || 'U';
+              }}
+            />
+          </div>
           <div className="user-details">
             <p className="user-name">{user.name || 'User'}</p>
             <p className="user-role">

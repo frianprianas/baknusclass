@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { BAKNUS_MAIL_URL } from '../config';
 import {
     MessageSquare,
     Send,
@@ -488,7 +489,17 @@ const ForumDiscussion = () => {
                     <div className="chat-topic-description">
                         <div className="original-post">
                             <div className="message-user">
-                                <div className="user-initials guru">G</div>
+                                <div className={`user-initials ${selectedTopic.roleGuru?.toLowerCase() || 'guru'}`} style={{ position: 'relative', overflow: 'hidden' }}>
+                                    <img
+                                        src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${selectedTopic.namaGuruEmail}`}
+                                        alt=""
+                                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.parentElement.innerText = selectedTopic.namaGuru?.charAt(0) || 'G';
+                                        }}
+                                    />
+                                </div>
                                 <div className="message-details">
                                     <span className="user-name">{selectedTopic.namaGuru}</span>
                                     <span className="user-role">Moderator</span>
@@ -509,8 +520,16 @@ const ForumDiscussion = () => {
                         {comments.map(comment => (
                             <div key={comment.id} className={`message-bubble ${comment.userId === user.userId ? 'own' : ''}`}>
                                 <div className={`message-user ${comment.userId === user.userId ? 'rtl' : ''}`}>
-                                    <div className={`user-initials ${comment.roleUser.toLowerCase()}`}>
-                                        {comment.namaUser.charAt(0)}
+                                    <div className={`user-initials ${comment.roleUser.toLowerCase()}`} style={{ position: 'relative', overflow: 'hidden' }}>
+                                        <img
+                                            src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${comment.email}`}
+                                            alt=""
+                                            style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                e.target.parentElement.innerText = comment.namaUser.charAt(0);
+                                            }}
+                                        />
                                     </div>
                                     <div className="message-details">
                                         <span className="user-name">{comment.namaUser}</span>

@@ -19,6 +19,8 @@ const Dashboard = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [proctorEvents, setProctorEvents] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
@@ -72,6 +74,25 @@ const Dashboard = () => {
     if (user.role === 'SISWA') checkStudentExams();
   }, []);
 
+  useEffect(() => {
+    if (summary?.aktivitasTerakhir?.length > 0) {
+      const lastSeen = localStorage.getItem('lastSeenActivity');
+      const latest = summary.aktivitasTerakhir[0].date + summary.aktivitasTerakhir[0].user;
+      if (lastSeen !== latest) {
+        setUnreadCount(summary.aktivitasTerakhir.length);
+      }
+    }
+  }, [summary]);
+
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications && summary?.aktivitasTerakhir?.length > 0) {
+      const latest = summary.aktivitasTerakhir[0].date + summary.aktivitasTerakhir[0].user;
+      localStorage.setItem('lastSeenActivity', latest);
+      setUnreadCount(0);
+    }
+  };
+
   const dataCards = [
     { label: 'Total Siswa', value: summary?.totalSiswa || 0, icon: Users, color: '#3b82f6' },
     { label: 'Total Guru', value: summary?.totalGuru || 0, icon: GraduationCap, color: '#8b5cf6' },
@@ -88,10 +109,40 @@ const Dashboard = () => {
         </div>
 
         <div className="top-nav-actions">
-          <button className="icon-btn">
-            <Bell size={20} />
-            <span className="badge"></span>
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button className="icon-btn" onClick={handleBellClick}>
+              <Bell size={20} />
+              {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+            </button>
+
+            {showNotifications && (
+              <div className="notifications-dropdown animate-slide-up">
+                <div className="notif-header">
+                  <h4>Notifikasi</h4>
+                  {unreadCount > 0 && <span className="unread-tag">{unreadCount} Baru</span>}
+                </div>
+                <div className="notif-body">
+                  {summary?.aktivitasTerakhir && summary.aktivitasTerakhir.length > 0 ? (
+                    summary.aktivitasTerakhir.map((act, i) => (
+                      <div key={i} className="notif-item">
+                        <div className="notif-dot"></div>
+                        <div className="notif-content">
+                          <p><strong>{act.user}</strong> {act.action}</p>
+                          <span className="notif-time">{act.date}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="notif-empty">Tidak ada notifikasi baru</div>
+                  )}
+                </div>
+                <div className="notif-footer">
+                  <button onClick={() => navigate('/exam-scoring')}>Lihat Semua Aktivitas</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="v-divider"></div>
           <div className="welcome-text">
             <p>Halo, <span>{user.name || 'User'}</span></p>
@@ -599,6 +650,116 @@ const Dashboard = () => {
         [data-theme="dark"] .activity-dot {
           background: #3b82f6;
           box-shadow: 0 0 0 4px #1e293b;
+        }
+
+        /* Notifications Dropdown */
+        .notifications-dropdown {
+          position: absolute;
+          top: 50px;
+          right: 0;
+          width: 320px;
+          background: white;
+          border-radius: 16px;
+          box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+          border: 1px solid #e5e7eb;
+          z-index: 1000;
+          overflow: hidden;
+        }
+
+        [data-theme="dark"] .notifications-dropdown {
+          background: #1e293b;
+          border-color: #334155;
+        }
+
+        .notif-header {
+          padding: 16px 20px;
+          border-bottom: 1px solid #f1f5f9;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        [data-theme="dark"] .notif-header {
+          border-bottom-color: #334155;
+        }
+
+        .notif-header h4 { margin: 0; font-weight: 700; color: #1e293b; }
+        [data-theme="dark"] .notif-header h4 { color: #f8fafc; }
+
+        .unread-tag {
+          background: #3b82f6;
+          color: white;
+          font-size: 0.7rem;
+          padding: 2px 8px;
+          border-radius: 50px;
+          font-weight: 700;
+        }
+
+        .notif-body {
+          max-height: 350px;
+          overflow-y: auto;
+        }
+
+        .notif-item {
+          padding: 12px 20px;
+          display: flex;
+          gap: 12px;
+          border-bottom: 1px solid #f8fafc;
+          transition: background 0.2s;
+          cursor: pointer;
+        }
+
+        .notif-item:hover { background: #f8fafc; }
+        [data-theme="dark"] .notif-item:hover { background: #0f172a; }
+
+        .notif-dot {
+          flex-shrink: 0;
+          width: 8px;
+          height: 8px;
+          background: #3b82f6;
+          border-radius: 50%;
+          margin-top: 6px;
+        }
+
+        .notif-content p {
+          margin: 0;
+          font-size: 0.85rem;
+          color: #475569;
+          line-height: 1.4;
+        }
+
+        [data-theme="dark"] .notif-content p { color: #cbd5e1; }
+        [data-theme="dark"] .notif-content p strong { color: #f8fafc; }
+
+        .notif-time {
+          font-size: 0.75rem;
+          color: #94a3b8;
+          display: block;
+          margin-top: 4px;
+        }
+
+        .notif-empty {
+          padding: 40px 20px;
+          text-align: center;
+          color: #94a3b8;
+          font-size: 0.9rem;
+        }
+
+        .notif-footer {
+          padding: 12px;
+          text-align: center;
+          border-top: 1px solid #f1f5f9;
+        }
+
+        [data-theme="dark"] .notif-footer { border-top-color: #334155; }
+
+        .notif-footer button {
+          background: none;
+          border: none;
+          color: #3b82f6;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
         }
       `}</style>
     </div>

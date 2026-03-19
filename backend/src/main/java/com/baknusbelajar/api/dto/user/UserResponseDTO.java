@@ -11,6 +11,7 @@ public class UserResponseDTO {
     private String role;
     private boolean isActive;
     private String namaLengkap;
+    private String phoneNumber;
     private Long profileId; // guruId or siswaId
 
     // Additional info for Siswa

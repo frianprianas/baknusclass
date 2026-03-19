@@ -19,6 +19,7 @@ public class ForumTopikDTO {
     private Boolean isClosed;
     private Long guruMapelId;
     private String namaGuru;
+    private String namaGuruEmail;
     private String namaMapel;
     private String namaKelas;
     private LocalDateTime createdAt;

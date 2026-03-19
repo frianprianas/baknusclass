@@ -34,6 +34,7 @@ public class UserService {
             dto.setRole(user.getRole());
             dto.setActive(user.getIsActive());
             dto.setNamaLengkap(user.getNamaLengkap());
+            dto.setPhoneNumber(user.getPhoneNumber());
 
             if ("SISWA".equalsIgnoreCase(user.getRole())) {
                 siswaRepository.findByUserId(user.getId()).ifPresent(s -> {
@@ -195,6 +196,9 @@ public class UserService {
 
         if (request.getNamaLengkap() != null) {
             user.setNamaLengkap(request.getNamaLengkap());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
         }
         userRepository.save(user);
 

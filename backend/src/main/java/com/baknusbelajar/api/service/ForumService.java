@@ -161,6 +161,7 @@ public class ForumService {
                                 .konten(t.getKonten())
                                 .guruMapelId(t.getGuruMapel().getId())
                                 .namaGuru(t.getGuruMapel().getGuru().getNamaLengkap())
+                                .namaGuruEmail(t.getGuruMapel().getGuru().getUser().getEmail())
                                 .namaMapel(t.getGuruMapel().getMapel().getNamaMapel())
                                 .namaKelas(t.getGuruMapel().getKelas() != null
                                                 ? t.getGuruMapel().getKelas().getNamaKelas()
@@ -181,6 +182,7 @@ public class ForumService {
                                 .namaUser(k.getUser().getNamaLengkap())
                                 .roleUser(k.getUser().getRole())
                                 .isiKomentar(k.getIsiKomentar())
+                                .email(k.getUser().getEmail())
                                 .createdAt(k.getCreatedAt())
                                 .build();
         }

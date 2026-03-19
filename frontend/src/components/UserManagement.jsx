@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { BAKNUS_MAIL_URL } from '../config';
 import {
     Users,
     RefreshCw,
@@ -22,7 +23,8 @@ const UserManagement = () => {
         namaLengkap: '',
         kelasId: '',
         nisn: '',
-        nip: ''
+        nip: '',
+        phoneNumber: ''
     });
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -82,7 +84,8 @@ const UserManagement = () => {
             namaLengkap: user.namaLengkap || '',
             kelasId: user.kelasId || '',
             nisn: user.nisn || '',
-            nip: user.nip || ''
+            nip: user.nip || '',
+            phoneNumber: user.phoneNumber || ''
         });
         setIsEditModalOpen(true);
     };
@@ -102,6 +105,27 @@ const UserManagement = () => {
             alert('Gagal memperbarui data: ' + (err.response?.data?.message || err.message));
         } finally {
             setUpdating(false);
+        }
+    };
+
+    const [syncingProfile, setSyncingProfile] = useState(false);
+    const handleSyncProfile = async () => {
+        if (!selectedUser?.email) return;
+        setSyncingProfile(true);
+        try {
+            const response = await axios.get(`${BAKNUS_MAIL_URL}/api/auth/info/${selectedUser.email}`);
+            const profile = response.data;
+            setFormData({
+                ...formData,
+                namaLengkap: profile.displayName || formData.namaLengkap,
+                phoneNumber: profile.phoneNumber || formData.phoneNumber
+            });
+            alert('Data profil berhasil ditarik dari sistem Email Sekolah!');
+        } catch (err) {
+            console.error('Failed to sync profile', err);
+            alert('Gagal menarik profil: Sistem BaknusMail mungkin sedang tidak dapat dijangkau.');
+        } finally {
+            setSyncingProfile(false);
         }
     };
 
@@ -195,6 +219,7 @@ const UserManagement = () => {
                                 <th>Role</th>
                                 <th>Status</th>
                                 <th>Info Tambahan</th>
+                                <th>WhatsApp</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -208,8 +233,16 @@ const UserManagement = () => {
                                     <tr key={user.id}>
                                         <td>
                                             <div className="user-cell">
-                                                <div className="user-avatar-small">
-                                                    {user.username?.charAt(0).toUpperCase()}
+                                                <div className="user-avatar-small" style={{ position: 'relative', overflow: 'hidden' }}>
+                                                    <img
+                                                        src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${user.email}`}
+                                                        alt=""
+                                                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.parentElement.innerText = user.username?.charAt(0).toUpperCase();
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div className="user-meta">
                                                     <p className="full-name">{user.namaLengkap || 'No Name'}</p>
@@ -237,6 +270,19 @@ const UserManagement = () => {
                                                     <span className="info-tag">Mapel: {user.mapelNames?.length || 0}</span>
                                                 )}
                                             </div>
+                                        </td>
+                                        <td>
+                                            {user.phoneNumber ? (
+                                                <a
+                                                    href={`https://wa.me/${user.phoneNumber.replace(/[^0-9]/g, '')}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    style={{ color: '#10b981', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                                >
+                                                    <MessageCircle size={16} />
+                                                    {user.phoneNumber}
+                                                </a>
+                                            ) : '-'}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '8px' }}>
@@ -328,6 +374,27 @@ const UserManagement = () => {
                                     />
                                 </div>
                             )}
+
+                            <div className="form-group">
+                                <label>Nomor WhatsApp</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="text"
+                                        value={formData.phoneNumber}
+                                        onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                                        placeholder="Contoh: 08123456789"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        style={{ whiteSpace: 'nowrap', padding: '0 12px' }}
+                                        onClick={handleSyncProfile}
+                                        disabled={syncingProfile}
+                                    >
+                                        {syncingProfile ? '...' : 'Sync Profile & WA'}
+                                    </button>
+                                </div>
+                            </div>
 
                             <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '8px 0 0' }}>
                                 * Untuk mengatur mata pelajaran yang diampu, gunakan menu <strong>Data Master → Guru Pengampu</strong>

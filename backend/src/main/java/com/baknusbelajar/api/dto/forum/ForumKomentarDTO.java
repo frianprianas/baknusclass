@@ -18,5 +18,6 @@ public class ForumKomentarDTO {
     private String namaUser;
     private String roleUser;
     private String isiKomentar;
+    private String email;
     private LocalDateTime createdAt;
 }
