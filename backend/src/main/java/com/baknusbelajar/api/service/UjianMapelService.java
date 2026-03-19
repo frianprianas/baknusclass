@@ -27,6 +27,7 @@ public class UjianMapelService {
     private final SiswaRepository siswaRepository;
     private final com.baknusbelajar.api.repository.SiswaUjianStatusRepository siswaUjianStatusRepository;
     private final BaknusDriveService baknusDriveService;
+    private final JawabanSiswaService jawabanSiswaService;
 
     public List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO> getExamMonitoring(Long ujianId,
             java.util.Set<String> onlineStudents) {
@@ -117,6 +118,9 @@ public class UjianMapelService {
         status.setStatusSelesai(true);
         status.setWaktuSelesai(java.time.LocalDateTime.now());
         siswaUjianStatusRepository.save(status);
+
+        // Trigger automatic AI scoring if enabled
+        jawabanSiswaService.processAiScoringForUjianAndSiswa(ujianId, siswa.getId());
     }
 
     public List<UjianMapelDTO> getUjianByGuruMapel(Long guruMapelId) {

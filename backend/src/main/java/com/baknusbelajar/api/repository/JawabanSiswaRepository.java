@@ -17,5 +17,7 @@ public interface JawabanSiswaRepository extends JpaRepository<JawabanSiswa, Long
 
     List<JawabanSiswa> findBySoalEssay_UjianMapel_Id(Long ujianId);
 
+    List<JawabanSiswa> findBySiswaIdAndSoalEssay_UjianMapel_Id(Long siswaId, Long ujianId);
+
     long countBySkorFinalGuruIsNull();
 }

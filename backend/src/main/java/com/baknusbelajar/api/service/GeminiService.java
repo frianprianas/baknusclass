@@ -27,12 +27,13 @@ public class GeminiService {
     @Value("${gemini.model:gemini-1.5-flash}")
     private String model;
 
-    public String getCurrentKey() {
-        // Check for user-configured key in database first
-        String userKey = appSettingService.getSettingValue("ai_api_key", "");
-        if (!userKey.trim().isEmpty()) {
-            log.info("Using AI API Key from Database Setting 'ai_api_key'");
-            return userKey.trim();
+    public String getCurrentKey(boolean forceConfig) {
+        if (!forceConfig) {
+            String userKey = appSettingService.getSettingValue("ai_api_key", "");
+            if (!userKey.trim().isEmpty()) {
+                log.info("Using AI API Key from Database Setting 'ai_api_key'");
+                return userKey.trim();
+            }
         }
 
         List<String> actualKeys = getActualKeys();
@@ -41,7 +42,7 @@ public class GeminiService {
             throw new RuntimeException("No Gemini API keys configured");
         }
         int index = Math.abs(keyIndex.get()) % actualKeys.size();
-        log.info("Using AI API Key index: {} of total keys: {}", index, actualKeys.size());
+        log.info("Using System Config AI API Key (index: {} of {})", index, actualKeys.size());
         return actualKeys.get(index);
     }
 
@@ -64,8 +65,8 @@ public class GeminiService {
         keyIndex.incrementAndGet();
     }
 
-    public Mono<String> scoreEssay(String question, String answerKey, String studentAnswer) {
-        String prompt = String.format(
+    private String buildPrompt(String question, String answerKey, String studentAnswer) {
+        return String.format(
                 "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa berdasarkan Kunci Jawaban yang diberikan.\n\n"
                         + "Pertanyaan: %s\n" +
                         "Kunci Jawaban: %s\n" +
@@ -77,6 +78,10 @@ public class GeminiService {
                         "}\n" +
                         "Kembalikan HANYA JSON tersebut.",
                 question, answerKey, studentAnswer);
+    }
+
+    public Mono<String> scoreEssay(String question, String answerKey, String studentAnswer) {
+        String prompt = buildPrompt(question, answerKey, studentAnswer);
 
         String priority = appSettingService.getSettingValue("ai_priority_provider", "gemini");
 
@@ -87,16 +92,29 @@ public class GeminiService {
         }
     }
 
+    public Mono<String> scoreEssayDirect(String question, String answerKey, String studentAnswer) {
+        String prompt = buildPrompt(question, answerKey, studentAnswer);
+        return doScoreGemini(prompt, question, answerKey, studentAnswer);
+    }
+
     private Mono<String> doScoreGemini(String prompt, String question, String answerKey, String studentAnswer) {
         return callGemini(prompt)
+                .onErrorResume(geminiError -> {
+                    String msg = geminiError.getMessage() != null ? geminiError.getMessage() : "";
+                    if (msg.contains("400") && msg.contains("API key not valid")) {
+                        log.warn("User AI API Key is invalid. Retrying with System Config Keys...");
+                        return callGemini(prompt).contextWrite(ctx -> ctx.put("useConfigOnly", true));
+                    }
+                    return Mono.error(geminiError);
+                })
                 .retryWhen(reactor.util.retry.Retry.max(2).filter(throwable -> {
                     rotateKey();
                     log.warn("Gemini API call failed. Rotating key and retrying... Error: {}", throwable.getMessage());
                     return true;
                 }))
-                .onErrorResume(geminiError -> {
-                    log.warn("Gemini exhausted. Error: {}. Attempting fallback to other services...",
-                            geminiError.getMessage());
+                .onErrorResume(finalError -> {
+                    log.error("Gemini Error Final: {}. Attempting fallback to other services...",
+                            finalError.getMessage());
                     return doScoreFallback(prompt, question, answerKey, studentAnswer, false);
                 });
     }
@@ -120,9 +138,11 @@ public class GeminiService {
         }
     }
 
-    private Mono<String> callGemini(String prompt) {
-        return Mono.defer(() -> {
-            String apiKey = getCurrentKey();
+    public Mono<String> callGemini(String prompt) {
+        return Mono.deferContextual(ctx -> {
+            boolean useConfigOnly = ctx.getOrDefault("useConfigOnly", false);
+            log.info("callGemini Debug: useConfigOnly={}", useConfigOnly);
+            String apiKey = getCurrentKey(useConfigOnly);
             String userModel = appSettingService.getSettingValue("ai_model", "");
             String activeModel = (userModel != null && !userModel.trim().isEmpty()) ? userModel : model;
 
@@ -132,15 +152,16 @@ public class GeminiService {
                 log.info("Using Gemini Model from Config (YML): {}", activeModel);
             }
 
-            // Use v1beta as it is required for gemini-2.5-flash and other newer models in
-            // this region
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/" + activeModel
+            // Use v1 for stable models
+            String url = "https://generativelanguage.googleapis.com/v1/models/" + activeModel
                     + ":generateContent?key="
                     + apiKey;
 
-            String maskedUrl = url.replace(apiKey,
-                    apiKey.substring(0, 5) + "..." + apiKey.substring(apiKey.length() - 4));
-            log.info("Calling Gemini API: {}", maskedUrl);
+            log.info("Gemini Full URL: {}", url.replace(apiKey, "REDACTED"));
+
+            String maskedApiKey = apiKey.substring(0, 5) + "..." + apiKey.substring(apiKey.length() - 4);
+            log.info("Calling Gemini API with model: {} and key: {}", activeModel, maskedApiKey);
+            log.debug("Prompt segment: {}...", prompt.length() > 50 ? prompt.substring(0, 50) : prompt);
 
             Map<String, Object> body = Map.of(
                     "contents", List.of(

@@ -2,15 +2,18 @@ package com.baknusbelajar.api.controller.materi;
 
 import com.baknusbelajar.api.dto.materi.MateriDTO;
 import com.baknusbelajar.api.service.MateriService;
+import com.baknusbelajar.api.service.BaknusDriveService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/materi")
@@ -19,6 +22,7 @@ import java.util.List;
 public class MateriController {
 
     private final MateriService materiService;
+    private final BaknusDriveService driveService;
 
     @GetMapping("/my")
     @PreAuthorize("hasRole('GURU')")
@@ -94,7 +98,15 @@ public class MateriController {
 
     @GetMapping("/view/collabora/{id}")
     public ResponseEntity<java.util.Map<String, String>> getCollaboraUrl(@PathVariable Long id) {
-        String viewerUrl = driveService.getCollaboraViewerUrl(id);
+        com.baknusbelajar.api.entity.Materi materi = materiService.getMateriEntity(id);
+        if (materi == null || materi.getDriveLink() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        String driveLink = materi.getDriveLink();
+        String driveFileId = driveLink.substring(driveLink.lastIndexOf("/") + 1);
+
+        String viewerUrl = driveService.getCollaboraViewerUrl(driveFileId);
         if (viewerUrl != null) {
             return ResponseEntity.ok(java.util.Map.of("url", viewerUrl));
         }

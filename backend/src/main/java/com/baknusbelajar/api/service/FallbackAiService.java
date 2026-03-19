@@ -26,13 +26,13 @@ public class FallbackAiService {
     @Value("${fallback-ai.keys:}")
     private List<String> apiKeys;
 
-    @Value("${fallback-ai.model:gpt-4o-mini}")
+    @Value("${fallback-ai.model:mistral-large-latest}")
     private String model;
 
-    @Value("${fallback-ai.base-url:https://api.openai.com/v1}")
+    @Value("${fallback-ai.base-url:https://api.mistral.ai/v1}")
     private String baseUrl;
 
-    @Value("${fallback-ai.provider:openai}")
+    @Value("${fallback-ai.provider:mistral}")
     private String provider;
 
     public boolean isAvailable() {
@@ -42,10 +42,12 @@ public class FallbackAiService {
         return !getActualKeys().isEmpty();
     }
 
-    private String getCurrentKey() {
-        String userKey = appSettingService.getSettingValue("ai_api_key", "");
-        if (!userKey.trim().isEmpty()) {
-            return userKey.trim();
+    private String getCurrentKey(boolean forceConfig) {
+        if (!forceConfig) {
+            String userKey = appSettingService.getSettingValue("ai_api_key", "");
+            if (!userKey.trim().isEmpty()) {
+                return userKey.trim();
+            }
         }
         List<String> actualKeys = getActualKeys();
         if (actualKeys.isEmpty()) {
@@ -92,8 +94,8 @@ public class FallbackAiService {
     }
 
     @SuppressWarnings("unchecked")
-    private Mono<String> callApi(String prompt) {
-        return Mono.defer(() -> {
+    public Mono<String> callApi(String prompt) {
+        return Mono.deferContextual(context -> {
             if (!isAvailable()) {
                 return Mono.error(new RuntimeException("Fallback AI (" + provider + ") API key not configured"));
             }
@@ -102,7 +104,8 @@ public class FallbackAiService {
             String userProvider = appSettingService.getSettingValue("ai_priority_provider", provider);
             String userModel = appSettingService.getSettingValue("ai_model", model);
 
-            String activeKey = getCurrentKey();
+            boolean useConfigOnly = context.getOrDefault("useConfigOnly", false);
+            String activeKey = getCurrentKey(useConfigOnly);
 
             // If we got here from Gemini falling back, we should check what's configured in
             // settings
@@ -170,16 +173,20 @@ public class FallbackAiService {
                         }
                     });
         })
+                .onErrorResume(e -> {
+                    String msg = e.getMessage() != null ? e.getMessage() : "";
+                    if (msg.contains("401") || msg.contains("403")) {
+                        log.warn("User Fallback AI Key is unauthorized/invalid. Retrying with System Config Keys...");
+                        return callApi(prompt).contextWrite(ctx -> ctx.put("useConfigOnly", true));
+                    }
+                    return Mono.error(e);
+                })
                 .retryWhen(reactor.util.retry.Retry.max(1).filter(throwable -> {
                     rotateKey();
                     log.warn("Fallback AI API call failed. Rotating key and retrying... Error: {}",
                             throwable.getMessage());
                     return true;
-                }))
-                .onErrorResume(e -> {
-                    log.error("Fallback AI error: {}", e.getMessage());
-                    return Mono.error(e);
-                });
+                }));
     }
 
     public Mono<String> analyzeForum(String topicTitle, String topicContent, String commentsTranscript) {

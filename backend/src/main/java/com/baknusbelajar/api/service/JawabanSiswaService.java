@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.ByteArrayOutputStream;
+import java.util.concurrent.CompletableFuture;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,6 +36,7 @@ public class JawabanSiswaService {
     private final SiswaUjianStatusRepository siswaUjianStatusRepository;
     private final UjianMapelRepository ujianMapelRepository;
     private final BaknusDriveService baknusDriveService;
+    private final AppSettingService appSettingService;
 
     public List<JawabanSiswaDTO> getJawabanBySoal(Long soalId) {
         return jawabanSiswaRepository.findBySoalEssayId(soalId).stream()
@@ -276,5 +278,37 @@ public class JawabanSiswaService {
         }
 
         return dto;
+    }
+
+    public void processAiScoringForUjianAndSiswa(Long ujianId, Long siswaId) {
+        String isEnabled = appSettingService.getSettingValue("essay_auto_scoring", "false");
+        if (!"true".equalsIgnoreCase(isEnabled)) {
+            log.info("Automatic AI scoring is disabled in settings.");
+            return;
+        }
+
+        log.info("Starting automatic AI scoring for Siswa ID: {} in Ujian ID: {}", siswaId, ujianId);
+
+        // Run in background to not block the user
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<JawabanSiswa> answers = jawabanSiswaRepository.findBySiswaIdAndSoalEssay_UjianMapel_Id(siswaId,
+                        ujianId);
+                for (JawabanSiswa ans : answers) {
+                    if (ans.getSkorAi() == null) {
+                        try {
+                            log.info("Auto-scoring Answer ID: {}", ans.getId());
+                            processAiScoringSync(ans.getId());
+                            // Add small delay to avoid hitting rate limits too fast
+                            Thread.sleep(1000);
+                        } catch (Exception e) {
+                            log.error("Failed auto-scoring for answer {}: {}", ans.getId(), e.getMessage());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in background AI scoring: {}", e.getMessage());
+            }
+        });
     }
 }

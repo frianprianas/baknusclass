@@ -9,6 +9,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.Map;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -293,7 +294,7 @@ public class BaknusDriveService {
     }
 
     // 4. Get Collabora Viewer URL for Materials (Integration)
-    public String getCollaboraViewerUrl(Long fileId) {
+    public String getCollaboraViewerUrl(String fileId) {
         String url = driveApiUrl + "/class/doc/open/" + fileId;
         log.info(">>> BaknusDrive: Requesting Collabora viewer URL for fileId: {}", fileId);
 
@@ -302,7 +303,8 @@ public class BaknusDriveService {
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(url, HttpMethod.GET, entity,
+                    (Class<Map<String, Object>>) (Class<?>) Map.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return (String) response.getBody().get("url");
             }

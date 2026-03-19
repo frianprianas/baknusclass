@@ -11,6 +11,7 @@ import com.baknusbelajar.api.repository.MateriRepository;
 import com.baknusbelajar.api.repository.SiswaRepository;
 import com.baknusbelajar.api.repository.MateriViewLogRepository;
 import com.baknusbelajar.api.repository.TugasSiswaRepository;
+import com.baknusbelajar.api.repository.BabRepository;
 import com.baknusbelajar.api.repository.UserRepository;
 import com.baknusbelajar.api.entity.Users;
 import com.baknusbelajar.api.entity.TugasSiswa;
@@ -43,6 +44,10 @@ public class MateriService {
     private final com.baknusbelajar.api.repository.BabRepository babRepository;
     private final TugasSiswaRepository tugasSiswaRepository;
     private final UserRepository userRepository;
+
+    public com.baknusbelajar.api.entity.Materi getMateriEntity(Long id) {
+        return materiRepository.findById(id).orElse(null);
+    }
 
     public List<MateriDTO> getMyMateri(String username) {
         return materiRepository.findByGuruMapelGuruUserUsername(username).stream()

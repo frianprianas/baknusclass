@@ -12,9 +12,9 @@ spring:
       - org.springframework.boot.autoconfigure.http.client.HttpClientAutoConfiguration
 
   datasource:
-    url: jdbc:oracle:thin:@192.168.100.2:1521/XEPDB1
-    username: sys as sysdba
-    password: on5laught
+    url: ${DB_URL:jdbc:oracle:thin:@192.168.100.2:1521/XEPDB1}
+    username: ${DB_USERNAME:sys as sysdba}
+    password: ${DB_PASSWORD:REDACTED}
     driver-class-name: oracle.jdbc.OracleDriver
   
   servlet:
@@ -30,34 +30,34 @@ spring:
 
   data:
     redis:
-      host: 192.168.100.2
-      port: 6379
-      password: on5laught
+      host: ${REDIS_HOST:192.168.100.2}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:REDACTED}
 
 jwt:
-  secret: 4578b87c7e5a611598db4c552085cf55272a5aa4d5a9c0498a442b3bf7cb95a3
+  secret: ${JWT_SECRET:REDACTED}
   expirationMs: 86400000
 
 mailcow:
   url: http://mail.smk.baktinusantara666.sch.id
-  api-key: YOUR_MAILCOW_KEY
+  api-key: ${MAILCOW_API_KEY:REDACTED}
 
 gemini:
-  keys: AIzaSyBE37KDFxAglp3BPUp0-rAu6iM1KEMuZfg,AIzaSyChdjVCxGSUxrqS7U-wP3mcqM2klBmfR1I
-  model: gemini-2.5-flash
+  keys: ${GEMINI_KEYS:REDACTED}
+  model: gemini-1.5-flash-latest
 
 
 # Fallback AI provider (used when Gemini quota is exceeded)
 # Supports: openai, grok (xAI), mistral
 fallback-ai:
   provider: mistral
-  keys: ${FALLBACK_AI_KEYS:ZxLIg6l2lF6mh8T17Je84V9joZw4pgk6,wmnVjrqCL1hDjhhErFZ4q8U9CEBurRaf}
+  keys: ${FALLBACK_AI_KEYS:REDACTED}
   model: mistral-large-latest
   base-url: https://api.mistral.ai/v1
 
 baknus-drive:
   url: https://baknusdrive.smkbn666.sch.id/api
-  api-key: BAKNUS_CLASS_SECRET
+  api-key: ${BAKNUS_DRIVE_API_KEY:REDACTED}
 
 logging:
   level:

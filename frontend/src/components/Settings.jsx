@@ -274,6 +274,26 @@ const Settings = () => {
 
                     <div style={{ padding: '20px' }}>
                         <div className="form-group" style={{ marginBottom: '15px' }}>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontWeight: '500', color: 'var(--text-secondary)' }}>
+                                Koreksi Essay Otomatis (BaknusAI)
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: settings.essay_auto_scoring === 'true' ? '#dcfce7' : '#f1f5f9', color: settings.essay_auto_scoring === 'true' ? '#166534' : '#64748b' }}>
+                                    {settings.essay_auto_scoring === 'true' ? 'Aktif' : 'Non-Aktif'}
+                                </span>
+                            </label>
+                            <div className="input-wrapper">
+                                <select
+                                    name="essay_auto_scoring"
+                                    value={settings.essay_auto_scoring || 'false'}
+                                    onChange={handleChange}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', outline: 'none', backgroundColor: 'transparent' }}
+                                >
+                                    <option value="false">Non-Aktif (Hanya koreksi manual)</option>
+                                    <option value="true">Aktif (Koreksi otomatis saat siswa selesai)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: '15px' }}>
                             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: 'var(--text-secondary)' }}>Provider AI Prioritas</label>
                             <div className="input-wrapper">
                                 <select
