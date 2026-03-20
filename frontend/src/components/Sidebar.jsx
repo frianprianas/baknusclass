@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronRight,
   MessageCircle,
+  ShieldCheck,
   Moon,
   Sun,
   User,
