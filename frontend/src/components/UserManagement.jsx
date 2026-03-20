@@ -11,7 +11,8 @@ import {
     XCircle,
     Mail,
     Shield,
-    Edit
+    Edit,
+    ExternalLink
 } from 'lucide-react';
 
 const UserManagement = () => {
@@ -325,6 +326,19 @@ const UserManagement = () => {
                                 <XCircle size={24} />
                             </button>
                         </div>
+                        <div style={{
+                            margin: '0 24px 20px', padding: '12px 16px', borderRadius: '12px',
+                            background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: '0.85rem'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <ExternalLink size={16} />
+                                <strong style={{ fontWeight: '700' }}>Pusat Akun BaknusMail</strong>
+                            </div>
+                            Nama Lengkap dan Nomor WA dikelola secara terpusat. Jika ingin mengubahnya, silakan arahkan user ke
+                            <a href={BAKNUS_MAIL_URL} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: '700', marginLeft: '4px', textDecoration: 'underline' }}>
+                                {BAKNUS_MAIL_URL.replace('https://', '')}
+                            </a>
+                        </div>
                         <form onSubmit={handleUpdateProfile}>
                             <div className="form-group">
                                 <label>Nama Lengkap</label>
@@ -409,7 +423,8 @@ const UserManagement = () => {
                         </form>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             <style>{`
                 .user-management {
@@ -772,7 +787,7 @@ const UserManagement = () => {
                     to { transform: rotate(360deg); }
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 

@@ -11,10 +11,11 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  ShieldCheck,
   MessageCircle,
   Moon,
-  Sun
+  Sun,
+  User,
+  ExternalLink
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
@@ -154,6 +155,11 @@ const Sidebar = ({ activePage, setActivePage }) => {
             </p>
           </div>
         </div>
+        <button className="theme-toggle-btn" onClick={() => window.open(BAKNUS_MAIL_URL, '_blank')} style={{ background: '#eff6ff', color: '#1e40af', marginBottom: '12px' }}>
+          <User size={18} />
+          <span>Kelola Profil</span>
+          <ExternalLink size={14} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+        </button>
         <button className="theme-toggle-btn" onClick={toggleTheme}>
           {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
