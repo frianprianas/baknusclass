@@ -428,7 +428,8 @@ const UserManagement = () => {
 
             <style>{`
                 .user-management {
-                    padding: 0;
+                    max-width: 1200px;
+                    margin: 0 auto;
                 }
 
                 .page-header {
@@ -436,6 +437,19 @@ const UserManagement = () => {
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 30px;
+                    gap: 20px;
+                }
+
+                @media (max-width: 768px) {
+                    .page-header {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                    .sync-btn { width: 100%; justify-content: center; }
+                    .table-actions { flex-direction: column; gap: 15px; }
+                    .search-box { width: 100% !important; }
+                    .filters { width: 100%; }
+                    .filter-btn { width: 100%; justify-content: center; }
                 }
 
                 .page-header h1 {
@@ -518,9 +532,15 @@ const UserManagement = () => {
                     font-weight: 500;
                 }
 
+                .table-responsive {
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+
                 .user-table {
                     width: 100%;
                     border-collapse: collapse;
+                    min-width: 800px;
                 }
 
                 .user-table th {

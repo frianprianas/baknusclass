@@ -173,16 +173,12 @@ const Sidebar = ({ activePage, setActivePage }) => {
 
       <style>{`
         .sidebar {
-          width: 280px;
+          width: 100%;
           height: 100vh;
           background: white;
           border-right: 1px solid #e5e7eb;
           display: flex;
           flex-direction: column;
-          position: fixed;
-          left: 0;
-          top: 0;
-          z-index: 100;
         }
 
         .sidebar-brand {
