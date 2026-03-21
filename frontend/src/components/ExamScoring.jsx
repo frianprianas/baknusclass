@@ -153,7 +153,10 @@ const ExamScoring = () => {
                     durasiStr = 'Pengerjaan';
                 }
 
-                return { ...std, totalAi, totalGuru, isFullyGraded, durasiStr };
+                const nilaiAkhir = questions.length > 0 ? (totalGuru / questions.length).toFixed(1) : 0;
+                const nilaiAkhirAi = questions.length > 0 ? (totalAi / questions.length).toFixed(1) : 0;
+
+                return { ...std, totalAi, totalGuru, nilaiAkhir, nilaiAkhirAi, isFullyGraded, durasiStr };
             });
 
             setStudentsData(grouped);
@@ -204,10 +207,18 @@ const ExamScoring = () => {
             });
 
             // Update local state
-            setSelectedStudent(prev => ({
-                ...prev,
-                answers: prev.answers.map(a => a.id === answerId ? { ...a, skorFinalGuru: parseFloat(newScore) } : a)
-            }));
+            setSelectedStudent(prev => {
+                if (!prev) return prev;
+                const newAnswers = prev.answers.map(a => a.id === answerId ? { ...a, skorFinalGuru: parseFloat(newScore) } : a);
+                let tguru = 0;
+                let full = true;
+                newAnswers.forEach(a => {
+                    if (a.skorFinalGuru !== null && a.skorFinalGuru !== undefined) tguru += a.skorFinalGuru;
+                    else full = false;
+                });
+                const nAkhir = questions.length > 0 ? (tguru / questions.length).toFixed(1) : 0;
+                return { ...prev, answers: newAnswers, totalGuru: tguru, nilaiAkhir: nAkhir, isFullyGraded: full };
+            });
 
             // Also update the main studentsData array
             setStudentsData(prev => prev.map(std => {
@@ -219,7 +230,8 @@ const ExamScoring = () => {
                         if (a.skorFinalGuru !== null && a.skorFinalGuru !== undefined) tguru += a.skorFinalGuru;
                         else full = false;
                     });
-                    return { ...std, answers: newAnswers, totalGuru: tguru, isFullyGraded: full };
+                    const nAkhir = questions.length > 0 ? (tguru / questions.length).toFixed(1) : 0;
+                    return { ...std, answers: newAnswers, totalGuru: tguru, nilaiAkhir: nAkhir, isFullyGraded: full };
                 }
                 return std;
             }));
@@ -239,16 +251,27 @@ const ExamScoring = () => {
 
             if (res.data) {
                 // Perbarui state selectedStudent
-                setSelectedStudent(prev => ({
-                    ...prev,
-                    answers: prev.answers.map(a => a.id === answerId ? res.data : a)
-                }));
+                setSelectedStudent(prev => {
+                    if (!prev) return prev;
+                    const newAnswers = prev.answers.map(a => a.id === answerId ? res.data : a);
+                    let tAi = 0;
+                    newAnswers.forEach(a => {
+                        if (a.skorAi !== null && a.skorAi !== undefined) tAi += a.skorAi;
+                    });
+                    const nAkhirAi = questions.length > 0 ? (tAi / questions.length).toFixed(1) : 0;
+                    return { ...prev, answers: newAnswers, totalAi: tAi, nilaiAkhirAi: nAkhirAi };
+                });
 
                 // Perbarui state global studentsData
                 setStudentsData(prev => prev.map(std => {
                     if (std.siswaId === selectedStudent?.siswaId) {
                         const newAnswers = std.answers.map(a => a.id === answerId ? res.data : a);
-                        return { ...std, answers: newAnswers };
+                        let tAi = 0;
+                        newAnswers.forEach(a => {
+                            if (a.skorAi !== null && a.skorAi !== undefined) tAi += a.skorAi;
+                        });
+                        const nAkhirAi = questions.length > 0 ? (tAi / questions.length).toFixed(1) : 0;
+                        return { ...std, answers: newAnswers, totalAi: tAi, nilaiAkhirAi: nAkhirAi };
                     }
                     return std;
                 }));
@@ -329,7 +352,7 @@ const ExamScoring = () => {
         // Header
         const header = table.createTHead();
         const hRow = header.insertRow(0);
-        ['No', 'Nama Siswa', 'NISN', 'Kelas', 'Status Ujian', 'Total Nilai (Guru)', 'Total Nilai (AI)'].forEach((text, i) => {
+        ['No', 'Nama Siswa', 'NISN', 'Kelas', 'Status Ujian', 'Total Skor (Guru)', 'Nilai Akhir (Rata-rata)'].forEach((text, i) => {
             const cell = hRow.insertCell(i);
             cell.innerHTML = `<b>${text}</b>`;
         });
@@ -344,7 +367,7 @@ const ExamScoring = () => {
             row.insertCell(3).innerText = std.namaKelas;
             row.insertCell(4).innerText = std.isFinished ? 'Selesai' : (std.durasiStr === 'Pengerjaan' ? 'Sedang Mengerjakan' : 'Belum Memulai');
             row.insertCell(5).innerText = std.totalGuru;
-            row.insertCell(6).innerText = std.totalAi;
+            row.insertCell(6).innerText = std.nilaiAkhir;
         });
 
         const template = `
@@ -614,6 +637,9 @@ const ExamScoring = () => {
                                                             <span className="badge-pending">Belum Dinilai</span>
                                                         )}
                                                         <div className="std-score">M: {std.totalGuru} | AI: {std.totalAi}</div>
+                                                        <div className="std-final-score" style={{ fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                                                            Saran Nilai Akhir: <span style={{ color: '#3b82f6' }}>{std.nilaiAkhir}</span>
+                                                        </div>
                                                     </div>
                                                     <div className="std-time" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
                                                         <Clock size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
@@ -660,8 +686,24 @@ const ExamScoring = () => {
                                                     * BaknusAI bisa membuat kesalahan. Keputusan nilai tetap pada Guru.
                                                 </span>
                                             </div>
-                                            <div className="total-score-badge">
-                                                Total Nilai: <strong>{selectedStudent.totalGuru}</strong> / {questions.reduce((a, b) => a + b.bobotNilai, 0)}
+                                            <div className="total-score-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '150px' }}>
+                                                <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>Saran Nilai Akhir:</span>
+                                                <strong style={{ fontSize: '1.25rem' }}>{selectedStudent.nilaiAkhir}</strong>
+                                                <span style={{ fontSize: '0.65rem', marginBottom: '6px' }}>Total Skor: {selectedStudent.totalGuru} / {questions.reduce((a, b) => a + b.bobotNilai, 0)}</span>
+                                                {selectedStudent.isFullyGraded && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`Setujui Nilai Akhir ${selectedStudent.nilaiAkhir} untuk ${selectedStudent.namaSiswa}? Ini akan langsung sinkronisasi keseluruhan rekap nilai ujian ke BaknusDrive.`)) {
+                                                                handleSyncToDrive();
+                                                            }
+                                                        }}
+                                                        style={{ background: '#10b981', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.2s', marginTop: '4px' }}
+                                                        onMouseOver={(e) => e.target.style.background = '#059669'}
+                                                        onMouseOut={(e) => e.target.style.background = '#10b981'}
+                                                    >
+                                                        <CheckCircle2 size={14} /> Setujui & Sync Laporan
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

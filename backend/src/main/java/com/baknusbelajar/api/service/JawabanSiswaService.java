@@ -21,7 +21,9 @@ import java.io.ByteArrayOutputStream;
 import java.util.concurrent.CompletableFuture;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -175,20 +177,31 @@ public class JawabanSiswaService {
                 .orElseThrow(() -> new RuntimeException("Ujian not found"));
 
         List<JawabanSiswa> jawabanList = jawabanSiswaRepository.findBySoalEssay_UjianMapel_Id(ujianId);
+        List<SoalEssay> questions = soalEssayRepository.findByUjianMapelId(ujianId);
 
         String eventName = ujian.getEventUjian().getNamaEvent();
         String subjectName = ujian.getGuruMapel().getMapel().getNamaMapel();
         String className = ujian.getGuruMapel().getKelas() != null ? ujian.getGuruMapel().getKelas().getNamaKelas()
                 : "Gabungan";
 
-        byte[] excelBytes = generateExcelReport(jawabanList, subjectName, className);
+        byte[] excelBytes = generateExcelReport(jawabanList, subjectName, className, questions.size());
         String fileName = "Rekap_Nilai_AI_" + subjectName.replace(" ", "_") + "_" + className.replace(" ", "_")
                 + ".xlsx";
 
         baknusDriveService.uploadFileBytes(eventName, subjectName, excelBytes, fileName);
     }
 
-    private byte[] generateExcelReport(List<JawabanSiswa> jawabanList, String subjectName, String className) {
+    private byte[] generateExcelReport(List<JawabanSiswa> jawabanList, String subjectName, String className,
+            int numQuestions) {
+        // Pre-calculate per-student totals for Guru score
+        Map<Long, Double> studentTotalsMap = new HashMap<>();
+        for (JawabanSiswa j : jawabanList) {
+            if (j.getSiswa() != null && j.getSkorFinalGuru() != null) {
+                studentTotalsMap.put(j.getSiswa().getId(),
+                        studentTotalsMap.getOrDefault(j.getSiswa().getId(), 0.0) + j.getSkorFinalGuru());
+            }
+        }
+
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Rekap Nilai AI");
 
@@ -204,7 +217,7 @@ public class JawabanSiswaService {
             // Headers
             Row headerRow = sheet.createRow(0);
             String[] columns = { "No", "NISN", "Nama Siswa", "Kelas", "Pertanyaan", "Jawaban Siswa", "Skor AI",
-                    "Alasan AI", "Skor Guru" };
+                    "Alasan AI", "Skor Guru", "Saran Nilai Akhir" };
             for (int i = 0; i < columns.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(columns[i]);
@@ -232,6 +245,12 @@ public class JawabanSiswaService {
                 row.createCell(6).setCellValue(j.getSkorAi() != null ? j.getSkorAi() : 0.0);
                 row.createCell(7).setCellValue(j.getAlasanAi() != null ? j.getAlasanAi() : "-");
                 row.createCell(8).setCellValue(j.getSkorFinalGuru() != null ? j.getSkorFinalGuru() : 0.0);
+
+                // NILAI AKHIR: (Total Skor / Jumlah Soal)
+                double finalTotal = studentTotalsMap.getOrDefault(j.getSiswa() != null ? j.getSiswa().getId() : -1L,
+                        0.0);
+                double scoreAverage = numQuestions > 0 ? finalTotal / numQuestions : 0.0;
+                row.createCell(9).setCellValue(Math.round(scoreAverage * 10.0) / 10.0);
             }
 
             for (int i = 0; i < columns.length; i++) {
