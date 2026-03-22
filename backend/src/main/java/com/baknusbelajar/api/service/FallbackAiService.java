@@ -212,4 +212,78 @@ public class FallbackAiService {
 
         return callApi(prompt);
     }
+
+    /**
+     * Generates a personalized academic recommendation for a student.
+     * 
+     * @param namaSiswa     student's name
+     * @param hasilPerMapel map of subject name -> score (0-100)
+     */
+    public Mono<String> saranNilaiSiswa(String namaSiswa, java.util.Map<String, Double> hasilPerMapel) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Anda adalah BaknusAI, asisten akademik cerdas untuk platform BaknusBelajar.\n");
+        sb.append(
+                "Tugas Anda adalah memberikan saran pembelajaran yang personal, empatik, dan memotivasi kepada siswa berdasarkan nilai ujian mereka.\n\n");
+        sb.append("Nama Siswa: ").append(namaSiswa).append("\n");
+        sb.append("Hasil Ujian:\n");
+        for (var entry : hasilPerMapel.entrySet()) {
+            sb.append("- Mata Pelajaran ").append(entry.getKey()).append(": ").append(entry.getValue())
+                    .append(" / 100\n");
+        }
+        sb.append(
+                "\nBerikan saran secara personal dan spesifik per mata pelajaran dalam Bahasa Indonesia yang sopan dan memotivasi. ");
+        sb.append("Format respons:\n");
+        sb.append("- Awali dengan sapaan hangat kepada siswa.\n");
+        sb.append(
+                "- Untuk SETIAP mata pelajaran, tulis satu paragraf berisi evaluasi dan saran peningkatan spesifik. ");
+        sb.append("  Jika nilai >= 75, berikan apresiasi dan tantangan untuk mempertahankan. ");
+        sb.append("  Jika nilai < 75, berikan saran konkret untuk meningkatkan kompetensi.\n");
+        sb.append("- Akhiri dengan kalimat penyemangat yang general.\n");
+        sb.append("- Panjang total: 150-300 kata. JANGAN gunakan format JSON. Tulis langsung sebagai teks saja.");
+
+        return callApi(sb.toString());
+    }
+
+    /**
+     * Deep personalized recommendation using full Q&A context per subject.
+     */
+    public Mono<String> saranNilaiSiswaMendalam(String namaSiswa,
+            java.util.List<com.baknusbelajar.api.controller.exam.SaranNilaiController.HasilMapel> hasilPerMapel) {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Anda adalah BaknusAI, asisten akademik cerdas dan empatik untuk platform BaknusBelajar.\n");
+        sb.append(
+                "Tugas Anda adalah memberikan evaluasi mendalam dan saran pembelajaran yang PERSONAL kepada siswa,\n");
+        sb.append("bukan hanya berdasarkan nilai akhir, melainkan dari ISI JAWABAN siswa itu sendiri.\n\n");
+        sb.append("Nama Siswa: ").append(namaSiswa).append("\n\n");
+
+        for (var mapel : hasilPerMapel) {
+            sb.append("=== MATA PELAJARAN: ").append(mapel.getNamaMapel())
+                    .append(" (Nilai Akhir: ").append(mapel.getNilaiAkhir()).append("/100) ===\n");
+
+            var daftar = mapel.getDaftarJawaban();
+            if (daftar != null) {
+                for (int i = 0; i < daftar.size(); i++) {
+                    var item = daftar.get(i);
+                    sb.append("Soal ").append(i + 1).append(": ").append(item.getSoal()).append("\n");
+                    sb.append("Jawaban Siswa: ").append(item.getJawabSiswa()).append("\n");
+                    if (item.getSkor() != null) {
+                        sb.append("Skor: ").append(item.getSkor()).append(" / ").append(item.getBobotMaksimal())
+                                .append("\n");
+                    } else {
+                        sb.append("Skor: Belum dinilai\n");
+                    }
+                    sb.append("\n");
+                }
+            }
+        }
+
+        sb.append("\n--- INSTRUKSI ---\n");
+        sb.append("Tulis saran singkat (total maksimal 120 kata) dalam Bahasa Indonesia yang hangat dan langsung.\n");
+        sb.append(
+                "Format: Satu kalimat sapaan > satu kalimat evaluasi singkat per mapel (sebutkan satu kekuatan & satu kelemahan spesifik dari jawaban) > satu kalimat penutup motivasi.\n");
+        sb.append("Gunakan nama siswa. JANGAN bertele-tele. Langsung ke intinya.");
+
+        return callApi(sb.toString());
+    }
 }

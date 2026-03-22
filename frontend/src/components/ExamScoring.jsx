@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
-    ArrowLeft, CloudUpload, ShieldCheck
+    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const ExamScoring = () => {
     const [events, setEvents] = useState([]);
@@ -20,6 +21,7 @@ const ExamScoring = () => {
     const [studentsData, setStudentsData] = useState([]); // Array of { siswaId, namaSiswa, nisn, answers: [] }
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [showAiModal, setShowAiModal] = useState(false);
+    const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
@@ -68,6 +70,7 @@ const ExamScoring = () => {
             // Fetch Questions
             const qResp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
             setQuestions(qResp.data);
+            const questionLength = qResp.data ? qResp.data.length : 0;
 
             // Fetch Monitoring Data (Ground Truth for who is Finished)
             const monitorResp = await axios.get(`/api/exam/ujian-mapel/${exam.id}/monitoring`, { headers });
@@ -153,8 +156,8 @@ const ExamScoring = () => {
                     durasiStr = 'Pengerjaan';
                 }
 
-                const nilaiAkhir = questions.length > 0 ? (totalGuru / questions.length).toFixed(1) : 0;
-                const nilaiAkhirAi = questions.length > 0 ? (totalAi / questions.length).toFixed(1) : 0;
+                const nilaiAkhir = questionLength > 0 ? (totalGuru / questionLength).toFixed(1) : 0;
+                const nilaiAkhirAi = questionLength > 0 ? (totalAi / questionLength).toFixed(1) : 0;
 
                 return { ...std, totalAi, totalGuru, nilaiAkhir, nilaiAkhirAi, isFullyGraded, durasiStr };
             });
@@ -292,6 +295,52 @@ const ExamScoring = () => {
             setSavingId(null);
             setShowAiModal(false);
         }
+    };
+
+    const handleToggleNilai = async () => {
+        if (!selectedExam) return;
+        const confirmMsg = selectedExam.tampilkanNilai
+            ? 'Sembunyikan Nilai Final dari akun siswa?'
+            : 'Publikasikan Nilai Final ke akun siswa? (Mereka akan bisa melihat transkrip)';
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            const res = await axios.put(`/api/exam/ujian-mapel/${selectedExam.id}/toggle-nilai`, {}, { headers });
+            setSelectedExam(res.data);
+            alert(res.data.tampilkanNilai ? 'Nilai berhasil dipublikasikan.' : 'Nilai kembali disembunyikan.');
+        } catch (err) {
+            console.error(err);
+            alert('Gagal mengubah visibilitas nilai.');
+        }
+    };
+
+    const getAnalyticsData = () => {
+        if (!studentsData || studentsData.length === 0) return null;
+
+        let min = 100, max = 0, sum = 0;
+        let cSelesai = 0, cPending = 0;
+        const dist = { '0-20': 0, '21-40': 0, '41-60': 0, '61-80': 0, '81-100': 0 };
+
+        studentsData.forEach(s => {
+            if (s.isFullyGraded) cSelesai++;
+            else cPending++;
+
+            const score = parseFloat(s.nilaiAkhir) || 0;
+            if (score < min) min = score;
+            if (score > max) max = score;
+            sum += score;
+
+            if (score <= 20) dist['0-20']++;
+            else if (score <= 40) dist['21-40']++;
+            else if (score <= 60) dist['41-60']++;
+            else if (score <= 80) dist['61-80']++;
+            else dist['81-100']++;
+        });
+
+        const avg = studentsData.length > 0 ? (sum / studentsData.length) : 0;
+        const distData = Object.keys(dist).map(key => ({ name: key, count: dist[key] }));
+
+        return { min: min === 100 && max === 0 ? 0 : min, max, avg: avg.toFixed(1), total: studentsData.length, cSelesai, cPending, distData };
     };
 
     const handleManagePraktek = async (exam) => {
@@ -583,6 +632,17 @@ const ExamScoring = () => {
                             </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <button
+                                className="btn-analytics"
+                                style={{ background: selectedExam.tampilkanNilai ? '#ecfdf5' : '#f8fafc', borderColor: selectedExam.tampilkanNilai ? '#10b981' : '#e2e8f0', color: selectedExam.tampilkanNilai ? '#059669' : '#64748b' }}
+                                onClick={handleToggleNilai}
+                            >
+                                {selectedExam.tampilkanNilai ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                                {selectedExam.tampilkanNilai ? 'Nilai Dipublikasi' : 'Sembunyikan Nilai'}
+                            </button>
+                            <button className="btn-analytics" onClick={() => setShowAnalyticsModal(true)}>
+                                <BarChart2 size={18} /> Analitik Ujian
+                            </button>
                             <button className="btn-praktek" onClick={() => handleManagePraktek(selectedExam)}>
                                 <CloudUpload size={18} /> Nilai Praktek
                             </button>
@@ -786,6 +846,67 @@ const ExamScoring = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {showAnalyticsModal && (
+                <div className="analytics-modal-overlay animate-fade-in" onClick={() => setShowAnalyticsModal(false)}>
+                    <div className="analytics-modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="analytics-header">
+                            <div>
+                                <h2 style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: 0, fontSize: '1.4rem' }}><Activity size={24} color="#3b82f6" /> Analisis Keberhasilan Ujian</h2>
+                                <p style={{ margin: '4px 0 0 36px', color: '#64748b', fontSize: '0.9rem' }}>{selectedExam?.namaMapel} - {selectedEventId ? events.find(e => e.id === Number(selectedEventId))?.namaEvent : ''}</p>
+                            </div>
+                            <button className="btn-close-analytics" onClick={() => setShowAnalyticsModal(false)}><X size={24} /></button>
+                        </div>
+
+                        {(() => {
+                            const data = getAnalyticsData();
+                            if (!data || data.total === 0) return <div className="p-8 text-center text-slate-500" style={{ padding: '40px', fontSize: '1.1rem' }}>Belum ada siswa yang mengikuti ujian ini.</div>;
+
+                            return (
+                                <div className="analytics-body">
+                                    <div className="analytics-stats-grid">
+                                        <div className="analytics-stat-card">
+                                            <span className="stat-label">Rata-Rata Kelas</span>
+                                            <strong className="stat-value text-blue">{data.avg}</strong>
+                                        </div>
+                                        <div className="analytics-stat-card">
+                                            <span className="stat-label">Nilai Tertinggi</span>
+                                            <strong className="stat-value text-green">{data.max}</strong>
+                                        </div>
+                                        <div className="analytics-stat-card">
+                                            <span className="stat-label">Nilai Terendah</span>
+                                            <strong className="stat-value text-red">{data.min}</strong>
+                                        </div>
+                                        <div className="analytics-stat-card">
+                                            <span className="stat-label">Total Kehadiran</span>
+                                            <strong className="stat-value">{data.total} <small>Siswa</small></strong>
+                                        </div>
+                                    </div>
+
+                                    <div className="analytics-chart-box">
+                                        <h3 style={{ marginBottom: '24px', fontSize: '1.1rem', color: '#1e293b' }}>Distribusi Rentang Nilai</h3>
+                                        <div style={{ width: '100%', height: 320 }}>
+                                            <ResponsiveContainer>
+                                                <BarChart data={data.distData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                    <XAxis dataKey="name" tick={{ fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#cbd5e1' }} />
+                                                    <YAxis allowDecimals={false} tick={{ fill: '#64748b' }} tickLine={false} axisLine={false} />
+                                                    <RechartsTooltip cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                                                    <Bar dataKey="count" name="Jumlah Siswa" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={60} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    <div className="analytics-footer-status">
+                                        <strong>Status Penilaian:</strong> {data.cSelesai} Peserta selesai dinilai penuh. {data.cPending > 0 ? <span style={{ color: '#f59e0b' }}>{data.cPending} Peserta masih menunggu koreksi.</span> : <span style={{ color: '#10b981' }}>Semua peserta telah dinilai.</span>}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
@@ -998,6 +1119,42 @@ const ExamScoring = () => {
                 [data-theme="dark"] .manual-box label { color: #e2e8f0; }
                 [data-theme="dark"] .score-input-group input { background: #0f172a; color: #f8fafc; border-color: #334155; }
                 [data-theme="dark"] .score-input-group input:focus { border-color: #3b82f6; }
+
+                /* Analytics Modal Styles */
+                .btn-analytics { background: #f8fafc; color: #64748b; border: 2px solid #e2e8f0; padding: 10px 20px; border-radius: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; }
+                .btn-analytics:hover { color: #3b82f6; border-color: #3b82f6; background: white; }
+
+                .analytics-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 5000; padding: 20px; }
+                .analytics-modal-content { background: white; border-radius: 24px; width: 100%; max-width: 800px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; }
+                .analytics-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
+                .btn-close-analytics { background: white; border: 1px solid #e2e8f0; color: #64748b; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+                .btn-close-analytics:hover { background: #ef4444; border-color: #ef4444; color: white; }
+                
+                .analytics-body { padding: 32px; overflow-y: auto; background: white; }
+                .analytics-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 32px; }
+                .analytics-stat-card { background: #f8fafc; border: 1px solid #f1f5f9; padding: 24px; border-radius: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+                .stat-label { font-size: 0.8rem; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+                .stat-value { font-size: 2.5rem; font-weight: 950; color: #1e293b; line-height: 1; }
+                .stat-value.text-blue { color: #3b82f6; }
+                .stat-value.text-green { color: #10b981; }
+                .stat-value.text-red { color: #ef4444; }
+                .stat-value small { font-size: 1rem; color: #94a3b8; font-weight: 700; margin-left: 4px; }
+                
+                .analytics-chart-box { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; margin-bottom: 24px; }
+                .analytics-footer-status { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 16px 24px; border-radius: 12px; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+
+                [data-theme="dark"] .analytics-modal-content { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+                [data-theme="dark"] .analytics-header { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .analytics-header h2 { color: #f8fafc !important; }
+                [data-theme="dark"] .btn-close-analytics { background: #1e293b; border-color: #334155; color: #94a3b8; }
+                [data-theme="dark"] .analytics-body { background: #1e293b; }
+                [data-theme="dark"] .analytics-stat-card { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .stat-value { color: #f8fafc; }
+                [data-theme="dark"] .analytics-chart-box { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .analytics-chart-box h3 { color: #f8fafc !important; }
+                [data-theme="dark"] .analytics-footer-status { background: #0f172a; border-color: #334155; color: #94a3b8; }
+                [data-theme="dark"] .btn-analytics { background: #1e293b; border-color: #334155; color: #cbd5e1; }
+                [data-theme="dark"] .btn-analytics:hover { background: #334155; border-color: #3b82f6; color: #f8fafc; }
 `}</style>
         </div>
     );

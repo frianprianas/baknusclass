@@ -28,6 +28,8 @@ public class UjianMapelService {
     private final com.baknusbelajar.api.repository.SiswaUjianStatusRepository siswaUjianStatusRepository;
     private final BaknusDriveService baknusDriveService;
     private final JawabanSiswaService jawabanSiswaService;
+    private final com.baknusbelajar.api.repository.SoalEssayRepository soalEssayRepository;
+    private final com.baknusbelajar.api.repository.JawabanSiswaRepository jawabanSiswaRepository;
 
     public List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO> getExamMonitoring(Long ujianId,
             java.util.Set<String> onlineStudents) {
@@ -94,6 +96,23 @@ public class UjianMapelService {
                                 }
                             });
 
+                    if (isFinished && dto.getTampilkanNilai()) {
+                        try {
+                            var questions = soalEssayRepository.findByUjianMapelId(e.getId());
+                            var userAnswers = jawabanSiswaRepository
+                                    .findBySiswaIdAndSoalEssay_UjianMapel_Id(siswa.getId(), e.getId());
+
+                            if (!questions.isEmpty()) {
+                                double totalSkor = userAnswers.stream()
+                                        .mapToDouble(a -> a.getSkorFinalGuru() != null ? a.getSkorFinalGuru() : 0.0)
+                                        .sum();
+                                dto.setNilaiAkhir(Math.round((totalSkor / questions.size()) * 10.0) / 10.0);
+                            }
+                        } catch (Exception ex) {
+                            log.error("Error calculating nilaiAkhir for student: {}", ex.getMessage());
+                        }
+                    }
+
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -142,6 +161,8 @@ public class UjianMapelService {
         entity.setWaktuSelesai(dto.getWaktuSelesai());
         entity.setDurasi(dto.getDurasi());
         entity.setToken(generateRandomToken());
+        if (dto.getTampilkanNilai() != null)
+            entity.setTampilkanNilai(dto.getTampilkanNilai());
 
         UjianMapel saved = ujianMapelRepository.save(entity);
 
@@ -212,7 +233,16 @@ public class UjianMapelService {
         entity.setWaktuMulai(dto.getWaktuMulai());
         entity.setWaktuSelesai(dto.getWaktuSelesai());
         entity.setDurasi(dto.getDurasi());
+        if (dto.getTampilkanNilai() != null)
+            entity.setTampilkanNilai(dto.getTampilkanNilai());
 
+        return mapToDTO(ujianMapelRepository.save(entity), true);
+    }
+
+    public UjianMapelDTO toggleTampilkanNilai(Long id) {
+        UjianMapel entity = ujianMapelRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan"));
+        entity.setTampilkanNilai(entity.getTampilkanNilai() == null ? true : !entity.getTampilkanNilai());
         return mapToDTO(ujianMapelRepository.save(entity), true);
     }
 
@@ -226,6 +256,7 @@ public class UjianMapelService {
         dto.setWaktuMulai(entity.getWaktuMulai());
         dto.setWaktuSelesai(entity.getWaktuSelesai());
         dto.setDurasi(entity.getDurasi());
+        dto.setTampilkanNilai(entity.getTampilkanNilai() != null ? entity.getTampilkanNilai() : false);
         if (includeToken) {
             dto.setToken(entity.getToken());
         }

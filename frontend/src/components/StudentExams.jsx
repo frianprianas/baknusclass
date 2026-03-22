@@ -15,7 +15,10 @@ import {
     LayoutGrid,
     X,
     User,
-    Check
+    Check,
+    Award,
+    Sparkles,
+    RefreshCw
 } from 'lucide-react';
 
 const StudentExams = () => {
@@ -24,14 +27,25 @@ const StudentExams = () => {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    const [showTokenOverlay, setShowTokenOverlay] = useState(null);
+    const [tokenInput, setTokenInput] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Transcript State
+    const [transcriptData, setTranscriptData] = useState(null);
+    const [showTranscript, setShowTranscript] = useState(false);
+
+    // AI Recommendation State
+    const [aiSaran, setAiSaran] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiGenerated, setAiGenerated] = useState({});
+
     // Exam Taking State
     const [currentExam, setCurrentExam] = useState(null);
     const [questions, setQuestions] = useState([]);
     const [answers, setAnswers] = useState({}); // { soalId: text }
     const [raguState, setRaguState] = useState({}); // { soalId: boolean }
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [tokenInput, setTokenInput] = useState('');
-    const [showTokenOverlay, setShowTokenOverlay] = useState(null); // Exam object
     const [timer, setTimer] = useState(0); // seconds remaining
     const [showFinishConfirm, setShowFinishConfirm] = useState(false);
 
@@ -82,9 +96,11 @@ const StudentExams = () => {
     const handleSelectEvent = async (event) => {
         setSelectedEvent(event);
         setLoading(true);
+        setAiSaran(null);
         try {
             const resp = await axios.get(`/api/exam/ujian-mapel/siswa?eventId=${event.id}`, { headers });
             setExams(resp.data);
+            generateAiSaran(resp.data);
         } catch (err) {
             console.error('Error fetching student exams:', err);
         } finally {
@@ -92,12 +108,117 @@ const StudentExams = () => {
         }
     };
 
-    const handleStartClick = (exam) => {
-        setShowTokenOverlay(exam);
-        setTokenInput('');
+    const generateAiSaran = async (examList, force = false) => {
+        const examsWithScores = examList.filter(e => e.tampilkanNilai && e.nilaiAkhir !== null && e.nilaiAkhir !== undefined);
+        if (examsWithScores.length < 1) return;
+
+        const cacheKey = examsWithScores.map(e => `${e.id}:${e.nilaiAkhir}`).join('|');
+        if (!force && aiGenerated[cacheKey]) {
+            setAiSaran(aiGenerated[cacheKey]);
+            return;
+        }
+
+        setAiLoading(true);
+        try {
+            // Fetch full Q&A detail for each exam with published scores
+            const hasilPerMapel = await Promise.all(
+                examsWithScores.map(async (ex) => {
+                    try {
+                        // Fetch questions
+                        const qResp = await axios.get(`/api/exam/soal-essay/ujian/${ex.id}`, { headers });
+                        const qs = qResp.data;
+
+                        // Fetch student answers for this exam
+                        const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
+                        const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
+
+                        // Strip HTML tags for cleaner AI context
+                        const stripHtml = (html) => html ? html.replace(/<[^>]*>/g, '').trim() : '';
+
+                        const daftarJawaban = qs.map(q => {
+                            const ans = userAnswers.find(a => a.soalId === q.id) || {};
+                            return {
+                                soal: stripHtml(q.pertanyaan),
+                                jawabSiswa: ans.teksJawaban || '(Tidak ada jawaban)',
+                                skor: ans.skorFinalGuru !== undefined && ans.skorFinalGuru !== null ? ans.skorFinalGuru : null,
+                                bobotMaksimal: q.bobotNilai || 100
+                            };
+                        });
+
+                        return {
+                            namaMapel: ex.namaMapel,
+                            nilaiAkhir: ex.nilaiAkhir,
+                            daftarJawaban
+                        };
+                    } catch (err) {
+                        // Fallback: just send the score if fetching Q&A fails
+                        return { namaMapel: ex.namaMapel, nilaiAkhir: ex.nilaiAkhir, daftarJawaban: [] };
+                    }
+                })
+            );
+
+            const namaSiswa = user.namaLengkap || user.username || 'Siswa';
+            const resp = await axios.post('/api/exam/saran-nilai/generate', { namaSiswa, hasilPerMapel }, { headers });
+            setAiSaran(resp.data);
+            setAiGenerated(prev => ({ ...prev, [cacheKey]: resp.data }));
+        } catch (err) {
+            console.error('Error generating AI recommendation:', err);
+        } finally {
+            setAiLoading(false);
+        }
     };
 
-    const handleVerifyToken = async () => {
+    const handleStartClick = (exam) => {
+        setTokenInput('');
+        setShowTokenOverlay(exam);
+    };
+
+    const handleViewTranscript = async (exam) => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // Fetch questions
+            const qResp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
+            const qs = qResp.data;
+
+            // Fetch answers
+            const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
+            const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
+
+            const compiledList = qs.map((q, i) => {
+                const ans = userAnswers.find(a => a.soalId === q.id) || {};
+                return {
+                    no: i + 1,
+                    pertanyaan: q.pertanyaan,
+                    bobot: q.bobotNilai,
+                    jawabanSiswa: ans.teksJawaban || 'Tidak ada jawaban',
+                    skorGuru: ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined ? ans.skorFinalGuru : null,
+                    saranAi: ans.alasanAi || 'Tidak ada catatan'
+                };
+            });
+
+            let totalSkor = 0;
+            let fullyGraded = true;
+            compiledList.forEach(item => {
+                if (item.skorGuru !== null) totalSkor += item.skorGuru;
+                else fullyGraded = false;
+            });
+            const finalScore = qs.length > 0 ? (totalSkor / qs.length).toFixed(1) : 0;
+
+            setTranscriptData({ exam, compiledList, finalScore, fullyGraded });
+            setShowTranscript(true);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal memuat transkrip nilai.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTokenSubmit = async (e) => {
+        setIsSubmitting(true);
         try {
             let deviceId = localStorage.getItem('deviceId');
             if (!deviceId) {
@@ -624,43 +745,92 @@ const StudentExams = () => {
             {loading ? (
                 <div className="flex justify-center p-20">Memuat data...</div>
             ) : exams.length > 0 ? (
-                <div className="exams-grid">
-                    {exams.map(ex => (
-                        <div key={ex.id} className="student-exam-card">
-                            <div className="exam-card-head">
-                                <div className="subject-icon">
-                                    <BookOpen size={24} />
+                <>
+                    {(aiSaran || aiLoading) && (
+                        <div className="ai-saran-card" style={{ marginBottom: '28px', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 8px 32px -8px rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            <div style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ background: 'rgba(255,255,255,0.15)', padding: '10px', borderRadius: '12px', display: 'flex' }}>
+                                        <Sparkles size={22} color="white" />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ margin: 0, color: 'white', fontSize: '1.1rem', fontWeight: '800' }}>Saran dari BaknusAI</h3>
+                                        <p style={{ margin: 0, color: 'rgba(255,255,255,0.75)', fontSize: '0.8rem' }}>Rekomendasi personal berdasarkan hasil ujian Anda</p>
+                                    </div>
                                 </div>
-                                <div className="duration-tag">{ex.durasi} Menit</div>
+                                {aiSaran && !aiLoading && (
+                                    <button
+                                        onClick={() => generateAiSaran(exams, true)}
+                                        style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                                    >
+                                        <RefreshCw size={14} /> Refresh
+                                    </button>
+                                )}
                             </div>
-                            <h3>{ex.namaMapel}</h3>
-                            <p className="teacher">{ex.namaGuru}</p>
-
-                            <div className="exam-times">
-                                <div className="time-item">
-                                    <Clock size={14} />
-                                    <span>Mulai: {new Date(ex.waktuMulai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                                <div className="time-item">
-                                    <Clock size={14} />
-                                    <span>Selesai: {new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
+                            <div className="ai-saran-body" style={{ padding: '24px 28px' }}>
+                                {aiLoading ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                        <div className="ai-thinking-dots" style={{ display: 'flex', gap: '6px' }}>
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                        <p className="ai-saran-text" style={{ margin: 0, fontSize: '0.95rem', fontStyle: 'italic' }}>BaknusAI sedang menganalisis hasil ujian Anda...</p>
+                                    </div>
+                                ) : (
+                                    <p className="ai-saran-text" style={{ margin: 0, lineHeight: '1.8', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{aiSaran}</p>
+                                )}
                             </div>
-
-                            {ex.isFinished || JSON.parse(localStorage.getItem('finishedExams') || '{}')[`${user.profileId}_${ex.id}`] ? (
-                                <button className="start-btn" style={{ background: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} disabled>
-                                    <CheckCircle size={18} />
-                                    Selesai Dikerjakan
-                                </button>
-                            ) : (
-                                <button className="start-btn" onClick={() => handleStartClick(ex)}>
-                                    <Play size={18} />
-                                    Ikuti Ujian
-                                </button>
-                            )}
                         </div>
-                    ))}
-                </div>
+                    )}
+                    <div className="exams-grid">
+                        {exams.map(ex => (
+                            <div key={ex.id} className="student-exam-card">
+                                <div className="exam-card-head">
+                                    <div className="subject-icon">
+                                        <BookOpen size={24} />
+                                    </div>
+                                    <div className="duration-tag">{ex.durasi} Menit</div>
+                                    {ex.tampilkanNilai && ex.nilaiAkhir !== null && (
+                                        <div className="score-badge" style={{ background: '#ecfdf5', color: '#059669', padding: '6px 14px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #10b981', boxShadow: '0 2px 4px rgba(16,185,129,0.1)' }}>
+                                            <Award size={16} /> {ex.nilaiAkhir}
+                                        </div>
+                                    )}
+                                </div>
+                                <h3>{ex.namaMapel}</h3>
+                                <p className="teacher">{ex.namaGuru}</p>
+
+                                <div className="exam-times">
+                                    <div className="time-item">
+                                        <Clock size={14} />
+                                        <span>Mulai: {new Date(ex.waktuMulai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                    <div className="time-item">
+                                        <Clock size={14} />
+                                        <span>Selesai: {new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                </div>
+
+                                {ex.isFinished || JSON.parse(localStorage.getItem('finishedExams') || '{}')[`${user.profileId}_${ex.id}`] ? (
+                                    ex.tampilkanNilai ? (
+                                        <button className="start-btn" style={{ background: '#ecfdf5', color: '#10b981', borderColor: '#10b981' }} onClick={() => handleViewTranscript(ex)}>
+                                            <Award size={18} />
+                                            Lihat Transkrip Nilai
+                                        </button>
+                                    ) : (
+                                        <button className="start-btn" style={{ background: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} disabled>
+                                            <CheckCircle size={18} />
+                                            Selesai Dikerjakan
+                                        </button>
+                                    )
+                                ) : (
+                                    <button className="start-btn" onClick={() => handleStartClick(ex)}>
+                                        <Play size={18} />
+                                        Ikuti Ujian
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </>
             ) : (
                 <div className="empty-state">
                     <AlertCircle size={48} />
@@ -721,6 +891,57 @@ const StudentExams = () => {
                 </div>
             )}
 
+            {showTranscript && transcriptData && (
+                <div className="modal-overlay animate-fade-in" onClick={() => setShowTranscript(false)}>
+                    <div className="modal-content" style={{ maxWidth: '800px', padding: '0', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ background: '#3b82f6', color: 'white', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '8px' }}><Award size={24} /> Transkrip Nilai</h2>
+                                <p style={{ margin: '4px 0 0', opacity: 0.9 }}>{transcriptData.exam.namaMapel} - {transcriptData.exam.namaGuru}</p>
+                            </div>
+                            <button onClick={() => setShowTranscript(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex' }}><X size={20} /></button>
+                        </div>
+                        <div className="transcript-scroll-area" style={{ padding: '32px', maxHeight: '70vh', overflowY: 'auto', background: 'var(--bg-color, white)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '32px' }}>
+                                <div className="transcript-nilai-box" style={{ padding: '24px 48px', borderRadius: '20px', textAlign: 'center' }}>
+                                    <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Nilai Akhir</span>
+                                    <div style={{ fontSize: '3.5rem', fontWeight: '950', color: transcriptData.fullyGraded ? '#059669' : '#f59e0b', lineHeight: 1, marginTop: '8px' }}>
+                                        {transcriptData.finalScore}
+                                        <small style={{ fontSize: '1.2rem', color: '#94a3b8' }}>/ 100</small>
+                                    </div>
+                                    {!transcriptData.fullyGraded && <p style={{ color: '#f59e0b', fontSize: '0.85rem', marginTop: '12px', fontWeight: 'bold' }}>Sebagian jawaban belum dinilai oleh Guru</p>}
+                                </div>
+                            </div>
+
+                            <h3 className="transcript-detail-title" style={{ paddingBottom: '12px', marginBottom: '20px' }}>Detail Evaluasi Jawaban</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                {transcriptData.compiledList.map((item, idx) => (
+                                    <div key={idx} className="transcript-item-card" style={{ padding: '24px', borderRadius: '16px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                            <span style={{ fontWeight: '900', color: '#3b82f6', fontSize: '1.1rem' }}>Soal No. {item.no}</span>
+                                            <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>Bobot Maksimal: {item.bobot}</span>
+                                        </div>
+                                        <div className="transcript-q-text" dangerouslySetInnerHTML={{ __html: item.pertanyaan }}></div>
+
+                                        <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                                            <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Jawaban Anda</p>
+                                            <p className="transcript-ans-text" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{item.jawabanSiswa}</p>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                            <div className="transcript-score-box" style={{ padding: '20px 48px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '200px' }}>
+                                                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Nilai Diperoleh</span>
+                                                <strong className="transcript-score-value" style={{ fontSize: '2.5rem', lineHeight: 1, marginTop: '8px' }}>{item.skorGuru !== null ? item.skorGuru : '-'}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style>{`
                 .student-home { padding: 32px; }
                 @media (max-width: 768px) {
@@ -766,6 +987,39 @@ const StudentExams = () => {
                 .btn-confirm { padding: 14px; border-radius: 12px; background: #3b82f6; color: white; border: none; font-weight: 800; cursor: pointer; transition: all 0.2s; }
                 .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(0,0,0,0.1); }
                 .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+                /* AI Recommendation Card */
+                .ai-saran-card { }
+                .ai-saran-body { background: white; }
+                .ai-saran-text { color: #334155; }
+                [data-theme="dark"] .ai-saran-body { background: #1e293b; }
+                [data-theme="dark"] .ai-saran-text { color: #cbd5e1; }
+
+                /* Animated thinking dots */
+                .ai-thinking-dots span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #7c3aed; animation: bounceDot 1.2s infinite ease-in-out; }
+                .ai-thinking-dots span:nth-child(1) { animation-delay: 0s; }
+                .ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+                .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+                @keyframes bounceDot { 0%, 100% { transform: scale(0.6); opacity: 0.4; } 50% { transform: scale(1); opacity: 1; } }
+
+                .transcript-nilai-box { background: #f8fafc; border-color: #e2e8f0; }
+                .transcript-item-card { background: #f8fafc; border-color: #e2e8f0; }
+                .transcript-q-text { color: #334155; }
+                .transcript-ans-box { background: white; border-left-color: #cbd5e1; }
+                .transcript-ans-text { color: #475569; }
+                .transcript-score-box { background: white; border-color: #e2e8f0; }
+                .transcript-score-value { color: #1e293b; }
+
+                /* Dark Mode for Transcript */
+                [data-theme="dark"] .transcript-scroll-area { background: #0f172a !important; }
+                [data-theme="dark"] .transcript-nilai-box { background: #1e293b; border-color: #334155 !important; }
+                [data-theme="dark"] .transcript-detail-title { color: #e2e8f0 !important; border-bottom-color: #334155 !important; }
+                [data-theme="dark"] .transcript-item-card { background: #1e293b !important; border-color: #334155 !important; }
+                [data-theme="dark"] .transcript-q-text, [data-theme="dark"] .transcript-q-text * { color: #f8fafc !important; }
+                [data-theme="dark"] .transcript-ans-box { background: #0f172a !important; border-left-color: #475569 !important; }
+                [data-theme="dark"] .transcript-ans-text { color: #cbd5e1 !important; }
+                [data-theme="dark"] .transcript-score-box { background: #0f172a !important; border-color: #334155 !important; }
+                [data-theme="dark"] .transcript-score-value { color: #f8fafc !important; }
             `}</style>
         </div>
     );

@@ -59,6 +59,14 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.updateUjianMapel(id, dto));
     }
 
+    @PutMapping("/{id}/toggle-nilai")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<UjianMapelDTO> toggleNilai(@PathVariable Long id) {
+        log.info("[UjianMapel] Toggle Nilai attempt for id={} by user: {}", id,
+                SecurityContextHolder.getContext().getAuthentication().getName());
+        return ResponseEntity.ok(ujianMapelService.toggleTampilkanNilai(id));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

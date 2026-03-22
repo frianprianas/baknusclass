@@ -38,4 +38,7 @@ public class UjianMapel {
 
     @Column(length = 6)
     private String token;
+
+    @Column(name = "tampilkan_nilai")
+    private Boolean tampilkanNilai = false;
 }

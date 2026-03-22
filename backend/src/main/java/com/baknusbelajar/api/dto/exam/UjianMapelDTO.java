@@ -17,4 +17,6 @@ public class UjianMapelDTO {
     private String token;
     private Boolean isFinished;
     private Long sisaWaktuDetik; // Ditambahkan untuk menyimpan sisa durasi ujian dalam detik
+    private Boolean tampilkanNilai; // Kontrol visibilitas raport
+    private Double nilaiAkhir; // Hanya untuk SISWA jika dipublikasikan
 }
