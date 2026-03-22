@@ -984,7 +984,20 @@ const ExamScoring = () => {
                 .stat-praktek label { font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; }
                 .stat-praktek strong { font-size: 1.5rem; color: #1e293b; font-weight: 950; }
 
-
+                /* Dark mode support for AI Box & Grading Panel */
+                [data-theme="dark"] .ai-box { background: #1e293b; border-color: #3b82f6; }
+                [data-theme="dark"] .ai-head { color: #60a5fa; }
+                [data-theme="dark"] .ai-score { background: #0f172a; border-color: #1e3a8a; color: #bae6fd; }
+                [data-theme="dark"] .ai-score strong { color: #38bdf8; }
+                [data-theme="dark"] .ai-reason { background: #0f172a; color: #f8fafc; }
+                [data-theme="dark"] .lbl, [data-theme="dark"] .key-answer-box .lbl { color: #94a3b8; }
+                [data-theme="dark"] .key-answer-box.lbl { color: #f59e0b; }
+                [data-theme="dark"] .std-answer-box .ans-text, [data-theme="dark"] .ans-text { color: #e2e8f0; }
+                
+                [data-theme="dark"] .manual-box { background: #1e293b; border-color: #475569; }
+                [data-theme="dark"] .manual-box label { color: #e2e8f0; }
+                [data-theme="dark"] .score-input-group input { background: #0f172a; color: #f8fafc; border-color: #334155; }
+                [data-theme="dark"] .score-input-group input:focus { border-color: #3b82f6; }
 `}</style>
         </div>
     );
