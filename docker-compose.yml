@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: baknusbelajar-backend
+    ports:
+      - "8088:8088"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_URL=jdbc:oracle:thin:@host.docker.internal:1521/XEPDB1
+      - DB_USERNAME=sys as sysdba
+      - DB_PASSWORD=REDACTED
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=change-me-to-save-something-different
+      - GEMINI_KEYS=${GEMINI_KEYS}
+      - FALLBACK_AI_KEYS=${FALLBACK_AI_KEYS}
+      - MAILCOW_API_KEY=${MAILCOW_API_KEY}
+      - BAKNUS_DRIVE_API_KEY=${BAKNUS_DRIVE_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    networks:
+      - baknus-network
+
+  frontend:
+    build: ./frontend
+    container_name: baknusbelajar-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - baknus-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: baknusbelajar-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    networks:
+      - baknus-network
+
+networks:
+  baknus-network:
+    driver: bridge
+
+volumes:
+  redis_data:
