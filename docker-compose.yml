@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  oracle-db:
+    image: gvenzl/oracle-free:latest
+    container_name: baknusbelajar-oracle
+    ports:
+      - "1521:1521"
+    environment:
+      - ORACLE_PASSWORD=${DB_PASSWORD}
+      - ORACLE_DATABASE=BAKNUSDB
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    networks:
+      - baknus-network
+
   backend:
     build: ./backend
     container_name: baknusbelajar-backend
@@ -8,19 +21,19 @@ services:
       - "8088:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - DB_URL=jdbc:oracle:thin:@host.docker.internal:1521/XEPDB1
-      - DB_USERNAME=sys as sysdba
-      - DB_PASSWORD=REDACTED
+      - DB_URL=jdbc:oracle:thin:@oracle-db:1521/FREEPDB1
+      - DB_USERNAME=SYSTEM
+      - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - JWT_SECRET=change-me-to-save-something-different
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
       - GEMINI_KEYS=${GEMINI_KEYS}
       - FALLBACK_AI_KEYS=${FALLBACK_AI_KEYS}
       - MAILCOW_API_KEY=${MAILCOW_API_KEY}
       - BAKNUS_DRIVE_API_KEY=${BAKNUS_DRIVE_API_KEY}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
+      - oracle-db
       - redis
     networks:
       - baknus-network
@@ -40,7 +53,7 @@ services:
     container_name: baknusbelajar-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     networks:
       - baknus-network
 
@@ -49,4 +62,5 @@ networks:
     driver: bridge
 
 volumes:
+  oracle_data:
   redis_data:
