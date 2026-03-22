@@ -4,7 +4,6 @@ services:
   oracle-db:
     image: gvenzl/oracle-free:latest
     container_name: baknusbelajar-oracle
-    # Port 1521 dihapus dari host agar tidak bentrok, tetap bisa diakses internal oleh backend
     environment:
       - ORACLE_PASSWORD=${DB_PASSWORD}
       - ORACLE_DATABASE=BAKNUSDB
@@ -12,16 +11,21 @@ services:
       - oracle_data:/opt/oracle/oradata
     networks:
       - baknus-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
 
   backend:
     build: ./backend
     container_name: baknusbelajar-backend
-    # Tetap diekspos jika ingin akses API langsung, hapus jika tidak perlu (opsional)
     ports:
       - "8088:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - DB_URL=jdbc:oracle:thin:@oracle-db:1521/FREEPDB1
+      # Nama service diganti dari FREEPDB1 menjadi BAKNUSDB agar sesuai
+      - DB_URL=jdbc:oracle:thin:@oracle-db:1521/BAKNUSDB
       - DB_USERNAME=SYSTEM
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
@@ -33,12 +37,13 @@ services:
       - MAILCOW_API_KEY=${MAILCOW_API_KEY}
       - BAKNUS_DRIVE_API_KEY=${BAKNUS_DRIVE_API_KEY}
     depends_on:
-      - oracle-db
-      - redis
+      oracle-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - baknus-network
 
-  # Port Frontend diganti ke 8080 agar tidak bentrok dengan port 80 standar (biasanya dipakai Nginx lain/Apache)
   frontend:
     build: ./frontend
     container_name: baknusbelajar-frontend
@@ -52,7 +57,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: baknusbelajar-redis
-    # Hapus baris ports agar tidak bentrok dengan Redis lain di server host
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     networks:
       - baknus-network
