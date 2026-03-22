@@ -401,6 +401,12 @@ const DashboardLayout = () => {
                 [data-theme="dark"] .nav-badge {
                     border-color: #1e293b;
                 }
+
+                /* Disable and Hide everything else during Exam */
+                body.is-exam-active .sidebar-container { display: none !important; }
+                body.is-exam-active .global-top-nav { display: none !important; }
+                body.is-exam-active .main-content { padding: 0 !important; }
+                body.is-exam-active .content-inner { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
             `}</style>
         </div>
     );

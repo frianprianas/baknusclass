@@ -55,10 +55,15 @@ const StudentExams = () => {
     useEffect(() => {
         if (currentExam || showTokenOverlay || showFinishConfirm) {
             document.body.style.overflow = 'hidden';
+            if (currentExam) document.body.classList.add('is-exam-active');
         } else {
             document.body.style.overflow = 'unset';
+            document.body.classList.remove('is-exam-active');
         }
-        return () => { document.body.style.overflow = 'unset'; };
+        return () => {
+            document.body.style.overflow = 'unset';
+            document.body.classList.remove('is-exam-active');
+        };
     }, [currentExam, showTokenOverlay, showFinishConfirm]);
 
     const fetchEvents = async () => {
@@ -554,6 +559,43 @@ const StudentExams = () => {
                     .btn-cancel:hover { background: #f1f5f9; border-color: #cbd5e1; }
                     .btn-confirm { padding: 14px; border-radius: 12px; background: #3b82f6; color: white; border: none; font-weight: 800; cursor: pointer; transition: all 0.2s; }
                     .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 8px 15px -3px rgba(0,0,0,0.1); }
+                    
+                    /* Dark Mode support for CBT Layout */
+                    [data-theme="dark"] .cbt-layout { background: #0f172a; color: #f8fafc; }
+                    [data-theme="dark"] .cbt-main { background: #0f172a; }
+                    [data-theme="dark"] .cbt-body { background: #0f172a; }
+                    [data-theme="dark"] .cbt-sidebar { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .cbt-container { background: #1e293b; color: #f8fafc; box-shadow: none; }
+                    [data-theme="dark"] .cbt-topbar { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .cbt-content-area { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .cbt-question-box { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .cbt-footer { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .cbt-answer-area textarea { background: #0f172a; color: #f8fafc; border-color: #334155; }
+                    [data-theme="dark"] .cbt-answer-area textarea:focus { border-color: #3b82f6; }
+                    [data-theme="dark"] .nav-btn { background: #0f172a; color: #94a3b8; border-color: #334155; }
+                    [data-theme="dark"] .icon-circle { background: #1e293b; }
+                    [data-theme="dark"] .cbt-question-text { color: #f8fafc; }
+                    [data-theme="dark"] .cbt-font-controls span { color: #94a3b8; }
+                    [data-theme="dark"] .cbt-font-controls span:hover { background: #334155; color: #3b82f6; }
+                    [data-theme="dark"] .active-font { background: #334155 !important; border-color: #475569; color: #3b82f6 !important; }
+                    [data-theme="dark"] .sidebar-legend { border-color: #334155; }
+                    [data-theme="dark"] .sidebar-title { border-color: #334155; color: #e2e8f0; }
+                    [data-theme="dark"] .cbt-soal-number { color: #cbd5e1; }
+                    [data-theme="dark"] .cbt-timer { color: #cbd5e1; border-color: #ef4444; }
+                    [data-theme="dark"] .cbt-timer-urgent { background: #450a0a; color: #fca5a5; }
+                    [data-theme="dark"] .cbt-instruction { color: #38bdf8; }
+                    [data-theme="dark"] .modal-content.token-modal { background: #1e293b; }
+                    [data-theme="dark"] .modal-content { background: #1e293b; color: #f8fafc; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+                    [data-theme="dark"] .modal-content h2, [data-theme="dark"] .modal-content h3 { color: #f8fafc !important; }
+                    [data-theme="dark"] .modal-content p { color: #cbd5e1 !important; }
+                    [data-theme="dark"] .token-field { background: #0f172a; color: #f8fafc; border-color: #334155; }
+                    [data-theme="dark"] .token-field:focus { background: #0f172a; border-color: #3b82f6; }
+                    [data-theme="dark"] .btn-cancel { background: #0f172a; color: #cbd5e1; border-color: #334155; }
+                    [data-theme="dark"] .btn-cancel:hover { background: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .modal-overlay { background: rgba(0, 0, 0, 0.8); }
+                    [data-theme="dark"] .cbt-modal-head { border-color: #334155; }
+                    [data-theme="dark"] .cbt-close-nav { background: #0f172a; color: #94a3b8; }
+                    [data-theme="dark"] .cbt-close-nav:hover { background: #334155; color: #f8fafc; }
                 `}</style>
             </div>
         );
