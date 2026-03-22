@@ -4,8 +4,7 @@ services:
   oracle-db:
     image: gvenzl/oracle-free:latest
     container_name: baknusbelajar-oracle
-    ports:
-      - "1521:1521"
+    # Port 1521 dihapus dari host agar tidak bentrok, tetap bisa diakses internal oleh backend
     environment:
       - ORACLE_PASSWORD=${DB_PASSWORD}
       - ORACLE_DATABASE=BAKNUSDB
@@ -17,6 +16,7 @@ services:
   backend:
     build: ./backend
     container_name: baknusbelajar-backend
+    # Tetap diekspos jika ingin akses API langsung, hapus jika tidak perlu (opsional)
     ports:
       - "8088:8088"
     environment:
@@ -38,11 +38,12 @@ services:
     networks:
       - baknus-network
 
+  # Port Frontend diganti ke 8080 agar tidak bentrok dengan port 80 standar (biasanya dipakai Nginx lain/Apache)
   frontend:
     build: ./frontend
     container_name: baknusbelajar-frontend
     ports:
-      - "80:80"
+      - "8080:80" 
     depends_on:
       - backend
     networks:
@@ -51,8 +52,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: baknusbelajar-redis
-    ports:
-      - "6379:6379"
+    # Hapus baris ports agar tidak bentrok dengan Redis lain di server host
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     networks:
       - baknus-network
