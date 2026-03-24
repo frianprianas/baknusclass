@@ -9,6 +9,8 @@ services:
       - ORACLE_DATABASE=BAKNUSDB
     volumes:
       - oracle_data:/opt/oracle/oradata
+    ports:
+      - "1521:1521"
     networks:
       - baknus-network
     healthcheck:
@@ -58,6 +60,8 @@ services:
     image: redis:7-alpine
     container_name: baknusbelajar-redis
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6380:6379"
     networks:
       - baknus-network
 

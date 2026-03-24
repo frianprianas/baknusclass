@@ -33,6 +33,10 @@ const UserManagement = () => {
     const [classList, setClassList] = useState([]);
     const [updating, setUpdating] = useState(false);
 
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+
     const fetchUsers = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -136,6 +140,20 @@ const UserManagement = () => {
         u.namaLengkap?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Pagination logic
+    const indexOfLastUser = currentPage * rowsPerPage;
+    const indexOfFirstUser = indexOfLastUser - rowsPerPage;
+    const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+    const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+
+    const handlePageChange = (pageNumber) => {
+        setCurrentPage(pageNumber);
+    };
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
     const handleToggleStatus = async (user) => {
         const action = (user.active || user.isActive) ? 'menonaktifkan' : 'mengaktifkan';
         if (!window.confirm(`Yakin ingin ${action} user ini?`)) return;
@@ -226,11 +244,11 @@ const UserManagement = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="5" className="text-center">Memuat data...</td></tr>
-                            ) : filteredUsers.length === 0 ? (
-                                <tr><td colSpan="5" className="text-center">Tidak ada user ditemukan.</td></tr>
+                                <tr><td colSpan="6" className="text-center">Memuat data...</td></tr>
+                            ) : currentUsers.length === 0 ? (
+                                <tr><td colSpan="6" className="text-center">Tidak ada user ditemukan.</td></tr>
                             ) : (
-                                filteredUsers.map((user) => (
+                                currentUsers.map((user) => (
                                     <tr key={user.id}>
                                         <td>
                                             <div className="user-cell">
@@ -314,6 +332,40 @@ const UserManagement = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && filteredUsers.length > 0 && (
+                    <div className="pagination-container">
+                        <div className="pagination-info">
+                            Menampilkan {indexOfFirstUser + 1} - {Math.min(indexOfLastUser, filteredUsers.length)} dari {filteredUsers.length} user
+                        </div>
+                        <div className="pagination-buttons">
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="page-btn"
+                            >
+                                Sebelumnya
+                            </button>
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button
+                                    key={i + 1}
+                                    onClick={() => handlePageChange(i + 1)}
+                                    className={`page - num ${currentPage === i + 1 ? 'active' : ''} `}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="page-btn"
+                            >
+                                Selanjutnya
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Edit Modal */}
@@ -797,6 +849,95 @@ const UserManagement = () => {
                 }
 
                 .text-center { text-align: center !important; }
+
+                .pagination-container {
+                    padding: 20px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-top: 1px solid #f1f5f9;
+                    background: #f8fafc;
+                }
+
+                .pagination-info {
+                    font-size: 0.85rem;
+                    color: #64748b;
+                    font-weight: 500;
+                }
+
+                .pagination-buttons {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .page-btn {
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    border: 1px solid #e2e8f0;
+                    background: white;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    color: #475569;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .page-btn:hover:not(:disabled) {
+                    border-color: #3b82f6;
+                    color: #3b82f6;
+                }
+
+                .page-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+
+                .page-num {
+                    width: 34px;
+                    height: 34px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 6px;
+                    border: 1px solid #e2e8f0;
+                    background: white;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    color: #475569;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .page-num:hover {
+                    border-color: #3b82f6;
+                    color: #3b82f6;
+                }
+
+                .page-num.active {
+                    background: #3b82f6;
+                    color: white;
+                    border-color: #3b82f6;
+                }
+
+                [data-theme="dark"] .pagination-container {
+                    background: #1e293b;
+                    border-top-color: #334155;
+                }
+
+                [data-theme="dark"] .pagination-info {
+                    color: #94a3b8;
+                }
+
+                [data-theme="dark"] .page-btn, [data-theme="dark"] .page-num {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #cbd5e1;
+                }
+
+                [data-theme="dark"] .page-btn:hover:not(:disabled), [data-theme="dark"] .page-num:hover {
+                    border-color: #3b82f6;
+                    color: #3b82f6;
+                }
 
                 .animate-spin {
                     animation: spin 1s linear infinite;
