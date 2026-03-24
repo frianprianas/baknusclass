@@ -66,7 +66,9 @@ const Dashboard = () => {
       } catch (e) { console.error(e); }
     };
 
-    fetchSummary();
+    if (['TU', 'GURU', 'ADMIN'].includes(user.role)) {
+      fetchSummary();
+    }
     checkProctorStatus();
     if (user.role === 'SISWA') checkStudentExams();
   }, []);

@@ -40,9 +40,15 @@ const DashboardLayout = () => {
                 console.error('Failed to fetch summary in layout', err);
             }
         };
-        fetchSummary();
+        if (['TU', 'GURU', 'ADMIN'].includes(user.role)) {
+            fetchSummary();
+        }
         // Refresh every 5 mins
-        const interval = setInterval(fetchSummary, 300000);
+        const interval = setInterval(() => {
+            if (['TU', 'GURU', 'ADMIN'].includes(user.role)) {
+                fetchSummary();
+            }
+        }, 300000);
         return () => clearInterval(interval);
     }, [token]);
 

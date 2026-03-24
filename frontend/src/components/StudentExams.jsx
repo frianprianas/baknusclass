@@ -217,7 +217,7 @@ const StudentExams = () => {
         }
     };
 
-    const handleTokenSubmit = async (e) => {
+    const handleVerifyToken = async (e) => {
         setIsSubmitting(true);
         try {
             let deviceId = localStorage.getItem('deviceId');
