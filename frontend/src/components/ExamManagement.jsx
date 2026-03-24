@@ -1052,8 +1052,8 @@ const ExamManagement = () => {
                     .questions - scroll - v2:: -webkit - scrollbar - thumb:hover { background: #cbd5e1; }
 
                     /* Modal Styles */
-                    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 10000; padding: 20px; }
-                    .modal-content { background: white; border-radius: 16px; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; padding: 30px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); position: relative; margin: 0; }
+                    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 10000; overflow-y: scroll; padding: 50px 20px; }
+                    .modal-content { background: white; border-radius: 16px; width: 100%; max-width: 480px; padding: 30px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); position: relative; margin: 0 auto; }
                     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
                     .modal-header h3 { font-size: 1.35rem; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
                     .close-btn { background: none; border: none; color: #94a3b8; cursor: pointer; transition: all 0.2s; padding: 6px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
