@@ -1618,7 +1618,7 @@ const ExamManagement = () => {
                                             required
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                         <div className="form-group">
                                             <label>Semester</label>
                                             <select value={eventForm.semester} onChange={(e) => setEventForm({ ...eventForm, semester: e.target.value })}>
@@ -1631,7 +1631,7 @@ const ExamManagement = () => {
                                             <input type="text" value={eventForm.tahunAjaran} onChange={(e) => setEventForm({ ...eventForm, tahunAjaran: e.target.value })} />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                         <div className="form-group">
                                             <label>Tanggal Mulai</label>
                                             <input type="date" value={eventForm.tanggalMulai} onChange={(e) => setEventForm({ ...eventForm, tanggalMulai: e.target.value })} required />
@@ -1771,6 +1771,20 @@ const ExamManagement = () => {
                     background: rgba(15, 23, 42, 0.75);
                     backdrop-filter: blur(8px);
                     z-index: 9999;
+                    display: flex;
+                    justify-content: center;
+                    align-items: flex-start;
+                    padding-top: 90px;
+                    overflow-y: auto;
+                }
+                .modal-content.animate-slide-up {
+                    border-radius: 16px;
+                    width: 100%;
+                    max-width: 750px;
+                    padding: 30px;
+                    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.4);
+                    background: white;
+                    margin-bottom: 40px;
                 }
                 .custom-scrollbar::-webkit-scrollbar { width: 8px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
