@@ -1052,21 +1052,21 @@ const ExamManagement = () => {
                     .questions - scroll - v2:: -webkit - scrollbar - thumb:hover { background: #cbd5e1; }
 
                     /* Modal Styles */
-                    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: flex-start; z-index: 10000; overflow-y: auto; padding: 20px 0; }
-                    .modal-content { background: white; border-radius: 20px; width: 100%; max-width: 440px; padding: 20px 24px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); margin: auto; }
+                    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 10000; padding: 20px; }
+                    .modal-content { background: white; border-radius: 16px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; padding: 24px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); position: relative; }
                     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-                    .modal-header h3 { font-size: 1.15rem; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
+                    .modal-header h3 { font-size: 1.1rem; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
                     .close-btn { background: none; border: none; color: #94a3b8; cursor: pointer; transition: all 0.2s; padding: 4px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
                     .close-btn:hover { background: #f1f5f9; color: #ef4444; }
-                    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+                    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
                     
                     .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-                    .form-group { margin-bottom: 12px; }
-                    .form-group label { display: block; margin-bottom: 4px; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
-                    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 2.2px solid #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; color: #0f172a; background: #ffffff; transition: all 0.2s; }
-                    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; background: white; outline: none; box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.08); }
+                    .form-group { margin-bottom: 10px; }
+                    .form-group label { display: block; margin-bottom: 3px; font-size: 0.65rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+                    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: #0f172a; background: #ffffff; transition: all 0.2s; }
+                    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; background: white; outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08); }
                     
                     .btn-secondary { background: #f1f5f9; color: #475569; padding: 14px 28px; border-radius: 14px; font-weight: 700; border: none; cursor: pointer; transition: all 0.2s; }
                     .btn-secondary:hover { background: #e2e8f0; color: #1e293b; }
