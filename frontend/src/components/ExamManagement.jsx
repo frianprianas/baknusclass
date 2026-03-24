@@ -1768,13 +1768,13 @@ const ExamManagement = () => {
                     position: fixed;
                     top: 0; left: 0;
                     width: 100%; height: 100%;
-                    background: rgba(15, 23, 42, 0.75);
-                    backdrop-filter: blur(8px);
-                    z-index: 9999;
+                    background: rgba(15, 23, 42, 0.82);
+                    backdrop-filter: blur(6px);
+                    z-index: 99999;
                     display: flex;
                     justify-content: center;
                     align-items: flex-start;
-                    padding-top: 90px;
+                    padding-top: 85px;
                     overflow-y: auto;
                 }
                 .modal-content.animate-slide-up {
@@ -1782,7 +1782,7 @@ const ExamManagement = () => {
                     width: 100%;
                     max-width: 750px;
                     padding: 30px;
-                    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.4);
+                    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.5);
                     background: white;
                     margin-bottom: 40px;
                 }
