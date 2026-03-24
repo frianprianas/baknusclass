@@ -1774,7 +1774,6 @@ const ExamManagement = () => {
                     display: flex;
                     justify-content: center;
                     align-items: flex-start;
-                    padding-top: 85px;
                     overflow-y: auto;
                 }
                 .modal-content.animate-slide-up {
@@ -1784,8 +1783,12 @@ const ExamManagement = () => {
                     padding: 30px;
                     box-shadow: 0 25px 60px -10px rgba(0,0,0,0.5);
                     background: white;
-                    margin-bottom: 40px;
+                    margin: 85px auto 40px auto;
+                    max-height: calc(100vh - 105px);
+                    overflow-y: auto;
                 }
+                .modal-content.animate-slide-up::-webkit-scrollbar { width: 6px; }
+                .modal-content.animate-slide-up::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar { width: 8px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; border: 2px solid transparent; background-clip: content-box; }
