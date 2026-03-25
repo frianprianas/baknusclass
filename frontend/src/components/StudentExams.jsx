@@ -18,8 +18,10 @@ import {
     Check,
     Award,
     Sparkles,
-    RefreshCw
+    RefreshCw,
+    Brush
 } from 'lucide-react';
+import Whiteboard from './Whiteboard';
 
 const StudentExams = () => {
     const [events, setEvents] = useState([]);
@@ -48,6 +50,8 @@ const StudentExams = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [timer, setTimer] = useState(0); // seconds remaining
     const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+    const [whiteboards, setWhiteboards] = useState({}); // { soalId: base64 }
+    const [showWhiteboard, setShowWhiteboard] = useState({}); // { soalId: boolean }
 
     // CBT Design State
     const [showNav, setShowNav] = useState(false);
@@ -259,17 +263,19 @@ const StudentExams = () => {
             });
             setAnswers(initialAnswers);
 
-            // Fetch existing answers to resume progress
             const answersResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
             const existingAnswers = {};
             const existingRagu = {};
+            const existingWhiteboards = {};
             answersResp.data.forEach(ans => {
                 existingAnswers[ans.soalId] = ans.teksJawaban;
                 existingRagu[ans.soalId] = ans.raguRagu;
+                existingWhiteboards[ans.soalId] = ans.whiteboardData;
             });
 
             setAnswers(prev => ({ ...prev, ...existingAnswers }));
             setRaguState(prev => ({ ...prev, ...existingRagu }));
+            setWhiteboards(prev => ({ ...prev, ...existingWhiteboards }));
 
             // Start keep-alive heartbeats
             const keepAliveInterval = setInterval(() => {
@@ -307,15 +313,16 @@ const StudentExams = () => {
 
     const [isSaving, setIsSaving] = useState(false);
 
-    const saveAnswer = async (soalId, text, isRagu = false) => {
-        if (!text || !user.profileId) return;
+    const saveAnswer = async (soalId, text, isRagu = false, wbData = null) => {
+        if (!user.profileId) return;
         setIsSaving(true);
         try {
             const payload = {
                 soalId,
                 siswaId: user.profileId,
-                teksJawaban: text,
-                raguRagu: isRagu
+                teksJawaban: text || '',
+                raguRagu: isRagu,
+                whiteboardData: wbData || whiteboards[soalId] || null
             };
             await axios.post('/api/exam/jawaban/submit', payload, { headers });
         } catch (err) {
@@ -327,20 +334,20 @@ const StudentExams = () => {
 
     const handleNext = () => {
         const qId = questions[currentIndex].id;
-        saveAnswer(qId, answers[qId], raguState[qId]);
+        saveAnswer(qId, answers[qId], raguState[qId], whiteboards[qId]);
         setCurrentIndex(prev => prev + 1);
     };
 
     const handlePrev = () => {
         const qId = questions[currentIndex].id;
-        saveAnswer(qId, answers[qId], raguState[qId]);
+        saveAnswer(qId, answers[qId], raguState[qId], whiteboards[qId]);
         setCurrentIndex(prev => prev - 1);
     };
 
     const handleFinishExam = async () => {
         // Final save before confirmation opens
         const qId = questions[currentIndex]?.id;
-        await saveAnswer(qId, answers[qId], raguState[qId]);
+        await saveAnswer(qId, answers[qId], raguState[qId], whiteboards[qId]);
         setShowFinishConfirm(true);
     };
 
@@ -348,7 +355,7 @@ const StudentExams = () => {
         const qId = questions[currentIndex].id;
         const newRagu = !raguState[qId];
         setRaguState(prev => ({ ...prev, [qId]: newRagu }));
-        saveAnswer(qId, answers[qId], newRagu);
+        saveAnswer(qId, answers[qId], newRagu, whiteboards[qId]);
     };
 
     const confirmFinishExam = async (forced = false) => {
@@ -471,16 +478,41 @@ const StudentExams = () => {
 
                             <div className="cbt-content-area">
                                 <div className="cbt-question-box">
-                                    <h3 className="cbt-instruction">Ketikkan jawabanmu!</h3>
                                     <div className={`cbt-question-text ${fontClass}`} dangerouslySetInnerHTML={{ __html: q?.pertanyaan }}></div>
 
                                     <div className="cbt-answer-area">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <h3 className="cbt-instruction" style={{ margin: 0 }}>Ketikkan jawabanmu!</h3>
+                                            <button
+                                                onClick={() => setShowWhiteboard({ ...showWhiteboard, [q.id]: !showWhiteboard[q.id] })}
+                                                style={{ background: showWhiteboard[q.id] ? '#ef4444' : '#1e88e5', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                <Brush size={16} /> {showWhiteboard[q.id] ? 'Tutup Whiteboard' : 'Buka Whiteboard Corat-coret'}
+                                            </button>
+                                        </div>
+
+                                        {showWhiteboard[q?.id] && (
+                                            <Whiteboard
+                                                initialData={whiteboards[q?.id]}
+                                                onSave={(data) => {
+                                                    setWhiteboards({ ...whiteboards, [q.id]: data });
+                                                    // Auto-save whiteboard data periodically or upon drawing
+                                                    saveAnswer(q.id, answers[q.id], raguState[q.id], data);
+                                                }}
+                                                onClear={() => {
+                                                    setWhiteboards({ ...whiteboards, [q.id]: null });
+                                                    saveAnswer(q.id, answers[q.id], raguState[q.id], null);
+                                                }}
+                                            />
+                                        )}
+
                                         <textarea
                                             className={fontClass}
                                             value={answers[q?.id] || ''}
                                             onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
                                             placeholder="Ketik jawaban Anda di sini..."
-                                            rows={8}
+                                            rows={showWhiteboard[q.id] ? 4 : 8}
+                                            style={{ marginTop: showWhiteboard[q.id] ? '16px' : '0' }}
                                         />
                                         <div className="cbt-save-indicator">
                                             <Clock size={12} className={isSaving ? 'animate-spin' : ''} />

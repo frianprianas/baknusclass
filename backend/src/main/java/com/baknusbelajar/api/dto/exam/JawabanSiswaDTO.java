@@ -18,4 +18,5 @@ public class JawabanSiswaDTO {
     private java.time.LocalDateTime waktuMulaiUjian;
     private java.time.LocalDateTime waktuSelesaiUjian;
     private Boolean statusSelesaiUjian;
+    private String whiteboardData;
 }

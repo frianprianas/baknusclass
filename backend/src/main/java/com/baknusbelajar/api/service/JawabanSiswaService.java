@@ -84,6 +84,9 @@ public class JawabanSiswaService {
         if (dto.getRaguRagu() != null) {
             entity.setRaguRagu(dto.getRaguRagu());
         }
+        if (dto.getWhiteboardData() != null) {
+            entity.setWhiteboardData(dto.getWhiteboardData());
+        }
 
         return mapToDTO(jawabanSiswaRepository.save(entity));
     }
@@ -273,6 +276,7 @@ public class JawabanSiswaService {
         dto.setAlasanAi(entity.getAlasanAi());
         dto.setSkorFinalGuru(entity.getSkorFinalGuru());
         dto.setRaguRagu(entity.getRaguRagu());
+        dto.setWhiteboardData(entity.getWhiteboardData());
 
         if (entity.getSiswa() != null) {
             dto.setSiswaId(entity.getSiswa().getId());

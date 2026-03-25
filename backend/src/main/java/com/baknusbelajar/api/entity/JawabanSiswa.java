@@ -43,4 +43,8 @@ public class JawabanSiswa {
     @Column(name = "ragu_ragu")
     @Builder.Default
     private Boolean raguRagu = false;
+
+    @Lob
+    @Column(name = "whiteboard_data")
+    private String whiteboardData;
 }

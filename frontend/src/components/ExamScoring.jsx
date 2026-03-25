@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
-    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity
+    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -784,6 +784,19 @@ const ExamScoring = () => {
                                                         <h4>Jawaban Siswa:</h4>
                                                         {ans?.raguRagu && <div className="ragu-badge" style={{ display: 'inline-block', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px' }}>Ragu - Ragu</div>}
                                                         <p className="ans-text">{ans?.teksJawaban || <span className="text-slate-400 italic">Tidak menjawab</span>}</p>
+
+                                                        {ans?.whiteboardData && (
+                                                            <div className="wb-answer-preview" style={{ marginTop: '16px', border: '3px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden', background: 'white', maxWidth: '600px' }}>
+                                                                <div style={{ background: '#f8fafc', padding: '6px 16px', fontSize: '0.8rem', fontWeight: '950', color: '#475569', borderBottom: '2px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <Brush size={14} /> Hasil Whiteboard / Corat-coret:
+                                                                </div>
+                                                                <img
+                                                                    src={ans.whiteboardData}
+                                                                    alt="Whiteboard"
+                                                                    style={{ width: '100%', display: 'block', height: 'auto', background: '#fff' }}
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="key-answer-box">
