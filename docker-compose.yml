@@ -4,6 +4,7 @@ services:
   oracle-db:
     image: gvenzl/oracle-free:latest
     container_name: baknusbelajar-oracle
+    restart: unless-stopped
     environment:
       - ORACLE_PASSWORD=${DB_PASSWORD}
       - ORACLE_DATABASE=BAKNUSDB
@@ -22,6 +23,7 @@ services:
   backend:
     build: ./backend
     container_name: baknusbelajar-backend
+    restart: unless-stopped
     ports:
       - "8088:8088"
     environment:
@@ -49,6 +51,7 @@ services:
   frontend:
     build: ./frontend
     container_name: baknusbelajar-frontend
+    restart: unless-stopped
     ports:
       - "8081:80" 
     depends_on:
@@ -59,6 +62,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: baknusbelajar-redis
+    restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     ports:
       - "6380:6379"
