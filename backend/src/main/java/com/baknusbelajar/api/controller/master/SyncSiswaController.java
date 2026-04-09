@@ -94,6 +94,16 @@ public class SyncSiswaController {
                 int success = 0;
                 int failed = 0;
 
+                // Cache all siswa from DB
+                List<Siswa> allSiswa = siswaRepository.findAll();
+                Map<String, List<Siswa>> nameMap = new HashMap<>();
+                for (Siswa s : allSiswa) {
+                    if (s.getNamaLengkap() != null) {
+                        String key = s.getNamaLengkap().trim().toLowerCase();
+                        nameMap.computeIfAbsent(key, k -> new ArrayList<>()).add(s);
+                    }
+                }
+
                 for (String line : lines) {
                     try {
                         String[] parts;
@@ -109,6 +119,22 @@ public class SyncSiswaController {
 
                         String nama = parts[0].trim();
                         String kelasStr = parts[1].trim();
+
+                        String key = nama.toLowerCase();
+                        List<Siswa> existingSiswa = nameMap.get(key);
+
+                        if (existingSiswa == null || existingSiswa.isEmpty()) {
+                            failed++;
+                            processed++;
+                            try {
+                                Map<String, Object> eventData = new HashMap<>();
+                                eventData.put("progress", processed);
+                                eventData.put("total", total);
+                                eventData.put("message", "[WARNING] " + nama + " tidak ditemukan di data aplikasi.");
+                                emitter.send(SseEmitter.event().name("progress").data(eventData));
+                            } catch (Exception ex) {}
+                            continue;
+                        }
 
                         // Find or create Kelas
                         Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(kelasStr).orElse(null);
@@ -127,37 +153,11 @@ public class SyncSiswaController {
                             kelas = kelasRepository.save(kelas);
                         }
 
-                        // Buat username & email
-                        String cleanName = nama.toLowerCase().replaceAll("[^a-z0-9]", "");
-                        if (cleanName.length() > 10) cleanName = cleanName.substring(0, 10);
-                        String suffix = String.format("%04d", new Random().nextInt(10000));
-                        String username = "s." + cleanName + suffix;
-                        String email = username + "@student.baknus";
-
-                        // Check existing
-                        Optional<Users> userOpt = userRepository.findByEmail(email);
-                        Users user;
-                        if (userOpt.isEmpty()) {
-                            user = new Users();
-                            user.setEmail(email);
-                            user.setUsername(username);
-                            user.setPasswordHash(passwordEncoder.encode("123456"));
-                            user.setRole("SISWA");
-                            user.setNamaLengkap(nama);
-                            user.setIsActive(true);
-                            user = userRepository.save(user);
-                        } else {
-                            user = userOpt.get();
+                        // Update kelas pada semua data siswa yang punya nama sama persis tersebut
+                        for (Siswa s : existingSiswa) {
+                            s.setKelas(kelas);
+                            siswaRepository.save(s);
                         }
-
-                        String nisn = String.valueOf(System.currentTimeMillis()).substring(3) + new Random().nextInt(100);
-
-                        Siswa siswa = new Siswa();
-                        siswa.setUser(user);
-                        siswa.setNamaLengkap(nama);
-                        siswa.setKelas(kelas);
-                        siswa.setNisn(nisn);
-                        siswaRepository.save(siswa);
 
                         success++;
                         processed++;
@@ -165,7 +165,7 @@ public class SyncSiswaController {
                         Map<String, Object> eventData = new HashMap<>();
                         eventData.put("progress", processed);
                         eventData.put("total", total);
-                        eventData.put("message", "[OK] Tersinkron: " + nama + " -> Kelas " + kelasStr);
+                        eventData.put("message", "[OK] Berhasil disinkron: " + nama + " -> Kelas " + kelasStr);
 
                         emitter.send(SseEmitter.event().name("progress").data(eventData));
 
