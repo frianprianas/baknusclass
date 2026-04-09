@@ -13,6 +13,7 @@ import SubjectManagement from './components/SubjectManagement'
 import StudentMaterials from './components/StudentMaterials'
 import ForumDiscussion from './components/ForumDiscussion'
 import DashboardLayout from './components/DashboardLayout'
+import SyncSiswa from './components/SyncSiswa'
 
 function App() {
   React.useEffect(() => {
@@ -39,6 +40,7 @@ function App() {
           <Route path="/subject-management" element={<SubjectManagement />} />
           <Route path="/student-materi" element={<StudentMaterials />} />
           <Route path="/forum" element={<ForumDiscussion />} />
+          <Route path="/sync-siswa" element={<SyncSiswa />} />
         </Route>
       </Routes>
     </Router>

@@ -16,7 +16,8 @@ import {
   Moon,
   Sun,
   User,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
@@ -67,6 +68,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     if (id === 'subject_management') navigate('/subject-management');
     if (id === 'materi_student') navigate('/student-materi');
     if (id === 'forum') navigate('/forum');
+    if (id === 'sync_siswa') navigate('/sync-siswa');
   };
 
   const toggleTheme = () => {
@@ -87,6 +89,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: 'student_exams', label: 'Daftar Ujian', icon: FileText, roles: ['ADMIN', 'SISWA'] },
     { id: 'master_data', label: 'Data Master', icon: Layout, roles: ['ADMIN', 'TU'] },
     { id: 'users', label: 'Manajemen User', icon: Users, roles: ['ADMIN', 'TU'] },
+    { id: 'sync_siswa', label: 'Sinkronisasi Siswa', icon: RefreshCw, roles: ['ADMIN', 'TU'] },
     { id: 'security', label: 'Token & Keamanan', icon: ShieldCheck, roles: ['ADMIN', 'TU'] },
     { id: 'settings', label: 'Pengaturan', icon: Settings, roles: ['ADMIN'] },
   ];
