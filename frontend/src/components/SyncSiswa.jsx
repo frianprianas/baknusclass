@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Upload, Terminal, RefreshCw } from 'lucide-react';
+import { Upload, Terminal, RefreshCw, Zap, AlertTriangle } from 'lucide-react';
 
 const SyncSiswa = () => {
   const [file, setFile] = useState(null);
@@ -96,6 +96,35 @@ const SyncSiswa = () => {
     });
   };
 
+  const handleDeepSync = async () => {
+    const isConfirmed = window.confirm(
+      "SINKRONISASI MENDALAM\n\n" +
+      "Apakah Anda yakin? Tindakan ini akan mencari siswa dengan nama sama persis, " +
+      "mengambil kelas dari data terbaru, dan memindahkannya ke akun dengan " +
+      "email @smk.baktinusantara666.sch.id, lalu menghapus data duplikatnya."
+    );
+
+    if (isConfirmed) {
+      try {
+        setStatus('syncing');
+        addLog("Memulai sinkronisasi mendalam. Mohon tunggu...", "info");
+        const token = localStorage.getItem('token');
+
+        const res = await axios.post('/api/master/sync-siswa/deep-sync', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        alert("Berhasil!\n" + res.data.message);
+        addLog(res.data.message, "success");
+      } catch (err) {
+        alert("Gagal melakukan sinkronisasi mendalam:\n" + (err.response?.data?.message || err.message));
+        addLog("Gagal: " + (err.response?.data?.message || err.message), "error");
+      } finally {
+        setStatus('complete');
+      }
+    }
+  };
+
   const progressPercentage = total > 0 ? Math.round((progress / total) * 100) : 0;
 
   return (
@@ -151,6 +180,25 @@ const SyncSiswa = () => {
             {status === 'uploading' || status === 'syncing' ? <RefreshCw size={18} className="spin" /> : <Upload size={18} />}
             <span>Mulai Sinkronisasi</span>
           </button>
+
+          <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px dashed #e2e8f0' }}>
+            <h4 style={{ marginBottom: '8px', fontSize: '0.95rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={16} color="#eab308" /> Fix Data Duplikat
+            </h4>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '12px' }}>
+              Fitur ini akan menyalin data Kelas dari siswa hasil upload CSV ke akun siswa sebenarnya yang menggunakan email <strong>@smk.baktinusantara666.sch.id</strong>.
+            </p>
+            <button 
+              onClick={handleDeepSync}
+              style={{
+                width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '10px', 
+                background: '#fff', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem'
+              }}
+            >
+              <AlertTriangle size={16} />
+              Jalankan Sinkronisasi Mendalam
+            </button>
+          </div>
         </div>
 
         <div className="terminal-card" style={{ background: '#0f172a', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', height: '400px' }}>

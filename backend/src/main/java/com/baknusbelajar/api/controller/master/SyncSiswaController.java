@@ -206,4 +206,76 @@ public class SyncSiswaController {
 
         return emitter;
     }
+
+    @PostMapping("/deep-sync")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> deepSyncDuplicates() {
+        try {
+            List<Siswa> allSiswa = siswaRepository.findAll();
+            
+            // Group by lowercase namaLengkap
+            Map<String, List<Siswa>> grouped = new HashMap<>();
+            for (Siswa s : allSiswa) {
+                if (s.getNamaLengkap() == null) continue;
+                String key = s.getNamaLengkap().toLowerCase().trim();
+                grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(s);
+            }
+
+            int mergedCount = 0;
+            int deletedCount = 0;
+
+            for (Map.Entry<String, List<Siswa>> entry : grouped.entrySet()) {
+                List<Siswa> group = entry.getValue();
+                if (group.size() <= 1) continue;
+
+                // Find primary (with email @smk.baktinusantara666.sch.id)
+                Siswa primary = null;
+                for (Siswa s : group) {
+                    if (s.getUser() != null && s.getUser().getEmail() != null && 
+                        s.getUser().getEmail().endsWith("@smk.baktinusantara666.sch.id")) {
+                        primary = s;
+                        break;
+                    }
+                }
+
+                if (primary == null) continue;
+
+                Kelas newKelas = null;
+                List<Siswa> toDelete = new ArrayList<>();
+
+                for (Siswa s : group) {
+                    if (s.getId().equals(primary.getId())) continue;
+                    
+                    if (s.getKelas() != null) {
+                        newKelas = s.getKelas(); // ambil kelas dari data duplikat (hasil csv)
+                    }
+                    toDelete.add(s);
+                }
+
+                if (newKelas != null) {
+                    primary.setKelas(newKelas);
+                    siswaRepository.save(primary);
+                    mergedCount++;
+                }
+
+                for (Siswa dupe : toDelete) {
+                    Users dupeUser = dupe.getUser();
+                    siswaRepository.delete(dupe);
+                    if (dupeUser != null) {
+                        userRepository.delete(dupeUser);
+                    }
+                    deletedCount++;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "message", "Sinkronisasi mendalam berhasil. Memperbarui " + mergedCount + " siswa dan menghapus " + deletedCount + " duplikat.",
+                "mergedCount", mergedCount,
+                "deletedCount", deletedCount
+            ));
+        } catch (Exception e) {
+            log.error("Deep sync error", e);
+            return ResponseEntity.status(500).body(Map.of("message", "Gagal sinkronisasi mendalam: " + e.getMessage()));
+        }
+    }
 }
