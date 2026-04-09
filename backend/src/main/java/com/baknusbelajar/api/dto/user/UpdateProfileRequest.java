@@ -12,4 +12,5 @@ public class UpdateProfileRequest {
     private String nip;
     private List<GuruMapelAssignment> assignments; // For mapping Mapel + Kelas for Teachers
     private String phoneNumber;
+    private String role;
 }

@@ -200,6 +200,9 @@ public class UserService {
         if (request.getPhoneNumber() != null) {
             user.setPhoneNumber(request.getPhoneNumber());
         }
+        if (request.getRole() != null) {
+            user.setRole(request.getRole());
+        }
         userRepository.save(user);
 
         String role = user.getRole();

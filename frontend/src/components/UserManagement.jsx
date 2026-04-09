@@ -12,7 +12,8 @@ import {
     Mail,
     Shield,
     Edit,
-    ExternalLink
+    ExternalLink,
+    MessageCircle
 } from 'lucide-react';
 
 const UserManagement = () => {
@@ -25,7 +26,8 @@ const UserManagement = () => {
         kelasId: '',
         nisn: '',
         nip: '',
-        phoneNumber: ''
+        phoneNumber: '',
+        role: ''
     });
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -90,7 +92,8 @@ const UserManagement = () => {
             kelasId: user.kelasId || '',
             nisn: user.nisn || '',
             nip: user.nip || '',
-            phoneNumber: user.phoneNumber || ''
+            phoneNumber: user.phoneNumber || '',
+            role: user.role || ''
         });
         setIsEditModalOpen(true);
     };
@@ -403,7 +406,21 @@ const UserManagement = () => {
                                 />
                             </div>
 
-                            {selectedUser.role === 'SISWA' && (
+                            <div className="form-group">
+                                <label>Role User</label>
+                                <select
+                                    value={formData.role}
+                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                    required
+                                >
+                                    <option value="SISWA">SISWA</option>
+                                    <option value="GURU">GURU</option>
+                                    <option value="TU">TU</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                </select>
+                            </div>
+
+                            {formData.role === 'SISWA' && (
                                 <>
                                     <div className="form-group">
                                         <label>NISN</label>
@@ -429,7 +446,7 @@ const UserManagement = () => {
                                 </>
                             )}
 
-                            {(selectedUser.role === 'GURU' || selectedUser.role === 'TU' || selectedUser.role === 'ADMIN') && (
+                            {(formData.role === 'GURU' || formData.role === 'TU' || formData.role === 'ADMIN') && (
                                 <div className="form-group">
                                     <label>NIP</label>
                                     <input
