@@ -231,28 +231,82 @@ public class UserService {
 
             if ("GURU".equalsIgnoreCase(role)) {
                 if (request.getAssignments() != null) {
-                    guruMapelRepository.deleteByGuruId(savedGuru.getId());
+                    List<GuruMapel> existingAssignments = guruMapelRepository.findByGuruId(savedGuru.getId());
+                    
                     for (com.baknusbelajar.api.dto.user.GuruMapelAssignment assign : request.getAssignments()) {
-                        mapelRepository.findById(assign.getMapelId()).ifPresent(m -> {
-                            GuruMapel gm = new GuruMapel();
-                            gm.setGuru(savedGuru);
-                            gm.setMapel(m);
-                            if (assign.getKelasId() != null) {
-                                kelasRepository.findById(assign.getKelasId()).ifPresent(gm::setKelas);
+                        boolean exists = false;
+                        for (int i = 0; i < existingAssignments.size(); i++) {
+                            GuruMapel gm = existingAssignments.get(i);
+                            Long exMapelId = gm.getMapel() != null ? gm.getMapel().getId() : null;
+                            Long exKelasId = gm.getKelas() != null ? gm.getKelas().getId() : null;
+                            
+                            if (java.util.Objects.equals(exMapelId, assign.getMapelId()) &&
+                                java.util.Objects.equals(exKelasId, assign.getKelasId())) {
+                                exists = true;
+                                existingAssignments.remove(i);
+                                break;
                             }
-                            guruMapelRepository.save(gm);
-                        });
+                        }
+                        
+                        if (!exists) {
+                            mapelRepository.findById(assign.getMapelId()).ifPresent(m -> {
+                                GuruMapel newGm = new GuruMapel();
+                                newGm.setGuru(savedGuru);
+                                newGm.setMapel(m);
+                                if (assign.getKelasId() != null) {
+                                    kelasRepository.findById(assign.getKelasId()).ifPresent(newGm::setKelas);
+                                }
+                                guruMapelRepository.save(newGm);
+                            });
+                        }
+                    }
+                    
+                    for (GuruMapel toDelete : existingAssignments) {
+                        try {
+                            if (guruMapelRepository.isSafeToDelete(toDelete.getId())) {
+                                guruMapelRepository.delete(toDelete);
+                            } else {
+                                log.warn("Cannot delete GuruMapel {} because it is referenced by Ujian, Materi, etc. Keeping it.", toDelete.getId());
+                            }
+                        } catch (Exception e) {
+                            log.error("Failed to delete obsolete GuruMapel {}", toDelete.getId(), e);
+                        }
                     }
                 } else if (request.getMapelIds() != null) {
                     // Fallback for simple mapel selection
-                    guruMapelRepository.deleteByGuruId(savedGuru.getId());
+                    List<GuruMapel> existingAssignments = guruMapelRepository.findByGuruId(savedGuru.getId());
+                    
                     for (Long mapelId : request.getMapelIds()) {
-                        mapelRepository.findById(mapelId).ifPresent(m -> {
-                            GuruMapel gm = new GuruMapel();
-                            gm.setGuru(savedGuru);
-                            gm.setMapel(m);
-                            guruMapelRepository.save(gm);
-                        });
+                        boolean exists = false;
+                        for (int i = 0; i < existingAssignments.size(); i++) {
+                            GuruMapel gm = existingAssignments.get(i);
+                            Long exMapelId = gm.getMapel() != null ? gm.getMapel().getId() : null;
+                            if (java.util.Objects.equals(exMapelId, mapelId)) {
+                                exists = true;
+                                existingAssignments.remove(i);
+                                break;
+                            }
+                        }
+                        if (!exists) {
+                            mapelRepository.findById(mapelId).ifPresent(m -> {
+                                GuruMapel gm = new GuruMapel();
+                                gm.setGuru(savedGuru);
+                                gm.setMapel(m);
+                                guruMapelRepository.save(gm);
+                            });
+                        }
+                    }
+                    
+                    for (GuruMapel toDelete : existingAssignments) {
+                        try {
+                            if (guruMapelRepository.isSafeToDelete(toDelete.getId())) {
+                                guruMapelRepository.delete(toDelete);
+                            } else {
+                                log.warn("Cannot delete GuruMapel {} because it is referenced. Keeping it.", toDelete.getId());
+                            }
+                        } catch (Exception e) {
+                            log.error("Failed to delete obsolete GuruMapel {}", toDelete.getId(), e);
+                        }
                     }
                 }
             }
