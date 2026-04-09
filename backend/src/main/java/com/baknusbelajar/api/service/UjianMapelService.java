@@ -160,7 +160,11 @@ public class UjianMapelService {
         entity.setWaktuMulai(dto.getWaktuMulai());
         entity.setWaktuSelesai(dto.getWaktuSelesai());
         entity.setDurasi(dto.getDurasi());
-        entity.setToken(generateRandomToken());
+        if (dto.getToken() != null && !dto.getToken().isEmpty()) {
+            entity.setToken(dto.getToken());
+        } else {
+            entity.setToken(generateRandomToken());
+        }
         if (dto.getTampilkanNilai() != null)
             entity.setTampilkanNilai(dto.getTampilkanNilai());
 

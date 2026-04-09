@@ -1743,18 +1743,31 @@ const ExamManagement = () => {
                                     <div className="form-group">
                                         <label>Token Ujian</label>
                                         <div className="auto-generate-box">
-                                            <Key size={16} />
-                                            {editMode && examForm.token ? (
+                                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <Key size={16} />
                                                 <input 
                                                     type="text" 
                                                     value={examForm.token || ''} 
                                                     onChange={(e) => setExamForm({ ...examForm, token: e.target.value.toUpperCase() })} 
                                                     style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '1.2rem', fontWeight: 800, color: '#2563eb', letterSpacing: '2px', width: '100%' }}
-                                                    placeholder="Token Ujian"
+                                                    placeholder="Input manual / kosongkan utk auto"
                                                 />
-                                            ) : (
-                                                <span>Token akan digenerate otomatis oleh sistem</span>
-                                            )}
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                onClick={() => {
+                                                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                                                    let randToken = '';
+                                                    for (let i = 0; i < 6; i++) {
+                                                        randToken += chars.charAt(Math.floor(Math.random() * chars.length));
+                                                    }
+                                                    setExamForm({ ...examForm, token: randToken });
+                                                }}
+                                                className="btn-icon-outline"
+                                                style={{ width: 'auto', padding: '0 12px', height: '36px', fontSize: '0.85rem', fontWeight: 'bold' }}
+                                            >
+                                                Acak
+                                            </button>
                                         </div>
                                     </div>
                                 </>
