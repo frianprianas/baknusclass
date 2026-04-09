@@ -36,6 +36,12 @@ public class SiswaMapelController {
         return ResponseEntity.ok(siswaMapelService.getEnrolledByMapelId(mapelId));
     }
 
+    @GetMapping("/all-siswa")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU')")
+    public ResponseEntity<List<Map<String, Object>>> getAllSiswa() {
+        return ResponseEntity.ok(siswaMapelService.getAllSiswaPlain());
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TU')")
     public ResponseEntity<SiswaMapelDTO> create(@RequestBody SiswaMapelDTO dto) {

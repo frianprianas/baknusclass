@@ -51,6 +51,9 @@ const MasterData = () => {
     const [importKelasId, setImportKelasId] = useState('');
     const [importing, setImporting] = useState(false);
     const [kelasForImport, setKelasForImport] = useState([]);
+    const [allSiswa, setAllSiswa] = useState([]);
+    const [searchSiswaTerm, setSearchSiswaTerm] = useState('');
+    const [addingSiswa, setAddingSiswa] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
@@ -168,11 +171,21 @@ const MasterData = () => {
         }
     };
 
-    const openPeserta = (mapel) => {
+    const openPeserta = async (mapel) => {
         setSelectedMapel(mapel);
         setImportKelasId('');
         setIsPesertaOpen(true);
         fetchPeserta(mapel.id);
+        
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('/api/enrollment/siswa-mapel/all-siswa', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAllSiswa(res.data);
+        } catch (err) {
+            console.error('Failed to load all siswa');
+        }
     };
 
     const handleImportKelas = async () => {
@@ -191,6 +204,23 @@ const MasterData = () => {
             alert('Gagal import: ' + (err.response?.data?.message || err.message));
         } finally {
             setImporting(false);
+        }
+    };
+
+    const handleAddIndividu = async (siswaId) => {
+        setAddingSiswa(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post('/api/enrollment/siswa-mapel',
+                { mapelId: selectedMapel.id, siswaId: siswaId },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setSearchSiswaTerm(''); // Close dropdown
+            fetchPeserta(selectedMapel.id);
+        } catch (err) {
+            alert('Gagal menambahkan: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setAddingSiswa(false);
         }
     };
 
@@ -253,22 +283,19 @@ const MasterData = () => {
         e.preventDefault();
         if (!selectedGuru) return;
 
-        // Validate: every checked mapel must have at least 1 kelas
-        const invalid = assignments.some(a => !a.kelasIds || a.kelasIds.length === 0);
-        if (invalid) {
-            alert('Harap pilih minimal 1 kelas untuk setiap mata pelajaran yang dipilih.');
-            return;
-        }
-
         setSavingPengampu(true);
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
         try {
             // Flatten: [{mapelId, kelasIds:[1,2]}] → [{mapelId, kelasId:1}, {mapelId, kelasId:2}]
-            const flatAssignments = assignments.flatMap(a =>
-                a.kelasIds.map(kelasId => ({ mapelId: a.mapelId, kelasId }))
-            );
+            // If no kelas selected, send kelasId: null for individual assignment
+            const flatAssignments = assignments.flatMap(a => {
+                if (!a.kelasIds || a.kelasIds.length === 0) {
+                    return [{ mapelId: a.mapelId, kelasId: null }];
+                }
+                return a.kelasIds.map(kelasId => ({ mapelId: a.mapelId, kelasId }));
+            });
 
             await axios.put(`/api/users/${selectedGuru.id}/profile`, {
                 namaLengkap: selectedGuru.namaLengkap,
@@ -547,6 +574,50 @@ const MasterData = () => {
                             </button>
                         </div>
 
+                        {/* Add Individual Siswa */}
+                        <div className="import-kelas-bar" style={{ marginTop: '10px', background: '#f8fafc', borderColor: '#e2e8f0' }}>
+                            <div className="import-kelas-label">
+                                <UserPlus size={16} />
+                                <span>Individu:</span>
+                            </div>
+                            <div style={{ flex: 1, position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama atau NISN siswa..."
+                                    value={searchSiswaTerm}
+                                    onChange={e => setSearchSiswaTerm(e.target.value)}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                                />
+                                {searchSiswaTerm && (
+                                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 10, boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                                        {allSiswa.filter(s => s.namaSiswa.toLowerCase().includes(searchSiswaTerm.toLowerCase()) || (s.nisn && s.nisn.includes(searchSiswaTerm)))
+                                            .slice(0, 20)
+                                            .map(s => (
+                                                <div 
+                                                    key={s.id} 
+                                                    onClick={() => !addingSiswa && handleAddIndividu(s.id)}
+                                                    style={{ padding: '10px', borderBottom: '1px solid #f1f5f9', cursor: addingSiswa ? 'wait' : 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                                    className="siswa-search-item"
+                                                >
+                                                    <div>
+                                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#0f172a' }}>{s.namaSiswa}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{s.kelas} • NISN: {s.nisn || '-'}</div>
+                                                    </div>
+                                                    <button className="import-btn" style={{ background: '#3b82f6', border: 'none', color: 'white', padding: '4px 8px', borderRadius: '6px' }}>
+                                                        <Plus size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {allSiswa.filter(s => s.namaSiswa.toLowerCase().includes(searchSiswaTerm.toLowerCase()) || (s.nisn && s.nisn.includes(searchSiswaTerm))).length === 0 && (
+                                                <div style={{ padding: '10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                                                    Siswa tidak ditemukan.
+                                                </div>
+                                            )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Student List */}
                         <div className="peserta-list-container">
                             {loadingPeserta ? (
@@ -746,7 +817,8 @@ const MasterData = () => {
 
                         <form onSubmit={handleSavePengampu}>
                             <p style={{ fontSize: '0.875rem', color: '#475569', marginBottom: 12 }}>
-                                Centang mata pelajaran, lalu centang kelas yang diampu (bisa lebih dari 1):
+                                Centang mata pelajaran, lalu centang kelas yang diampu. <br/>
+                                <em>Penting: Tipe Mapel Pilihan/Individu tidak perlu memilih kelas.</em>
                             </p>
                             <div className="mapel-assignment-list">
                                 {mapelList.map(m => {

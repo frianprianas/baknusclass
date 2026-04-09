@@ -37,6 +37,17 @@ public class SiswaMapelService {
         return siswaMapelRepository.findByMapelId(mapelId).stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    public List<java.util.Map<String, Object>> getAllSiswaPlain() {
+        return siswaRepository.findAll().stream().map(s -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", s.getId());
+            map.put("namaSiswa", s.getNamaLengkap());
+            map.put("nisn", s.getNisn());
+            map.put("kelas", s.getKelas() != null ? s.getKelas().getNamaKelas() : "-");
+            return map;
+        }).collect(Collectors.toList());
+    }
+
     public SiswaMapelDTO createSiswaMapel(SiswaMapelDTO dto) {
         if (siswaMapelRepository.existsBySiswaIdAndMapelId(dto.getSiswaId(), dto.getMapelId())) {
             throw new RuntimeException("Siswa sudah terdaftar di mata pelajaran ini");

@@ -73,7 +73,9 @@ public class UjianMapelService {
         var siswa = siswaRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Siswa record not found"));
 
-        return ujianMapelRepository.findByEventUjianIdAndGuruMapelKelasId(eventId, siswa.getKelas().getId())
+        Long kelasId = siswa.getKelas() != null ? siswa.getKelas().getId() : null;
+
+        return ujianMapelRepository.findByEventAndStudent(eventId, kelasId, siswa.getId())
                 .stream()
                 .map(e -> {
                     UjianMapelDTO dto = mapToDTO(e, false);
