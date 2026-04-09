@@ -235,6 +235,10 @@ public class UjianMapelService {
         entity.setDurasi(dto.getDurasi());
         if (dto.getTampilkanNilai() != null)
             entity.setTampilkanNilai(dto.getTampilkanNilai());
+            
+        if (dto.getToken() != null && !dto.getToken().isEmpty()) {
+            entity.setToken(dto.getToken());
+        }
 
         return mapToDTO(ujianMapelRepository.save(entity), true);
     }

@@ -1745,7 +1745,13 @@ const ExamManagement = () => {
                                         <div className="auto-generate-box">
                                             <Key size={16} />
                                             {editMode && examForm.token ? (
-                                                <span style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.2rem', letterSpacing: '2px' }}>{examForm.token}</span>
+                                                <input 
+                                                    type="text" 
+                                                    value={examForm.token || ''} 
+                                                    onChange={(e) => setExamForm({ ...examForm, token: e.target.value.toUpperCase() })} 
+                                                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '1.2rem', fontWeight: 800, color: '#2563eb', letterSpacing: '2px', width: '100%' }}
+                                                    placeholder="Token Ujian"
+                                                />
                                             ) : (
                                                 <span>Token akan digenerate otomatis oleh sistem</span>
                                             )}
