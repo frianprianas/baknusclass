@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
-    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush
+    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -642,6 +642,9 @@ const ExamScoring = () => {
                             </button>
                             <button className="btn-analytics" onClick={() => setShowAnalyticsModal(true)}>
                                 <BarChart2 size={18} /> Analitik Ujian
+                            </button>
+                            <button className="btn-analytics" onClick={() => handleSelectExam(selectedExam)} title="Tarik pembaruan data siswa jika ada perubahan di kelas">
+                                <RefreshCw size={18} /> Sync Peserta
                             </button>
                             <button className="btn-praktek" onClick={() => handleManagePraktek(selectedExam)}>
                                 <CloudUpload size={18} /> Nilai Praktek
