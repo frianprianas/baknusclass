@@ -23,6 +23,7 @@ public class NilaiPraktekService {
 
     private final NilaiPraktekRepository nilaiPraktekRepository;
     private final UjianMapelRepository ujianMapelRepository;
+    private final GuruMapelRepository guruMapelRepository;
     private final SiswaRepository siswaRepository;
     private final BaknusDriveService baknusDriveService;
 
@@ -30,9 +31,15 @@ public class NilaiPraktekService {
         UjianMapel ujian = ujianMapelRepository.findById(ujianMapelId)
                 .orElseThrow(() -> new RuntimeException("Ujian not found"));
 
-        List<Siswa> allSiswa = siswaRepository.findAll().stream()
-                .filter(s -> s.getKelas() != null && s.getKelas().equals(ujian.getGuruMapel().getKelas()))
+        List<com.baknusbelajar.api.entity.GuruMapel> guruMapels = guruMapelRepository.findByGuruId(ujian.getGuru().getId())
+                .stream()
+                .filter(gm -> gm.getMapel().getId().equals(ujian.getMapel().getId()))
                 .collect(Collectors.toList());
+
+        List<Siswa> allSiswa = new java.util.ArrayList<>();
+        for (com.baknusbelajar.api.entity.GuruMapel gm : guruMapels) {
+            allSiswa.addAll(siswaRepository.findByKelasId(gm.getKelas().getId()));
+        }
 
         List<NilaiPraktek> existingNilai = nilaiPraktekRepository.findByUjianMapelId(ujianMapelId);
 
@@ -80,9 +87,8 @@ public class NilaiPraktekService {
     private void syncToDrive(UjianMapel ujian) {
         List<NilaiPraktek> allNilai = nilaiPraktekRepository.findByUjianMapelId(ujian.getId());
         String eventName = ujian.getEventUjian().getNamaEvent();
-        String subjectName = ujian.getGuruMapel().getMapel().getNamaMapel();
-        String className = ujian.getGuruMapel().getKelas() != null ? ujian.getGuruMapel().getKelas().getNamaKelas()
-                : "UnknownClass";
+        String subjectName = ujian.getMapel().getNamaMapel();
+        String className = "Gabungan";
 
         String fileName = "Nilai_Praktek_" + subjectName.replaceAll("\\s+", "_") + "_"
                 + className.replaceAll("\\s+", "_") + ".xlsx";

@@ -183,9 +183,8 @@ public class JawabanSiswaService {
         List<SoalEssay> questions = soalEssayRepository.findByUjianMapelId(ujianId);
 
         String eventName = ujian.getEventUjian().getNamaEvent();
-        String subjectName = ujian.getGuruMapel().getMapel().getNamaMapel();
-        String className = ujian.getGuruMapel().getKelas() != null ? ujian.getGuruMapel().getKelas().getNamaKelas()
-                : "Gabungan";
+        String subjectName = ujian.getMapel().getNamaMapel();
+        String className = "Gabungan";
 
         byte[] excelBytes = generateExcelReport(jawabanList, subjectName, className, questions.size());
         String fileName = "Rekap_Nilai_AI_" + subjectName.replace(" ", "_") + "_" + className.replace(" ", "_")

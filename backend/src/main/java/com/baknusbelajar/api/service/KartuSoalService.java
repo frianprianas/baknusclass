@@ -74,7 +74,7 @@ public class KartuSoalService {
         try {
             return baknusDriveService.uploadFileResource(
                     ujian.getEventUjian().getNamaEvent(),
-                    ujian.getGuruMapel().getMapel().getNamaMapel(),
+                    ujian.getMapel().getNamaMapel(),
                     resource);
         } catch (Exception e) {
             log.error("Gagal upload kartu soal ke drive: {}", e.getMessage());
@@ -88,7 +88,7 @@ public class KartuSoalService {
         try {
             KartuSoalRequest req = new KartuSoalRequest();
             req.setUjianMapelId(ujian.getId());
-            req.setJudul("Soal " + jenis + " - " + ujian.getGuruMapel().getMapel().getNamaMapel());
+            req.setJudul("Soal " + jenis + " - " + ujian.getMapel().getNamaMapel());
             req.setTujuanPembelajaran("-");
             req.setKriteriaKetercapaian("-");
             req.setPetunjukAssesment(pertanyaan);
@@ -108,7 +108,7 @@ public class KartuSoalService {
 
             baknusDriveService.uploadFileResource(
                     ujian.getEventUjian().getNamaEvent(),
-                    ujian.getGuruMapel().getMapel().getNamaMapel(),
+                    ujian.getMapel().getNamaMapel(),
                     resource);
         } catch (Exception e) {
             log.error("Gagal auto upload kartu soal ke drive (Terjadi error di service): {}", e.getMessage(), e);
@@ -144,8 +144,8 @@ public class KartuSoalService {
             subRun.setText(request.getJudul());
 
             // Info Section
-            addInfoRow(document, "Mata Pelajaran", ujian.getGuruMapel().getMapel().getNamaMapel());
-            addInfoRow(document, "Guru Pengampu", ujian.getGuruMapel().getGuru().getNamaLengkap());
+            addInfoRow(document, "Mata Pelajaran", ujian.getMapel().getNamaMapel());
+            addInfoRow(document, "Guru Pengampu", ujian.getGuru().getNamaLengkap());
             addInfoRow(document, "Event", ujian.getEventUjian().getNamaEvent());
             if (request.getBobotNilai() != null) {
                 addInfoRow(document, "Bobot Nilai", String.valueOf(request.getBobotNilai()));

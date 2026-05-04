@@ -71,7 +71,7 @@ public class DashboardService {
                     Map<String, Object> map = new java.util.HashMap<>();
                     map.put("user", s.getSiswa().getNamaLengkap());
                     map.put("action",
-                            "Menyelesaikan Ujian: " + s.getUjianMapel().getGuruMapel().getMapel().getNamaMapel());
+                            "Menyelesaikan Ujian: " + s.getUjianMapel().getMapel().getNamaMapel());
                     map.put("date", s.getWaktuSelesai() != null ? s.getWaktuSelesai().format(formatter) : "Baru saja");
                     return map;
                 })
