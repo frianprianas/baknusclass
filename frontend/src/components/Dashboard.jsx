@@ -27,51 +27,64 @@ const Dashboard = () => {
     try { userEmail = JSON.parse(atob(token.split('.')[1])).sub; } catch (e) { }
   }
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('/api/dashboard/summary', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setSummary(response.data);
-      } catch (err) {
-        console.error('Failed to fetch dashboard summary', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const [myExams, setMyExams] = useState([]);
 
-    const checkProctorStatus = async () => {
-      if (!token || user.role !== 'GURU') return;
-      try {
-        const res = await axios.get('/api/exam/event', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const active = res.data.filter(e => e.statusAktif && e.proktorIds?.includes(user.profileId));
-        setProctorEvents(active);
-      } catch (e) { console.error(e); }
-    };
+    useEffect(() => {
+        const fetchSummary = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await axios.get('/api/dashboard/summary', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setSummary(response.data);
+            } catch (err) {
+                console.error('Failed to fetch dashboard summary', err);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const checkStudentExams = async () => {
-      if (user.role !== 'SISWA' || !token) return;
-      try {
-        const resp = await axios.get('/api/exam/event', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const hasActiveEvent = resp.data.some(e => e.statusAktif);
-        if (hasActiveEvent) {
-          navigate('/student-exams');
+        const fetchMyExams = async () => {
+            if (user.role !== 'GURU' || !token) return;
+            try {
+                const res = await axios.get(`/api/exam/ujian-mapel/guru/${user.profileId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setMyExams(res.data);
+            } catch (e) { console.error(e); }
+        };
+
+        const checkProctorStatus = async () => {
+            if (!token || user.role !== 'GURU') return;
+            try {
+                const res = await axios.get('/api/exam/event', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const active = res.data.filter(e => e.statusAktif && e.proktorIds?.includes(user.profileId));
+                setProctorEvents(active);
+            } catch (e) { console.error(e); }
+        };
+
+        const checkStudentExams = async () => {
+            if (user.role !== 'SISWA' || !token) return;
+            try {
+                const resp = await axios.get('/api/exam/event', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const hasActiveEvent = resp.data.some(e => e.statusAktif);
+                if (hasActiveEvent) {
+                    navigate('/student-exams');
+                }
+            } catch (e) { console.error(e); }
+        };
+
+        if (['TU', 'GURU', 'ADMIN'].includes(user.role)) {
+            fetchSummary();
         }
-      } catch (e) { console.error(e); }
-    };
-
-    if (['TU', 'GURU', 'ADMIN'].includes(user.role)) {
-      fetchSummary();
-    }
-    checkProctorStatus();
-    if (user.role === 'SISWA') checkStudentExams();
-  }, []);
+        if (user.role === 'GURU') fetchMyExams();
+        checkProctorStatus();
+        if (user.role === 'SISWA') checkStudentExams();
+    }, []);
 
   const dataCards = [
     { label: 'Total Siswa', value: summary?.totalSiswa || 0, icon: Users, color: '#3b82f6' },
@@ -135,36 +148,79 @@ const Dashboard = () => {
       </div>
 
       <div className="dashboard-grid">
-        <div className="chart-container">
-          <div className="container-header">
-            <h3>Sebaran Nilai Siswa</h3>
-            <p>Data rata-rata nilai seluruh siswa</p>
-          </div>
-          <div className="placeholder-chart">
-            <div className="bar-group">
-              {(summary?.sebaranNilaiSiswa || []).map((item, idx) => {
-                const maxCount = Math.max(...(summary?.sebaranNilaiSiswa?.map(s => s.count) || [1]));
-                const height = maxCount > 0 ? (item.count / maxCount) * 100 : 5;
-                return (
-                  <div
-                    key={idx}
-                    className="bar"
-                    style={{
-                      height: `${height}%`,
-                      background: item.range === '80-100' ? '#10b981' : item.range === '60-79' ? '#3b82f6' : '#f59e0b'
-                    }}
-                    title={`${item.range}: ${item.count} siswa`}
-                  ></div>
-                );
-              })}
+        {user.role === 'GURU' ? (
+          <div className="chart-container">
+            <div className="container-header">
+              <h3>Jadwal Ujian Anda</h3>
+              <p>Daftar ujian yang Anda ampu pada event aktif</p>
             </div>
-            <div className="chart-labels">
-              {(summary?.sebaranNilaiSiswa || []).map((item, idx) => (
-                <span key={idx}>{item.range}</span>
-              ))}
+            <div className="my-exams-list">
+              {myExams.length > 0 ? (
+                <div className="table-responsive">
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Mata Pelajaran</th>
+                        <th>Event</th>
+                        <th>Waktu</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {myExams.map((ex, i) => (
+                        <tr key={i}>
+                          <td><strong>{ex.namaMapel}</strong></td>
+                          <td><span className="badge-event">{ex.namaEvent}</span></td>
+                          <td>{new Date(ex.waktuMulai).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                          <td>
+                            <button className="small-action-btn" onClick={() => navigate('/exams')}>Kelola</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-exams">
+                  <BookMarked size={48} />
+                  <p>Belum ada jadwal ujian untuk Anda.</p>
+                  <button onClick={() => navigate('/exams')}>Buat Jadwal</button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="chart-container">
+            <div className="container-header">
+              <h3>Sebaran Nilai Siswa</h3>
+              <p>Data rata-rata nilai seluruh siswa</p>
+            </div>
+            <div className="placeholder-chart">
+              <div className="bar-group">
+                {(summary?.sebaranNilaiSiswa || []).map((item, idx) => {
+                  const maxCount = Math.max(...(summary?.sebaranNilaiSiswa?.map(s => s.count) || [1]));
+                  const height = maxCount > 0 ? (item.count / maxCount) * 100 : 5;
+                  return (
+                    <div
+                      key={idx}
+                      className="bar"
+                      style={{
+                        height: `${height}%`,
+                        background: item.range === '80-100' ? '#10b981' : item.range === '60-79' ? '#3b82f6' : '#f59e0b'
+                      }}
+                      title={`${item.range}: ${item.count} siswa`}
+                    ></div>
+                  );
+                })}
+              </div>
+              <div className="chart-labels">
+                {(summary?.sebaranNilaiSiswa || []).map((item, idx) => (
+                  <span key={idx}>{item.range}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="activity-container">
           <div className="container-header">
@@ -527,6 +583,83 @@ const Dashboard = () => {
         [data-theme="dark"] .activity-dot {
           background: #3b82f6;
           box-shadow: 0 0 0 4px #1e293b;
+        }
+
+        .dashboard-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+        }
+        .dashboard-table th {
+          text-align: left;
+          padding: 12px 16px;
+          color: #64748b;
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .dashboard-table td {
+          padding: 16px;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 0.9rem;
+        }
+        .badge-event {
+          background: #eff6ff;
+          color: #3b82f6;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 700;
+        }
+        .small-action-btn {
+          background: white;
+          border: 1.5px solid #e2e8f0;
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #1e293b;
+          transition: all 0.2s;
+        }
+        .small-action-btn:hover {
+          background: #f8fafc;
+          border-color: #3b82f6;
+          color: #3b82f6;
+        }
+        .empty-exams {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+          color: #94a3b8;
+          text-align: center;
+        }
+        .empty-exams p {
+          margin: 16px 0;
+          font-weight: 500;
+        }
+        .empty-exams button {
+          background: #3b82f6;
+          color: white;
+          border: none;
+          padding: 8px 24px;
+          border-radius: 10px;
+          font-weight: 600;
+        }
+
+        [data-theme="dark"] .dashboard-table th,
+        [data-theme="dark"] .dashboard-table td {
+          border-bottom-color: #334155;
+        }
+        [data-theme="dark"] .badge-event {
+          background: #3b82f620;
+        }
+        [data-theme="dark"] .small-action-btn {
+          background: #0f172a;
+          border-color: #334155;
+          color: #f8fafc;
         }
 
       `}</style>

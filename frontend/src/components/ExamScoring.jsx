@@ -52,7 +52,7 @@ const ExamScoring = () => {
             // Filter only exams that belong to this teacher, unless ADMIN/TU
             let fetchedExams = resp.data;
             if (user.role === 'GURU') {
-                fetchedExams = fetchedExams.filter(exam => exam.namaGuru === user.name || exam.namaGuru === user.namaLengkap);
+                fetchedExams = fetchedExams.filter(exam => exam.guruId == user.profileId);
             }
             setExams(fetchedExams);
         } catch (err) {

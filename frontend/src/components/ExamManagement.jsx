@@ -292,7 +292,15 @@ const ExamManagement = () => {
         const headers = { Authorization: `Bearer ${token}` };
         try {
             const res = await axios.get('/api/exam/event', { headers });
-            setEvents(res.data);
+            const eventData = res.data;
+            setEvents(eventData);
+
+            // Auto-select first active event if nothing selected
+            if (eventData.length > 0 && !examForm.eventId) {
+                const activeEvent = eventData.find(e => e.statusAktif) || eventData[0];
+                setExamForm(prev => ({ ...prev, eventId: activeEvent.id }));
+                fetchExams(activeEvent.id);
+            }
 
             if (effectiveRole === 'ADMIN' || effectiveRole === 'TU') {
                 try {
