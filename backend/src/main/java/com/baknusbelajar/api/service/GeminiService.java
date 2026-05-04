@@ -66,18 +66,36 @@ public class GeminiService {
     }
 
     private String buildPrompt(String question, String answerKey, String studentAnswer) {
-        return String.format(
-                "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa berdasarkan Kunci Jawaban yang diberikan.\n\n"
-                        + "Pertanyaan: %s\n" +
-                        "Kunci Jawaban: %s\n" +
-                        "Jawaban Siswa: %s\n\n" +
-                        "Berikan penilaian dalam format JSON mentah sebagai berikut:\n" +
-                        "{\n" +
-                        "  \"skor\": (angka 0-100),\n" +
-                        "  \"alasan\": \"(penjelasan singkat mengapa siswa mendapat skor tersebut)\"\n" +
-                        "}\n" +
-                        "Kembalikan HANYA JSON tersebut.",
-                question, answerKey, studentAnswer);
+        boolean hasAnswerKey = answerKey != null && !answerKey.trim().isEmpty() && !answerKey.trim().equals("-");
+
+        if (hasAnswerKey) {
+            return String.format(
+                    "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa berdasarkan Kunci Jawaban yang diberikan.\n\n"
+                            + "Pertanyaan: %s\n" +
+                            "Kunci Jawaban: %s\n" +
+                            "Jawaban Siswa: %s\n\n" +
+                            "Berikan penilaian dalam format JSON mentah sebagai berikut:\n" +
+                            "{\n" +
+                            "  \"skor\": (angka 0-100),\n" +
+                            "  \"alasan\": \"(penjelasan singkat mengapa siswa mendapat skor tersebut, merujuk pada kunci jawaban)\"\n" +
+                            "}\n" +
+                            "Kembalikan HANYA JSON tersebut.",
+                    question, answerKey, studentAnswer);
+        } else {
+            return String.format(
+                    "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa. "
+                            + "Tidak ada kunci jawaban yang disediakan, sehingga penilaian harus dilakukan secara kontekstual "
+                            + "berdasarkan relevansi, kelengkapan, kelogisan, dan kualitas jawaban siswa terhadap pertanyaan yang diberikan.\n\n"
+                            + "Pertanyaan: %s\n" +
+                            "Jawaban Siswa: %s\n\n" +
+                            "Berikan penilaian dalam format JSON mentah sebagai berikut:\n" +
+                            "{\n" +
+                            "  \"skor\": (angka 0-100),\n" +
+                            "  \"alasan\": \"(penjelasan singkat mengapa siswa mendapat skor tersebut berdasarkan kualitas dan relevansi jawaban)\"\n" +
+                            "}\n" +
+                            "Kembalikan HANYA JSON tersebut.",
+                    question, studentAnswer);
+        }
     }
 
     public Mono<String> scoreEssay(String question, String answerKey, String studentAnswer) {

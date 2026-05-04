@@ -804,7 +804,10 @@ const ExamScoring = () => {
 
                                                     <div className="key-answer-box">
                                                         <div className="lbl">Rubrik / Kunci Jawaban:</div>
-                                                        <div className="ans-text" dangerouslySetInnerHTML={{ __html: q.kunciJawaban }}></div>
+                                                        {q.kunciJawaban && q.kunciJawaban.trim() !== '' && q.kunciJawaban.trim() !== '-' && q.kunciJawaban.trim() !== '<p><br></p>'
+                                                            ? <div className="ans-text" dangerouslySetInnerHTML={{ __html: q.kunciJawaban }}></div>
+                                                            : <div className="ans-text" style={{ color: '#94a3b8', fontStyle: 'italic' }}>Tidak ada kunci jawaban — AI menilai secara kontekstual.</div>
+                                                        }
                                                     </div>
 
                                                     {ans && (

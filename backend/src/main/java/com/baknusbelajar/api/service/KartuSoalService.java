@@ -38,8 +38,7 @@ public class KartuSoalService {
             pertanyaan = "-";
 
         String kunciJawaban = request.getKunciJawaban();
-        if (kunciJawaban == null || kunciJawaban.trim().isEmpty())
-            kunciJawaban = "-";
+        if (kunciJawaban == null) kunciJawaban = "";
 
         SoalEssay soal;
         // If soalEssayId is provided, update existing; otherwise create new

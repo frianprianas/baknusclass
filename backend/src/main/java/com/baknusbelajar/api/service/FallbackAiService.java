@@ -77,18 +77,37 @@ public class FallbackAiService {
     }
 
     public Mono<String> scoreEssay(String question, String answerKey, String studentAnswer) {
-        String prompt = String.format(
-                "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa berdasarkan Kunci Jawaban yang diberikan.\n\n"
-                        + "Pertanyaan: %s\n" +
-                        "Kunci Jawaban: %s\n" +
-                        "Jawaban Siswa: %s\n\n" +
-                        "Berikan penilaian dalam format JSON mentah sebagai berikut:\n" +
-                        "{\n" +
-                        "  \"skor\": (angka 0-100),\n" +
-                        "  \"alasan\": \"(penjelasan singkat mengapa siswa mendapat skor tersebut)\"\n" +
-                        "}\n" +
-                        "Kembalikan HANYA JSON tersebut.",
-                question, answerKey, studentAnswer);
+        boolean hasAnswerKey = answerKey != null && !answerKey.trim().isEmpty() && !answerKey.trim().equals("-");
+
+        String prompt;
+        if (hasAnswerKey) {
+            prompt = String.format(
+                    "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa berdasarkan Kunci Jawaban yang diberikan.\n\n"
+                            + "Pertanyaan: %s\n" +
+                            "Kunci Jawaban: %s\n" +
+                            "Jawaban Siswa: %s\n\n" +
+                            "Berikan penilaian dalam format JSON mentah sebagai berikut:\n" +
+                            "{\n" +
+                            "  \"skor\": (angka 0-100),\n" +
+                            "  \"alasan\": \"(penjelasan singkat mengapa siswa mendapat skor tersebut, merujuk pada kunci jawaban)\"\n" +
+                            "}\n" +
+                            "Kembalikan HANYA JSON tersebut.",
+                    question, answerKey, studentAnswer);
+        } else {
+            prompt = String.format(
+                    "Anda adalah asisten guru profesional. Tugas Anda adalah menilai jawaban essay siswa. "
+                            + "Tidak ada kunci jawaban yang disediakan, sehingga penilaian harus dilakukan secara kontekstual "
+                            + "berdasarkan relevansi, kelengkapan, kelogisan, dan kualitas jawaban siswa terhadap pertanyaan yang diberikan.\n\n"
+                            + "Pertanyaan: %s\n" +
+                            "Jawaban Siswa: %s\n\n" +
+                            "Berikan penilaian dalam format JSON mentah sebagai berikut:\n" +
+                            "{\n" +
+                            "  \"skor\": (angka 0-100),\n" +
+                            "  \"alasan\": \"(penjelasan singkat mengapa siswa mendapat skor tersebut berdasarkan kualitas dan relevansi jawaban)\"\n" +
+                            "}\n" +
+                            "Kembalikan HANYA JSON tersebut.",
+                    question, studentAnswer);
+        }
 
         return callApi(prompt);
     }

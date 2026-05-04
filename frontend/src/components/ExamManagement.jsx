@@ -742,13 +742,13 @@ const ExamManagement = () => {
 
                                     {qType === 'essay' && (
                                         <div className="form-group-v2">
-                                            <label>Pedoman Penskoran (Kunci Jawaban)</label>
+                                            <label>Pedoman Penskoran / Kunci Jawaban <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.85em' }}>(Opsional — jika dikosongkan, AI akan menilai secara kontekstual)</span></label>
                                             <div className="editor-container-v2">
                                                 <QuillEditor
                                                     key="essay-kunci"
                                                     value={questionForm.kunciJawaban}
                                                     onChange={(content) => setQuestionForm(prev => ({ ...prev, kunciJawaban: content }))}
-                                                    placeholder="Tuliskan poin-poin penilaian atau kunci jawaban..."
+                                                    placeholder="Opsional: Tuliskan poin-poin penilaian atau kunci jawaban. Jika kosong, AI akan menilai berdasarkan relevansi dan kualitas jawaban siswa."
                                                     isSimple={true}
                                                 />
                                             </div>
