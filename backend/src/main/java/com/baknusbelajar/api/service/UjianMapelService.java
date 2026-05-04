@@ -8,6 +8,9 @@ import com.baknusbelajar.api.repository.EventUjianRepository;
 import com.baknusbelajar.api.repository.GuruMapelRepository;
 import com.baknusbelajar.api.repository.SiswaRepository;
 import com.baknusbelajar.api.repository.UjianMapelRepository;
+import com.baknusbelajar.api.repository.MapelRepository;
+import com.baknusbelajar.api.repository.GuruRepository;
+import com.baknusbelajar.api.repository.SiswaMapelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,9 @@ public class UjianMapelService {
     private final GuruMapelRepository guruMapelRepository;
     private final SiswaRepository siswaRepository;
     private final com.baknusbelajar.api.repository.SiswaUjianStatusRepository siswaUjianStatusRepository;
+    private final MapelRepository mapelRepository;
+    private final GuruRepository guruRepository;
+    private final SiswaMapelRepository siswaMapelRepository;
     private final BaknusDriveService baknusDriveService;
     private final JawabanSiswaService jawabanSiswaService;
     private final com.baknusbelajar.api.repository.SoalEssayRepository soalEssayRepository;
@@ -36,12 +42,14 @@ public class UjianMapelService {
         UjianMapel ujian = ujianMapelRepository.findById(ujianId)
                 .orElseThrow(() -> new RuntimeException("Ujian not found"));
 
-        if (ujian.getGuruMapel() == null || ujian.getGuruMapel().getKelas() == null) {
+        if (ujian.getMapel() == null) {
             return java.util.Collections.emptyList();
         }
 
-        Long kelasId = ujian.getGuruMapel().getKelas().getId();
-        List<com.baknusbelajar.api.entity.Siswa> siswaList = siswaRepository.findByKelasId(kelasId);
+        List<com.baknusbelajar.api.entity.Siswa> siswaList = siswaMapelRepository.findByMapelId(ujian.getMapel().getId())
+                .stream()
+                .map(com.baknusbelajar.api.entity.SiswaMapel::getSiswa)
+                .collect(Collectors.toList());
 
         return siswaList.stream().map(siswa -> {
             com.baknusbelajar.api.dto.exam.ExamMonitoringDTO dto = new com.baknusbelajar.api.dto.exam.ExamMonitoringDTO();
@@ -73,9 +81,7 @@ public class UjianMapelService {
         var siswa = siswaRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Siswa record not found"));
 
-        Long kelasId = siswa.getKelas() != null ? siswa.getKelas().getId() : null;
-
-        return ujianMapelRepository.findByEventAndStudent(eventId, kelasId, siswa.getId())
+        return ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId())
                 .stream()
                 .map(e -> {
                     UjianMapelDTO dto = mapToDTO(e, false);
@@ -144,8 +150,8 @@ public class UjianMapelService {
         jawabanSiswaService.processAiScoringForUjianAndSiswa(ujianId, siswa.getId());
     }
 
-    public List<UjianMapelDTO> getUjianByGuruMapel(Long guruMapelId) {
-        return ujianMapelRepository.findByGuruMapelId(guruMapelId).stream()
+    public List<UjianMapelDTO> getUjianByGuruId(Long guruId) {
+        return ujianMapelRepository.findByGuruId(guruId).stream()
                 .map(e -> mapToDTO(e, true))
                 .collect(Collectors.toList());
     }
@@ -153,12 +159,15 @@ public class UjianMapelService {
     public UjianMapelDTO createUjianMapel(UjianMapelDTO dto) {
         EventUjian event = eventUjianRepository.findById(dto.getEventId())
                 .orElseThrow(() -> new RuntimeException("Event Ujian not found"));
-        GuruMapel gm = guruMapelRepository.findById(dto.getGuruMapelId())
-                .orElseThrow(() -> new RuntimeException("GuruMapel assignment not found"));
+        com.baknusbelajar.api.entity.Mapel mapel = mapelRepository.findById(dto.getMapelId())
+                .orElseThrow(() -> new RuntimeException("Mapel not found"));
+        com.baknusbelajar.api.entity.Guru guru = guruRepository.findById(dto.getGuruId())
+                .orElseThrow(() -> new RuntimeException("Guru not found"));
 
         UjianMapel entity = new UjianMapel();
         entity.setEventUjian(event);
-        entity.setGuruMapel(gm);
+        entity.setMapel(mapel);
+        entity.setGuru(guru);
         entity.setWaktuMulai(dto.getWaktuMulai());
         entity.setWaktuSelesai(dto.getWaktuSelesai());
         entity.setDurasi(dto.getDurasi());
@@ -174,8 +183,8 @@ public class UjianMapelService {
 
         // Notify BaknusDrive to create subject folder
         try {
-            if (event.getNamaEvent() != null && gm.getMapel() != null) {
-                baknusDriveService.createSubjectFolder(event.getNamaEvent(), gm.getMapel().getNamaMapel());
+            if (event.getNamaEvent() != null && mapel != null) {
+                baknusDriveService.createSubjectFolder(event.getNamaEvent(), mapel.getNamaMapel());
             }
         } catch (Exception e) {
             log.error("Failed to trigger subject folder creation in BaknusDrive: {}", e.getMessage());
@@ -276,14 +285,13 @@ public class UjianMapelService {
             dto.setNamaEvent(entity.getEventUjian().getNamaEvent());
         }
 
-        if (entity.getGuruMapel() != null) {
-            dto.setGuruMapelId(entity.getGuruMapel().getId());
-            if (entity.getGuruMapel().getMapel() != null) {
-                dto.setNamaMapel(entity.getGuruMapel().getMapel().getNamaMapel());
-            }
-            if (entity.getGuruMapel().getGuru() != null) {
-                dto.setNamaGuru(entity.getGuruMapel().getGuru().getNamaLengkap());
-            }
+        if (entity.getMapel() != null) {
+            dto.setMapelId(entity.getMapel().getId());
+            dto.setNamaMapel(entity.getMapel().getNamaMapel());
+        }
+        if (entity.getGuru() != null) {
+            dto.setGuruId(entity.getGuru().getId());
+            dto.setNamaGuru(entity.getGuru().getNamaLengkap());
         }
         return dto;
     }

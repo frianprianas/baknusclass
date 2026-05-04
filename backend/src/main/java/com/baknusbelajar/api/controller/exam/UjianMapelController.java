@@ -36,10 +36,10 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.getUjianForStudent(eventId, userDetails.getId()));
     }
 
-    @GetMapping("/guru-mapel/{guruMapelId}")
+    @GetMapping("/guru/{guruId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
-    public ResponseEntity<List<UjianMapelDTO>> getByGuruMapel(@PathVariable Long guruMapelId) {
-        return ResponseEntity.ok(ujianMapelService.getUjianByGuruMapel(guruMapelId));
+    public ResponseEntity<List<UjianMapelDTO>> getByGuruId(@PathVariable Long guruId) {
+        return ResponseEntity.ok(ujianMapelService.getUjianByGuruId(guruId));
     }
 
     @PostMapping

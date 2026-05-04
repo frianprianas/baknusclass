@@ -115,7 +115,8 @@ const ExamManagement = () => {
 
     const [examForm, setExamForm] = useState({
         eventId: '',
-        guruMapelId: '',
+        mapelId: '',
+        guruId: '',
         waktuMulai: '',
         waktuSelesai: '',
         durasi: 90,
@@ -375,7 +376,10 @@ const ExamManagement = () => {
 
         const payload = {
             ...examForm,
-            waktuSelesai: endDate.toISOString()
+            mapelId: Number(examForm.mapelId),
+            guruId: Number(examForm.guruId),
+            waktuSelesai: endDate.toISOString(),
+            durasi: Number(examForm.durasi)
         };
 
         // Validation against Event Range
@@ -1435,7 +1439,7 @@ const ExamManagement = () => {
                                     className="btn-primary"
                                     onClick={() => {
                                         setEditMode(false);
-                                        setExamForm({ ...examForm, guruMapelId: '', waktuMulai: '', waktuSelesai: '', token: '', durasi: 90 });
+                                        setExamForm({ eventId: examForm.eventId, mapelId: '', guruId: '', waktuMulai: '', waktuSelesai: '', durasi: 90, token: '' });
                                         setIsModalOpen(true);
                                     }}
                                 >
@@ -1491,14 +1495,8 @@ const ExamManagement = () => {
                                             {exams
                                                 .filter(exam => {
                                                     if (userRole !== 'GURU') return true;
-                                                    // Cek berdasarkan guruMapelId yang dimiliki guru ini
-                                                    const myGuruMapelIds = myAssignments.map(a => a.id);
-                                                    if (myGuruMapelIds.length > 0) {
-                                                        return myGuruMapelIds.includes(exam.guruMapelId);
-                                                    }
-                                                    // Fallback: cek nama (jika myAssignments belum loaded)
                                                     const user = JSON.parse(localStorage.getItem('user') || '{}');
-                                                    return exam.namaGuru === user.namaLengkap;
+                                                    return exam.guruId == user.profileId;
                                                 })
                                                 .map(exam => (
                                                     <tr key={exam.id}>
@@ -1562,7 +1560,8 @@ const ExamManagement = () => {
                                                                                 setEditMode(true);
                                                                                 setExamForm({
                                                                                     ...examForm,
-                                                                                    guruMapelId: exam.guruMapelId,
+                                                                                    mapelId: exam.mapelId,
+                                                                                    guruId: exam.guruId,
                                                                                     waktuMulai: exam.waktuMulai.substring(0, 16),
                                                                                     waktuSelesai: exam.waktuSelesai.substring(0, 16),
                                                                                     durasi: exam.durasi || 90,
@@ -1683,14 +1682,22 @@ const ExamManagement = () => {
                                     <div className="form-group">
                                         <label>{userRole === 'GURU' ? 'Mata Pelajaran Anda' : 'Pilih Mata Pelajaran & Guru'}</label>
                                         <select
-                                            value={examForm.guruMapelId}
-                                            onChange={(e) => setExamForm({ ...examForm, guruMapelId: e.target.value })}
+                                            value={examForm.mapelId && examForm.guruId ? `${examForm.mapelId}-${examForm.guruId}` : ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if(val) {
+                                                    const [mId, gId] = val.split('-');
+                                                    setExamForm({ ...examForm, mapelId: mId, guruId: gId });
+                                                } else {
+                                                    setExamForm({ ...examForm, mapelId: '', guruId: '' });
+                                                }
+                                            }}
                                             required
                                         >
                                             <option value="">-- Pilih Mapel & Guru --</option>
-                                            {myAssignments.map(a => (
-                                                <option key={a.id} value={a.id}>
-                                                    {a.namaMapel} - {a.namaKelas} ({a.namaGuru})
+                                            {Array.from(new Map(myAssignments.map(a => [`${a.mapelId}-${a.guruId}`, a])).values()).map(a => (
+                                                <option key={`${a.mapelId}-${a.guruId}`} value={`${a.mapelId}-${a.guruId}`}>
+                                                    {a.namaMapel} ({a.namaGuru})
                                                 </option>
                                             ))}
                                         </select>

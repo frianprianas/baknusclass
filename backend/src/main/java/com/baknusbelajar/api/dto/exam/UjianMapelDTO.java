@@ -8,7 +8,8 @@ public class UjianMapelDTO {
     private Long id;
     private Long eventId;
     private String namaEvent; // Response context
-    private Long guruMapelId;
+    private Long mapelId;
+    private Long guruId;
     private String namaMapel; // Response context
     private String namaGuru; // Response context
     private LocalDateTime waktuMulai;

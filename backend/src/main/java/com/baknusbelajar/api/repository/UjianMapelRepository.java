@@ -10,10 +10,9 @@ import java.util.List;
 public interface UjianMapelRepository extends JpaRepository<UjianMapel, Long> {
     List<UjianMapel> findByEventUjianId(Long eventId);
 
-    List<UjianMapel> findByGuruMapelId(Long guruMapelId);
+    List<UjianMapel> findByGuruId(Long guruId);
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT u FROM UjianMapel u WHERE u.eventUjian.id = :eventId AND (" +
-           "u.guruMapel.kelas.id = :kelasId OR " +
-           "(u.guruMapel.kelas IS NULL AND u.guruMapel.mapel.id IN (SELECT sm.mapel.id FROM com.baknusbelajar.api.entity.SiswaMapel sm WHERE sm.siswa.id = :siswaId)))")
-    List<UjianMapel> findByEventAndStudent(Long eventId, Long kelasId, Long siswaId);
+           "u.mapel.id IN (SELECT sm.mapel.id FROM com.baknusbelajar.api.entity.SiswaMapel sm WHERE sm.siswa.id = :siswaId))")
+    List<UjianMapel> findByEventAndStudent(Long eventId, Long siswaId);
 }

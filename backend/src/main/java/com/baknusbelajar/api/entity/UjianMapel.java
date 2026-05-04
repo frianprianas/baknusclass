@@ -24,8 +24,12 @@ public class UjianMapel {
     private EventUjian eventUjian;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "guru_mapel_id", nullable = false)
-    private GuruMapel guruMapel;
+    @JoinColumn(name = "mapel_id")
+    private Mapel mapel;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "guru_id")
+    private Guru guru;
 
     @Column(name = "waktu_mulai", nullable = false)
     private LocalDateTime waktuMulai;
