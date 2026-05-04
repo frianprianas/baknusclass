@@ -22,6 +22,20 @@ const Dashboard = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
 
+  if (!token) {
+    navigate('/login');
+    return null;
+  }
+
+  // Force relogin if profileId is missing for GURU
+  if (user.role === 'GURU' && !user.profileId) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    alert('Sesi Anda perlu diperbarui. Silakan login kembali.');
+    navigate('/login');
+    return null;
+  }
+
   let userEmail = user.email;
   if (!userEmail && token) {
     try { userEmail = JSON.parse(atob(token.split('.')[1])).sub; } catch (e) { }

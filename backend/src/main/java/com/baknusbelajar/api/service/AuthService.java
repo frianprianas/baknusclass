@@ -123,14 +123,14 @@ public class AuthService {
                 Siswa siswa = new Siswa();
                 siswa.setUser(user);
                 siswa.setNamaLengkap(name != null && !name.isEmpty() ? name : user.getUsername());
-                siswaRepository.save(siswa);
+                Siswa savedSiswa = siswaRepository.saveAndFlush(siswa);
             }
         } else if ("GURU".equalsIgnoreCase(role) || "TU".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) {
             if (guruRepository.findByUserId(user.getId()).isEmpty()) {
                 Guru guru = new Guru();
                 guru.setUser(user);
                 guru.setNamaLengkap(name != null && !name.isEmpty() ? name : user.getUsername());
-                guruRepository.save(guru);
+                Guru savedGuru = guruRepository.saveAndFlush(guru);
             }
         }
     }
