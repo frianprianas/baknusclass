@@ -17,7 +17,7 @@ public interface GuruMapelRepository extends JpaRepository<GuruMapel, Long> {
     List<GuruMapel> findByKelasId(Long kelasId);
 
     @org.springframework.data.jpa.repository.Query("SELECT CASE WHEN (" +
-           "EXISTS (SELECT 1 FROM UjianMapel u WHERE u.guruMapel.id = :id) OR " +
+           "EXISTS (SELECT 1 FROM UjianMapel u WHERE u.mapel.id = gm.mapel.id AND u.guru.id = gm.guru.id) OR " +
            "EXISTS (SELECT 1 FROM Materi m WHERE m.guruMapel.id = :id) OR " +
            "EXISTS (SELECT 1 FROM ForumTopik f WHERE f.guruMapel.id = :id) OR " +
            "EXISTS (SELECT 1 FROM Bab b WHERE b.guruMapel.id = :id)" +
