@@ -46,10 +46,15 @@ public class UjianMapelService {
             return java.util.Collections.emptyList();
         }
 
-        List<com.baknusbelajar.api.entity.Siswa> siswaList = siswaMapelRepository.findByMapelId(ujian.getMapel().getId())
+        List<com.baknusbelajar.api.entity.GuruMapel> guruMapels = guruMapelRepository.findByGuruId(ujian.getGuru().getId())
                 .stream()
-                .map(com.baknusbelajar.api.entity.SiswaMapel::getSiswa)
+                .filter(gm -> gm.getMapel().getId().equals(ujian.getMapel().getId()))
                 .collect(Collectors.toList());
+
+        List<com.baknusbelajar.api.entity.Siswa> siswaList = new java.util.ArrayList<>();
+        for (com.baknusbelajar.api.entity.GuruMapel gm : guruMapels) {
+            siswaList.addAll(siswaRepository.findByKelasId(gm.getKelas().getId()));
+        }
 
         return siswaList.stream().map(siswa -> {
             com.baknusbelajar.api.dto.exam.ExamMonitoringDTO dto = new com.baknusbelajar.api.dto.exam.ExamMonitoringDTO();
