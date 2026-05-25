@@ -172,6 +172,7 @@ public class UjianMapelService {
                 .orElseThrow(() -> new RuntimeException("Guru not found"));
 
         UjianMapel entity = new UjianMapel();
+        entity.setKelasList(new java.util.HashSet<>());
         entity.setEventUjian(event);
         entity.setMapel(mapel);
         entity.setGuru(guru);
@@ -187,9 +188,6 @@ public class UjianMapelService {
             entity.setTampilkanNilai(dto.getTampilkanNilai());
 
         if (dto.getKelasIds() != null && !dto.getKelasIds().isEmpty()) {
-            if (entity.getKelasList() == null) {
-                entity.setKelasList(new java.util.HashSet<>());
-            }
             java.util.List<com.baknusbelajar.api.entity.Kelas> kelasList = kelasRepository.findAllById(dto.getKelasIds());
             entity.getKelasList().addAll(kelasList);
         }

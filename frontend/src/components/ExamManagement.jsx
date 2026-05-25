@@ -412,7 +412,9 @@ const ExamManagement = () => {
             setIsModalOpen(false);
             fetchExams(examForm.eventId);
         } catch (err) {
-            alert('Gagal menyimpan ujian');
+            console.error(err);
+            const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Unknown error';
+            alert('Gagal menyimpan ujian: ' + errorMsg);
         }
     };
 
