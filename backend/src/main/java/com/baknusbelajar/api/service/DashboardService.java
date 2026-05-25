@@ -37,6 +37,10 @@ public class DashboardService {
                 .aktivitasTerakhir(getRecentActivities(null))
                 .build();
     }
+    public DashboardSummaryDTO getGuruSummaryByUserId(Long userId) {
+        Long guruId = guruRepository.findByUserId(userId).map(com.baknusbelajar.api.entity.Guru::getId).orElse(0L);
+        return getGuruSummary(guruId);
+    }
 
     public DashboardSummaryDTO getGuruSummary(Long guruId) {
         return DashboardSummaryDTO.builder()

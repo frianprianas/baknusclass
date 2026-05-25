@@ -44,6 +44,7 @@ public class UjianMapel {
     private String token;
 
     @Column(name = "tampilkan_nilai")
+    @Builder.Default
     private Boolean tampilkanNilai = false;
 
     @ManyToMany(fetch = FetchType.LAZY)

@@ -22,9 +22,11 @@ public class DashboardController {
     @PreAuthorize("hasAnyRole('TU', 'GURU', 'ADMIN')")
     public ResponseEntity<DashboardSummaryDTO> getSummary(Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        boolean isGuru = userDetails.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GURU"));
         
-        if ("GURU".equalsIgnoreCase(userDetails.getRole())) {
-            return ResponseEntity.ok(dashboardService.getGuruSummary(userDetails.getProfileId()));
+        if (isGuru) {
+            return ResponseEntity.ok(dashboardService.getGuruSummaryByUserId(userDetails.getId()));
         }
         
         return ResponseEntity.ok(dashboardService.getAdminSummary());
