@@ -96,6 +96,7 @@ const ExamManagement = () => {
     const [myAssignments, setMyAssignments] = useState([]);
     const [exams, setExams] = useState([]);
     const [teachers, setTeachers] = useState([]);
+    const [kelasList, setKelasList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
@@ -120,7 +121,8 @@ const ExamManagement = () => {
         waktuMulai: '',
         waktuSelesai: '',
         durasi: 90,
-        token: ''
+        token: '',
+        kelasIds: []
     });
 
     // Sub-view for entering questions
@@ -307,12 +309,12 @@ const ExamManagement = () => {
                     const usersRes = await axios.get('/api/users', { headers });
                     // Filter only teachers to assign as proktor
                     const guruUsers = usersRes.data.filter(u => u.role === 'GURU');
-                    // We need guruId. In UserResponseDTO, maybe nip or id is there?
-                    // Wait, we need Guru.id to store in EventUjianDTO proktorIds.
-                    // The backend user fetching mapping...let's check. 
                     setTeachers(guruUsers);
+
+                    const kelasRes = await axios.get('/api/master/kelas', { headers });
+                    setKelasList(kelasRes.data);
                 } catch (e) {
-                    console.error("Error fetching users for proktor", e);
+                    console.error("Error fetching master data", e);
                 }
             }
         } catch (err) {
@@ -1447,7 +1449,7 @@ const ExamManagement = () => {
                                     className="btn-primary"
                                     onClick={() => {
                                         setEditMode(false);
-                                        setExamForm({ eventId: examForm.eventId, mapelId: '', guruId: '', waktuMulai: '', waktuSelesai: '', durasi: 90, token: '' });
+                                        setExamForm({ eventId: examForm.eventId, mapelId: '', guruId: '', waktuMulai: '', waktuSelesai: '', durasi: 90, token: '', kelasIds: [] });
                                         setIsModalOpen(true);
                                     }}
                                 >
@@ -1573,7 +1575,8 @@ const ExamManagement = () => {
                                                                                     waktuMulai: exam.waktuMulai.substring(0, 16),
                                                                                     waktuSelesai: exam.waktuSelesai.substring(0, 16),
                                                                                     durasi: exam.durasi || 90,
-                                                                                    token: exam.token
+                                                                                    token: exam.token,
+                                                                                    kelasIds: exam.kelasIds || []
                                                                                 });
                                                                                 setIsModalOpen(true);
                                                                             }}
@@ -1710,6 +1713,36 @@ const ExamManagement = () => {
                                             ))}
                                         </select>
                                     </div>
+
+                                    {(userRole === 'ADMIN' || userRole === 'TU') && (
+                                        <div className="form-group">
+                                            <label>Peserta Kelas (Opsional - Jika kosong, akan otomatis mengambil semua kelas guru bersangkutan)</label>
+                                            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc' }}>
+                                                {kelasList.map(k => (
+                                                    <label key={k.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={examForm.kelasIds?.includes(k.id)}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setExamForm(prev => {
+                                                                    const ids = prev.kelasIds || [];
+                                                                    return {
+                                                                        ...prev,
+                                                                        kelasIds: checked
+                                                                            ? (ids.includes(k.id) ? ids : [...ids, k.id])
+                                                                            : ids.filter(id => id !== k.id)
+                                                                    };
+                                                                });
+                                                            }}
+                                                        />
+                                                        <span style={{ fontSize: '0.9rem' }}>{k.namaKelas}</span>
+                                                    </label>
+                                                ))}
+                                                {kelasList.length === 0 && <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Belum ada data kelas</span>}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {(() => {
                                         const ev = events.find(e => e.id == examForm.eventId);

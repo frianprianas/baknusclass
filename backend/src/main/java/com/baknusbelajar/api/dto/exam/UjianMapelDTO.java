@@ -20,4 +20,6 @@ public class UjianMapelDTO {
     private Long sisaWaktuDetik; // Ditambahkan untuk menyimpan sisa durasi ujian dalam detik
     private Boolean tampilkanNilai; // Kontrol visibilitas raport
     private Double nilaiAkhir; // Hanya untuk SISWA jika dipublikasikan
+    private java.util.List<Long> kelasIds;
+    private String namaKelas; // Comma separated list of kelas names
 }

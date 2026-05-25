@@ -45,4 +45,13 @@ public class UjianMapel {
 
     @Column(name = "tampilkan_nilai")
     private Boolean tampilkanNilai = false;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "tb_ujian_mapel_kelas",
+        joinColumns = @JoinColumn(name = "ujian_mapel_id"),
+        inverseJoinColumns = @JoinColumn(name = "kelas_id")
+    )
+    @Builder.Default
+    private java.util.Set<Kelas> kelasList = new java.util.HashSet<>();
 }

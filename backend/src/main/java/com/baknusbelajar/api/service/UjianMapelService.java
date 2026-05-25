@@ -11,6 +11,7 @@ import com.baknusbelajar.api.repository.UjianMapelRepository;
 import com.baknusbelajar.api.repository.MapelRepository;
 import com.baknusbelajar.api.repository.GuruRepository;
 import com.baknusbelajar.api.repository.SiswaMapelRepository;
+import com.baknusbelajar.api.repository.KelasRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class UjianMapelService {
     private final MapelRepository mapelRepository;
     private final GuruRepository guruRepository;
     private final SiswaMapelRepository siswaMapelRepository;
+    private final KelasRepository kelasRepository;
     private final BaknusDriveService baknusDriveService;
     private final JawabanSiswaService jawabanSiswaService;
     private final com.baknusbelajar.api.repository.SoalEssayRepository soalEssayRepository;
@@ -184,6 +186,11 @@ public class UjianMapelService {
         if (dto.getTampilkanNilai() != null)
             entity.setTampilkanNilai(dto.getTampilkanNilai());
 
+        if (dto.getKelasIds() != null && !dto.getKelasIds().isEmpty()) {
+            java.util.List<com.baknusbelajar.api.entity.Kelas> kelasList = kelasRepository.findAllById(dto.getKelasIds());
+            entity.getKelasList().addAll(kelasList);
+        }
+
         UjianMapel saved = ujianMapelRepository.save(entity);
 
         // Notify BaknusDrive to create subject folder
@@ -260,6 +267,14 @@ public class UjianMapelService {
             entity.setToken(dto.getToken());
         }
 
+        if (dto.getKelasIds() != null) {
+            entity.getKelasList().clear();
+            if (!dto.getKelasIds().isEmpty()) {
+                java.util.List<com.baknusbelajar.api.entity.Kelas> kelasList = kelasRepository.findAllById(dto.getKelasIds());
+                entity.getKelasList().addAll(kelasList);
+            }
+        }
+
         return mapToDTO(ujianMapelRepository.save(entity), true);
     }
 
@@ -298,6 +313,15 @@ public class UjianMapelService {
             dto.setGuruId(entity.getGuru().getId());
             dto.setNamaGuru(entity.getGuru().getNamaLengkap());
         }
+        
+        if (entity.getKelasList() != null && !entity.getKelasList().isEmpty()) {
+            dto.setKelasIds(entity.getKelasList().stream().map(com.baknusbelajar.api.entity.Kelas::getId).collect(Collectors.toList()));
+            dto.setNamaKelas(entity.getKelasList().stream().map(com.baknusbelajar.api.entity.Kelas::getNamaKelas).collect(Collectors.joining(", ")));
+        } else {
+            dto.setKelasIds(new java.util.ArrayList<>());
+            dto.setNamaKelas("-");
+        }
+        
         return dto;
     }
 }
