@@ -44,19 +44,35 @@ public class UjianMapelController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
-    public ResponseEntity<UjianMapelDTO> create(@RequestBody UjianMapelDTO dto) {
+    public ResponseEntity<?> create(@RequestBody UjianMapelDTO dto) {
         log.info("[UjianMapel] Create attempt by user: {} with authorities: {}",
                 SecurityContextHolder.getContext().getAuthentication().getName(),
                 SecurityContextHolder.getContext().getAuthentication().getAuthorities());
-        return ResponseEntity.ok(ujianMapelService.createUjianMapel(dto));
+        try {
+            return ResponseEntity.ok(ujianMapelService.createUjianMapel(dto));
+        } catch (Exception e) {
+            log.error("[UjianMapel] CREATE ERROR: ", e);
+            java.util.Map<String, String> errMap = new java.util.HashMap<>();
+            errMap.put("message", e.getMessage() != null ? e.getMessage() : "Unknown internal error");
+            errMap.put("error", e.getClass().getName());
+            return ResponseEntity.status(500).body(errMap);
+        }
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
-    public ResponseEntity<UjianMapelDTO> update(@PathVariable Long id, @RequestBody UjianMapelDTO dto) {
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody UjianMapelDTO dto) {
         log.info("[UjianMapel] Update attempt for id={} by user: {}", id,
                 SecurityContextHolder.getContext().getAuthentication().getName());
-        return ResponseEntity.ok(ujianMapelService.updateUjianMapel(id, dto));
+        try {
+            return ResponseEntity.ok(ujianMapelService.updateUjianMapel(id, dto));
+        } catch (Exception e) {
+            log.error("[UjianMapel] UPDATE ERROR for id={}: ", id, e);
+            java.util.Map<String, String> errMap = new java.util.HashMap<>();
+            errMap.put("message", e.getMessage() != null ? e.getMessage() : "Unknown internal error");
+            errMap.put("error", e.getClass().getName());
+            return ResponseEntity.status(500).body(errMap);
+        }
     }
 
     @PutMapping("/{id}/toggle-nilai")
