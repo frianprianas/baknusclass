@@ -187,6 +187,9 @@ public class UjianMapelService {
             entity.setTampilkanNilai(dto.getTampilkanNilai());
 
         if (dto.getKelasIds() != null && !dto.getKelasIds().isEmpty()) {
+            if (entity.getKelasList() == null) {
+                entity.setKelasList(new java.util.HashSet<>());
+            }
             java.util.List<com.baknusbelajar.api.entity.Kelas> kelasList = kelasRepository.findAllById(dto.getKelasIds());
             entity.getKelasList().addAll(kelasList);
         }
@@ -268,6 +271,9 @@ public class UjianMapelService {
         }
 
         if (dto.getKelasIds() != null) {
+            if (entity.getKelasList() == null) {
+                entity.setKelasList(new java.util.HashSet<>());
+            }
             entity.getKelasList().clear();
             if (!dto.getKelasIds().isEmpty()) {
                 java.util.List<com.baknusbelajar.api.entity.Kelas> kelasList = kelasRepository.findAllById(dto.getKelasIds());
