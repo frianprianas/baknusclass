@@ -78,7 +78,7 @@ public class ForumService {
                                 String role = creator.getRole();
                                 if ("GURU".equals(role)) {
                                         com.baknusbelajar.api.entity.Guru guru = guruRepository.findByUserId(creator.getId()).orElse(null);
-                                        if (guru == null || guru.getIsCoAdmin() == null || guru.getIsCoAdmin() == 0) {
+                                        if (guru == null || !Boolean.TRUE.equals(guru.getIsCoAdmin())) {
                                                 throw new RuntimeException("Akses Ditolak: Hanya Co-Admin yang dapat membuat diskusi internal Guru.");
                                         }
                                 } else if ("SISWA".equals(role)) {
