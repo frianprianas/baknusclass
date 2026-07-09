@@ -501,7 +501,7 @@ const ForumDiscussion = () => {
                                     )}
                                 </div>
                                     {
-                                    (user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU') && (
+                                    (user.role === 'ADMIN' || user.role === 'TU' || user.isCoAdmin) && (
                                         <div className="topic-ai-teaser" onClick={(e) => { e.stopPropagation(); handleGetAnalysis(topic.id); }}>
                                             <div className="ai-teaser-content">
                                                 <div className="ai-sparkle-group">

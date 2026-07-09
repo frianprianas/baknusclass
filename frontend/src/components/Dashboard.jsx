@@ -18,6 +18,7 @@ const Dashboard = () => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [proctorEvents, setProctorEvents] = useState([]);
+  const [internalTopics, setInternalTopics] = useState([]);
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
@@ -92,8 +93,19 @@ const Dashboard = () => {
             } catch (e) { console.error(e); }
         };
 
+        const fetchInternalTopics = async () => {
+            if (!['TU', 'GURU', 'ADMIN'].includes(user.role) || !token) return;
+            try {
+                const res = await axios.get('/api/forum/topik/guru-only', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setInternalTopics(res.data.slice(0, 5));
+            } catch (e) { console.error(e); }
+        };
+
         if (['TU', 'GURU', 'ADMIN'].includes(user.role)) {
             fetchSummary();
+            fetchInternalTopics();
         }
         if (user.role === 'GURU') fetchMyExams();
         checkProctorStatus();
@@ -257,6 +269,34 @@ const Dashboard = () => {
             )}
           </div>
         </div>
+
+        {['TU', 'GURU', 'ADMIN'].includes(user.role) && (
+          <div className="activity-container" style={{ marginTop: '24px' }}>
+            <div className="container-header">
+              <h3>Forum Diskusi Guru</h3>
+              <button className="text-link" onClick={() => navigate('/forum')}>Lihat Forum</button>
+            </div>
+            <div className="activity-list">
+              {internalTopics && internalTopics.length > 0 ? (
+                internalTopics.map((topic, i) => (
+                  <div key={i} className="activity-item" style={{ cursor: 'pointer' }} onClick={() => navigate('/forum')}>
+                    <div className="activity-dot" style={{ backgroundColor: '#f59e0b', boxShadow: '0 0 0 4px #fef3c7' }}></div>
+                    <div className="activity-info">
+                      <p className="activity-text">
+                        <strong>{topic.judul}</strong>
+                      </p>
+                      <p className="activity-time">
+                        {topic.namaGuru} &bull; {topic.jumlahKomentar} balasan
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="empty-state">Belum ada topik diskusi internal.</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <style>{`
