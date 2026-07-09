@@ -72,6 +72,19 @@ public class ForumService {
                         creator = userRepository.findById(dto.getCreatorUserId()).orElse(null);
                 }
 
+                if (Boolean.TRUE.equals(dto.getIsGuruOnly())) {
+                        if (creator != null) {
+                                String role = creator.getRole().name();
+                                if ("GURU".equals(role)) {
+                                        if (creator.getGuru() == null || creator.getGuru().getIsCoAdmin() == null || creator.getGuru().getIsCoAdmin() == 0) {
+                                                throw new RuntimeException("Akses Ditolak: Hanya Co-Admin yang dapat membuat diskusi internal Guru.");
+                                        }
+                                } else if ("SISWA".equals(role)) {
+                                        throw new RuntimeException("Akses Ditolak: Siswa tidak dapat mengakses forum internal.");
+                                }
+                        }
+                }
+
                 ForumTopik topik = ForumTopik.builder()
                                 .judul(dto.getJudul())
                                 .konten(dto.getKonten())

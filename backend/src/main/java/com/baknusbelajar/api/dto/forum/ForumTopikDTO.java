@@ -15,9 +15,12 @@ public class ForumTopikDTO {
     private Long id;
     private String judul;
     private String konten;
+    @com.fasterxml.jackson.annotation.JsonProperty("isPinned")
     private Boolean isPinned;
+    @com.fasterxml.jackson.annotation.JsonProperty("isClosed")
     private Boolean isClosed;
     private Long guruMapelId;
+    @com.fasterxml.jackson.annotation.JsonProperty("isGuruOnly")
     private Boolean isGuruOnly;
     private Long creatorUserId;
     private String namaGuru;
