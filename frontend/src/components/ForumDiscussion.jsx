@@ -37,6 +37,7 @@ const ForumDiscussion = () => {
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newTopic, setNewTopic] = useState({ judul: '', konten: '', guruMapelId: '', isPinned: false });
+    const [forumTab, setForumTab] = useState((JSON.parse(localStorage.getItem('user') || '{}').role === 'ADMIN' || JSON.parse(localStorage.getItem('user') || '{}').role === 'TU') ? 'guru' : 'class');
     const [guruMapels, setGuruMapels] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [typingUsers, setTypingUsers] = useState({}); // {userId: {name, timestamp}}
@@ -54,7 +55,7 @@ const ForumDiscussion = () => {
 
     useEffect(() => {
         fetchInitialData();
-    }, []);
+    }, [forumTab]);
 
     useEffect(() => {
         if (view === 'chat' && selectedTopic) {
@@ -187,28 +188,30 @@ const ForumDiscussion = () => {
     const fetchInitialData = async () => {
         setLoading(true);
         try {
-            if (user.role === 'GURU') {
-                // Fetch topics for teacher based on their subjects
-                const gmRes = await axios.get('/api/enrollment/guru-mapel/my', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setGuruMapels(gmRes.data);
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
 
-                // For teacher, fetch all topics from all their subjects
-                const allTopics = [];
-                for (const gm of gmRes.data) {
-                    const tRes = await axios.get(`/api/forum/topik/guru-mapel/${gm.id}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    allTopics.push(...tRes.data);
+            if (forumTab === 'guru') {
+                const res = await axios.get('/api/forum/topik/guru-only', { headers });
+                setTopics(res.data);
+            } else {
+                if (user.role === 'GURU') {
+                    // Fetch topics for teacher based on their subjects
+                    const gmRes = await axios.get('/api/enrollment/guru-mapel/my', { headers });
+                    setGuruMapels(gmRes.data);
+
+                    // For teacher, fetch all topics from all their subjects
+                    const allTopics = [];
+                    for (const gm of gmRes.data) {
+                        const tRes = await axios.get(`/api/forum/topik/guru-mapel/${gm.id}`, { headers });
+                        allTopics.push(...tRes.data);
+                    }
+                    setTopics(allTopics.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+                } else if (user.role === 'SISWA' && user.kelasId) {
+                    // Fetch topics for student based on their class
+                    const tRes = await axios.get(`/api/forum/topik/kelas/${user.kelasId}`, { headers });
+                    setTopics(tRes.data);
                 }
-                setTopics(allTopics.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-            } else if (user.role === 'SISWA' && user.kelasId) {
-                // Fetch topics for student based on their class
-                const tRes = await axios.get(`/api/forum/topik/kelas/${user.kelasId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setTopics(tRes.data);
             }
         } catch (err) {
             console.error('Failed to fetch forum data', err);
@@ -253,9 +256,19 @@ const ForumDiscussion = () => {
     };
 
     const handleCreateTopic = async () => {
-        if (!newTopic.judul || !newTopic.konten || !newTopic.guruMapelId) return;
+        const isGuruTab = forumTab === 'guru';
+        if (!newTopic.judul || !newTopic.konten) return;
+        if (!isGuruTab && !newTopic.guruMapelId) return;
+
+        const payload = {
+            ...newTopic,
+            isGuruOnly: isGuruTab,
+            guruMapelId: isGuruTab ? null : newTopic.guruMapelId,
+            creatorUserId: user.userId
+        };
+
         try {
-            const res = await axios.post('/api/forum/topik', newTopic, {
+            const res = await axios.post('/api/forum/topik', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setTopics([res.data, ...topics]);
@@ -375,12 +388,50 @@ const ForumDiscussion = () => {
 
     return (
         <div className="forum-container animate-fade-in">
+            {/* Forum Tabs for GURU/ADMIN/TU */}
+            {(user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU') && view === 'topics' && (
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+                    {user.role === 'GURU' && (
+                        <button
+                            onClick={() => setForumTab('class')}
+                            style={{
+                                padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+                                backgroundColor: forumTab === 'class' ? '#3b82f6' : 'transparent',
+                                color: forumTab === 'class' ? 'white' : '#64748b',
+                                fontWeight: '700'
+                            }}
+                        >
+                            Forum Kelas & Mapel
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setForumTab('guru')}
+                        style={{
+                            padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+                            backgroundColor: forumTab === 'guru' ? '#3b82f6' : 'transparent',
+                            color: forumTab === 'guru' ? 'white' : '#64748b',
+                            fontWeight: '700'
+                        }}
+                    >
+                        Forum Internal Guru & Staf
+                    </button>
+                </div>
+            )}
             <div className="forum-header">
                 <div className="header-info">
-                    <h1>Forum Diskusi</h1>
-                    <p>Diskusikan materi pelajaran dengan guru dan teman sekelas</p>
+                    {forumTab === 'guru' ? (
+                        <>
+                            <h1>Forum Internal Guru & Staf</h1>
+                            <p>Ruang diskusi tertutup khusus untuk pendidik dan staf sekolah</p>
+                        </>
+                    ) : (
+                        <>
+                            <h1>Forum Kelas & Mapel</h1>
+                            <p>Diskusikan materi pelajaran dengan siswa dan rekan pengajar</p>
+                        </>
+                    )}
                 </div>
-                {user.role === 'GURU' && view === 'topics' && (
+                {(user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU') && view === 'topics' && (
                     <button className="create-topic-btn" onClick={() => setShowCreateModal(true)}>
                         <Plus size={20} />
                         <span>Buat Topik Baru</span>
@@ -404,7 +455,10 @@ const ForumDiscussion = () => {
                         {filteredTopics.length > 0 ? filteredTopics.map(topic => (
                             <div key={topic.id} className={`topic-card ${topic.isPinned ? 'pinned' : ''}`} onClick={() => handleSelectTopic(topic)}>
                                 <div className="topic-card-header">
-                                    <div className="topic-badge">{topic.namaMapel}</div>
+                                    <div className="topic-badge">
+                                        {topic.namaMapel}
+                                        {topic.isGuruOnly && <span style={{ marginLeft: '6px', padding: '2px 6px', backgroundColor: '#fee2e2', color: '#ef4444', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>Internal</span>}
+                                    </div>
                                     <div className="topic-header-badges">
                                         {topic.isPinned && <div className="pinned-badge"><PinIcon size={12} fill="currentColor" /> TERSEMAT</div>}
                                         {topic.isClosed && <div className="closed-badge"><Lock size={12} /> DITUTUP</div>}
@@ -421,7 +475,7 @@ const ForumDiscussion = () => {
                                         <MessageCircle size={14} />
                                         <span>{topic.jumlahKomentar || 0}</span>
                                     </div>
-                                    {user.role === 'GURU' && (
+                                    {(user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU') && (
                                         <div className="topic-actions">
                                             <button
                                                 className={`pin-toggle-btn ${topic.isPinned ? 'active' : ''}`}
@@ -443,8 +497,8 @@ const ForumDiscussion = () => {
                                         </div>
                                     )}
                                 </div>
-                                {
-                                    user.role === 'GURU' && (
+                                    {
+                                    (user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU') && (
                                         <div className="topic-ai-teaser" onClick={(e) => { e.stopPropagation(); handleGetAnalysis(topic.id); }}>
                                             <div className="ai-teaser-content">
                                                 <div className="ai-sparkle-group">
@@ -592,20 +646,29 @@ const ForumDiscussion = () => {
                     <div className="modal-overlay">
                         <div className="modal-content-forum">
                             <h2>Buat Topik Diskusi Baru</h2>
-                            <div className="form-group-forum">
-                                <label>Pilih Mata Pelajaran & Kelas</label>
-                                <select
-                                    value={newTopic.guruMapelId}
-                                    onChange={(e) => setNewTopic({ ...newTopic, guruMapelId: e.target.value })}
-                                >
-                                    <option value="">-- Pilih --</option>
-                                    {guruMapels.map(gm => (
-                                        <option key={gm.id} value={gm.id}>
-                                            {gm.namaMapel} - {gm.namaKelas || 'Semua'}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            {forumTab === 'guru' ? (
+                                <div className="form-group-forum">
+                                    <label>Tujuan Forum</label>
+                                    <div style={{ padding: '10px', backgroundColor: '#fee2e2', color: '#ef4444', borderRadius: '8px', fontWeight: '700', fontSize: '0.9rem' }}>
+                                        Khusus Guru & Staf TU (Terisolasi)
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="form-group-forum">
+                                    <label>Pilih Mata Pelajaran & Kelas</label>
+                                    <select
+                                        value={newTopic.guruMapelId}
+                                        onChange={(e) => setNewTopic({ ...newTopic, guruMapelId: e.target.value })}
+                                    >
+                                        <option value="">-- Pilih --</option>
+                                        {guruMapels.map(gm => (
+                                            <option key={gm.id} value={gm.id}>
+                                                {gm.namaMapel} - {gm.namaKelas || 'Semua'}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div className="form-group-forum">
                                 <label>Judul Diskusi</label>
                                 <input

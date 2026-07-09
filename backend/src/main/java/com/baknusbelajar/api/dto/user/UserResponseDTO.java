@@ -21,6 +21,7 @@ public class UserResponseDTO {
 
     // Additional info for Guru
     private String nip;
+    private Boolean isCoAdmin;
     private List<String> mapelNames;
     private List<Long> mapelIds;
     private List<GuruMapelAssignment> assignments;

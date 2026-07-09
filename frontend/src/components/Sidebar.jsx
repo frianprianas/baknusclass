@@ -104,7 +104,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
   const getRoleLabel = (r) => {
     switch (r) {
       case 'ADMIN': return 'Super Admin';
-      case 'GURU': return 'Tenaga Pengajar';
+      case 'GURU': return user.isCoAdmin ? 'Co-Admin (Guru)' : 'Tenaga Pengajar';
       case 'TU': return 'Staf Tata Usaha';
       case 'SISWA': return 'Siswa / Peserta';
       default: return r;

@@ -15,4 +15,5 @@ public class AuthResponse {
     private Long profileId;
     private Long userId;
     private Long kelasId;
+    private Boolean isCoAdmin;
 }

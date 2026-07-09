@@ -11,4 +11,6 @@ public interface GuruRepository extends JpaRepository<Guru, Long> {
     Optional<Guru> findByNip(String nip);
 
     Optional<Guru> findByUserId(Long userId);
+
+    long countByIsCoAdminTrue();
 }

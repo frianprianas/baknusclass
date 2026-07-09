@@ -36,8 +36,18 @@ public class ForumTopik {
     private String konten;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "guru_mapel_id", nullable = false)
+    @JoinColumn(name = "guru_mapel_id")
     private GuruMapel guruMapel;
+
+    @Column(name = "is_guru_only", nullable = false)
+    @Builder.Default
+    private Boolean isGuruOnly = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "creator_user_id")
+    private Users creator;
+
+
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

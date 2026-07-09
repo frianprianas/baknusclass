@@ -20,14 +20,23 @@ public class CustomUserDetails implements UserDetails {
     private Collection<? extends GrantedAuthority> authorities;
 
     public static CustomUserDetails create(Users user) {
-        GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase());
+        return create(user, false);
+    }
+
+    public static CustomUserDetails create(Users user, boolean isCoAdmin) {
+        java.util.List<GrantedAuthority> authorities = new java.util.ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase()));
+        if (isCoAdmin) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_CO_ADMIN"));
+        }
         return new CustomUserDetails(
                 user.getId(),
                 user.getEmail(),
                 user.getUsername(),
                 user.getPasswordHash(),
-                Collections.singletonList(authority));
+                authorities);
     }
+
 
     @Override
     public boolean isAccountNonExpired() {

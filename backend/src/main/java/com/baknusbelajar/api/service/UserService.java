@@ -49,6 +49,7 @@ public class UserService {
                 guruRepository.findByUserId(user.getId()).ifPresent(g -> {
                     dto.setProfileId(g.getId());
                     dto.setNip(g.getNip());
+                    dto.setIsCoAdmin(g.getIsCoAdmin());
                     List<GuruMapel> gms = guruMapelRepository.findByGuruId(g.getId());
                     dto.setMapelNames(gms.stream().map(gm -> gm.getMapel().getNamaMapel()).toList());
                     dto.setMapelIds(gms.stream().map(gm -> gm.getMapel().getId()).toList());
@@ -323,5 +324,22 @@ public class UserService {
 
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
+    }
+
+    @Transactional
+    public void toggleCoAdminStatus(Long guruId) {
+        Guru guru = guruRepository.findById(guruId)
+                .orElseThrow(() -> new RuntimeException("Guru tidak ditemukan"));
+
+        if (Boolean.TRUE.equals(guru.getIsCoAdmin())) {
+            guru.setIsCoAdmin(false);
+        } else {
+            long currentCoAdmins = guruRepository.countByIsCoAdminTrue();
+            if (currentCoAdmins >= 3) {
+                throw new RuntimeException("LIMIT_REACHED: Maksimal 3 guru yang bisa ditunjuk sebagai Co-Admin");
+            }
+            guru.setIsCoAdmin(true);
+        }
+        guruRepository.save(guru);
     }
 }

@@ -146,6 +146,7 @@ public class AuthService {
         Long profileId = null;
         Long kelasId = null;
 
+        Boolean isCoAdmin = null;
         if ("SISWA".equalsIgnoreCase(user.getRole())) {
             var s = siswaRepository.findByUserId(user.getId());
             name = s.map(Siswa::getNamaLengkap).orElse(name);
@@ -156,8 +157,10 @@ public class AuthService {
             var g = guruRepository.findByUserId(user.getId());
             name = g.map(Guru::getNamaLengkap).orElse(name);
             profileId = g.map(Guru::getId).orElse(null);
+            isCoAdmin = g.map(Guru::getIsCoAdmin).orElse(false);
         }
 
-        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId);
+        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId, isCoAdmin);
+
     }
 }

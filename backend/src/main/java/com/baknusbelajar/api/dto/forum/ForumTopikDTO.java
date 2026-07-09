@@ -18,7 +18,10 @@ public class ForumTopikDTO {
     private Boolean isPinned;
     private Boolean isClosed;
     private Long guruMapelId;
+    private Boolean isGuruOnly;
+    private Long creatorUserId;
     private String namaGuru;
+
     private String namaGuruEmail;
     private String namaMapel;
     private String namaKelas;

@@ -172,15 +172,39 @@ const UserManagement = () => {
         }
     };
 
-    const getRoleBadge = (role) => {
+    const handleToggleCoAdmin = async (user) => {
+        if (user.role !== 'GURU') return;
+        const action = user.isCoAdmin ? 'menghapus' : 'menunjuk';
+        if (!window.confirm(`Yakin ingin ${action} guru ini sebagai Co-Admin?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`/api/users/guru/${user.profileId}/toggle-co-admin`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchUsers();
+        } catch (err) {
+            alert('Gagal memproses Co-Admin: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+
+    const getRoleBadge = (role, isCoAdmin) => {
         let color = '#64748b';
         let bg = '#f1f5f9';
+        let label = role;
 
         switch (role) {
-            case 'ADMIN': color = '#ef4444'; bg = '#fee2e2'; break;
-            case 'GURU': color = '#3b82f6'; bg = '#eff6ff'; break;
-            case 'TU': color = '#8b5cf6'; bg = '#f5f3ff'; break;
-            case 'SISWA': color = '#10b981'; bg = '#ecfdf5'; break;
+            case 'ADMIN': color = '#ef4444'; bg = '#fee2e2'; label = 'Admin'; break;
+            case 'GURU': 
+                if (isCoAdmin) {
+                    color = '#d97706'; bg = '#fef3c7'; label = 'Co-Admin (Guru)';
+                } else {
+                    color = '#3b82f6'; bg = '#eff6ff'; label = 'Guru';
+                }
+                break;
+            case 'TU': color = '#8b5cf6'; bg = '#f5f3ff'; label = 'TU'; break;
+            case 'SISWA': color = '#10b981'; bg = '#ecfdf5'; label = 'Siswa'; break;
         }
 
         return (
@@ -190,9 +214,13 @@ const UserManagement = () => {
                 padding: '4px 12px',
                 borderRadius: '50px',
                 fontSize: '0.75rem',
-                fontWeight: '600'
+                fontWeight: '700',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
             }}>
-                {role}
+                {role === 'GURU' && isCoAdmin && <Shield size={12} />}
+                {label}
             </span>
         );
     };
@@ -273,7 +301,7 @@ const UserManagement = () => {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{getRoleBadge(user.role)}</td>
+                                        <td>{getRoleBadge(user.role, user.isCoAdmin)}</td>
                                         <td>
                                             <div className="status-cell">
                                                 {(user.active || user.isActive) ? (
@@ -327,6 +355,19 @@ const UserManagement = () => {
                                                 >
                                                     {(user.active || user.isActive) ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
                                                 </button>
+                                                {user.role === 'GURU' && JSON.parse(localStorage.getItem('user') || '{}').role === 'ADMIN' && (
+                                                    <button
+                                                        style={{
+                                                            backgroundColor: user.isCoAdmin ? '#d97706' : '#64748b',
+                                                            color: 'white', border: 'none', padding: '6px 10px',
+                                                            borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                        }}
+                                                        onClick={() => handleToggleCoAdmin(user)}
+                                                        title={user.isCoAdmin ? 'Hapus dari Co-Admin' : 'Jadikan Co-Admin'}
+                                                    >
+                                                        <Shield size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

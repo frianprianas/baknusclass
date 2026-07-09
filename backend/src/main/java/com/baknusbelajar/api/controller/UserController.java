@@ -44,4 +44,18 @@ public class UserController {
         userService.toggleUserStatus(id);
         return ResponseEntity.ok().build();
     }
+
+    @PutMapping("/guru/{guruId}/toggle-co-admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> toggleCoAdmin(@PathVariable Long guruId) {
+        try {
+            userService.toggleCoAdminStatus(guruId);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("LIMIT_REACHED")) {
+                return ResponseEntity.status(400).body(java.util.Map.of("message", e.getMessage()));
+            }
+            throw e;
+        }
+    }
 }

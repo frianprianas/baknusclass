@@ -279,9 +279,12 @@ const ExamManagement = () => {
             setUserRole('GURU');
         }
 
-        if (role === 'GURU') {
+        const userObj = JSON.parse(userStr || '{}');
+        const isCoAdmin = userObj.isCoAdmin;
+        if (role === 'GURU' && !isCoAdmin) {
             setActiveTab('exams');
         }
+
 
         fetchData(role);
         fetchMyAssignments(role); // ✅ pass role directly, tidak pakai state yg belum ready
@@ -304,7 +307,7 @@ const ExamManagement = () => {
                 fetchExams(activeEvent.id);
             }
 
-            if (effectiveRole === 'ADMIN' || effectiveRole === 'TU') {
+            if (effectiveRole === 'ADMIN' || effectiveRole === 'TU' || JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) {
                 try {
                     const usersRes = await axios.get('/api/users', { headers });
                     // Filter only teachers to assign as proktor
@@ -331,7 +334,7 @@ const ExamManagement = () => {
         const headers = { Authorization: `Bearer ${token}` };
         try {
             // ADMIN/TU: ambil semua. GURU: ambil punya sendiri via /my
-            const endpoint = (effectiveRole === 'ADMIN' || effectiveRole === 'TU')
+            const endpoint = (effectiveRole === 'ADMIN' || effectiveRole === 'TU' || user.isCoAdmin)
                 ? '/api/enrollment/guru-mapel'
                 : '/api/enrollment/guru-mapel/my';
             const res = await axios.get(endpoint, { headers });
@@ -1460,7 +1463,7 @@ const ExamManagement = () => {
                             )}
                         </div>
 
-                        {userRole === 'GURU' && myAssignments.length > 0 && (
+                        {userRole === 'GURU' && !JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin && myAssignments.length > 0 && (
                             <div className="my-assignments-summary">
                                 <h3><BookOpen size={18} /> Mata Pelajaran & Kelas Anda</h3>
                                 <div className="assignments-grid">
@@ -1508,6 +1511,7 @@ const ExamManagement = () => {
                                                 .filter(exam => {
                                                     if (userRole !== 'GURU') return true;
                                                     const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                                    if (user.isCoAdmin) return true;
                                                     return exam.guruId == user.profileId;
                                                 })
                                                 .map(exam => (
@@ -1693,7 +1697,7 @@ const ExamManagement = () => {
                             ) : (
                                 <>
                                     <div className="form-group">
-                                        <label>{userRole === 'GURU' ? 'Mata Pelajaran Anda' : 'Pilih Mata Pelajaran & Guru'}</label>
+                                        <label>{(userRole === 'GURU' && !JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) ? 'Mata Pelajaran Anda' : 'Pilih Mata Pelajaran & Guru'}</label>
                                         <select
                                             value={examForm.mapelId && examForm.guruId ? `${examForm.mapelId}-${examForm.guruId}` : ''}
                                             onChange={(e) => {
@@ -1716,7 +1720,7 @@ const ExamManagement = () => {
                                         </select>
                                     </div>
 
-                                    {(userRole === 'ADMIN' || userRole === 'TU') && (
+                                    {(userRole === 'ADMIN' || userRole === 'TU' || JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) && (
                                         <div className="form-group">
                                             <label>Peserta Kelas (Opsional - Jika kosong, akan otomatis mengambil semua kelas guru bersangkutan)</label>
                                             <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc' }}>

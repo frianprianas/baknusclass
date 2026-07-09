@@ -30,35 +30,42 @@ public class ForumController {
         return ResponseEntity.ok(forumService.getTopikByKelas(kelasId));
     }
 
+    @GetMapping("/topik/guru-only")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<List<ForumTopikDTO>> getTopikGuruOnly() {
+        return ResponseEntity.ok(forumService.getTopikGuruOnly());
+    }
+
     @GetMapping("/topik/{id}")
     public ResponseEntity<ForumTopikDTO> getTopikById(@PathVariable Long id) {
         return ResponseEntity.ok(forumService.getTopikById(id));
     }
 
     @PostMapping("/topik")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<ForumTopikDTO> createTopik(@RequestBody ForumTopikDTO dto) {
         return ResponseEntity.ok(forumService.createTopik(dto));
     }
 
     @DeleteMapping("/topik/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<Void> deleteTopik(@PathVariable Long id) {
         forumService.deleteTopik(id);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/topik/{id}/pin")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<ForumTopikDTO> togglePin(@PathVariable Long id) {
         return ResponseEntity.ok(forumService.togglePin(id));
     }
 
     @PutMapping("/topik/{id}/close")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<ForumTopikDTO> toggleClosed(@PathVariable Long id) {
         return ResponseEntity.ok(forumService.toggleClosed(id));
     }
+
 
     @GetMapping("/topik/{topikId}/komentar")
     public ResponseEntity<List<ForumKomentarDTO>> getKomentar(@PathVariable Long topikId) {

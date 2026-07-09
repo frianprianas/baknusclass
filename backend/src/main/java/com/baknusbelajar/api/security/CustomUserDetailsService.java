@@ -2,6 +2,8 @@ package com.baknusbelajar.api.security;
 
 import com.baknusbelajar.api.entity.Users;
 import com.baknusbelajar.api.repository.UserRepository;
+import com.baknusbelajar.api.repository.GuruRepository;
+import com.baknusbelajar.api.entity.Guru;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final GuruRepository guruRepository;
 
     @Override
     public UserDetails loadUserByUsername(String emailOrUsername) throws UsernameNotFoundException {
@@ -20,12 +23,28 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseGet(() -> userRepository.findByUsername(emailOrUsername)
                         .orElseThrow(() -> new UsernameNotFoundException(
                                 "User not found with email or username: " + emailOrUsername)));
-        return CustomUserDetails.create(user);
+        
+        boolean isCoAdmin = false;
+        if ("GURU".equalsIgnoreCase(user.getRole())) {
+            isCoAdmin = guruRepository.findByUserId(user.getId())
+                    .map(Guru::getIsCoAdmin)
+                    .orElse(false);
+        }
+        
+        return CustomUserDetails.create(user, isCoAdmin);
     }
 
     public UserDetails loadUserById(Long id) {
         Users user = userRepository.findById(id).orElseThrow(
                 () -> new UsernameNotFoundException("User not found with id: " + id));
-        return CustomUserDetails.create(user);
+        
+        boolean isCoAdmin = false;
+        if ("GURU".equalsIgnoreCase(user.getRole())) {
+            isCoAdmin = guruRepository.findByUserId(user.getId())
+                    .map(Guru::getIsCoAdmin)
+                    .orElse(false);
+        }
+        
+        return CustomUserDetails.create(user, isCoAdmin);
     }
 }

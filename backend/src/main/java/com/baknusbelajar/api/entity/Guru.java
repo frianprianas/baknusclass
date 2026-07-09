@@ -28,4 +28,7 @@ public class Guru {
     @Column(name = "nama_lengkap", nullable = false)
     private String namaLengkap;
 
+    @Column(name = "is_co_admin", nullable = false)
+    @Builder.Default
+    private Boolean isCoAdmin = false;
 }

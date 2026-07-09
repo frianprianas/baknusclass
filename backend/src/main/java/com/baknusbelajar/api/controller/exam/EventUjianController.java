@@ -28,21 +28,21 @@ public class EventUjianController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'CO_ADMIN')")
     public ResponseEntity<com.baknusbelajar.api.dto.exam.EventUjianDTO> create(
             @RequestBody com.baknusbelajar.api.dto.exam.EventUjianDTO dto) {
         return ResponseEntity.ok(eventUjianService.createEvent(dto));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'CO_ADMIN')")
     public ResponseEntity<com.baknusbelajar.api.dto.exam.EventUjianDTO> update(@PathVariable Long id,
             @RequestBody com.baknusbelajar.api.dto.exam.EventUjianDTO dto) {
         return ResponseEntity.ok(eventUjianService.updateEvent(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'CO_ADMIN')")
     public ResponseEntity<?> delete(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean force) {
         try {
             eventUjianService.deleteEvent(id, force);
@@ -56,7 +56,7 @@ public class EventUjianController {
     }
 
     @PutMapping("/{id}/toggle-status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CO_ADMIN')")
     public ResponseEntity<com.baknusbelajar.api.dto.exam.EventUjianDTO> toggleStatus(@PathVariable Long id) {
         return ResponseEntity.ok(eventUjianService.toggleEventStatus(id));
     }

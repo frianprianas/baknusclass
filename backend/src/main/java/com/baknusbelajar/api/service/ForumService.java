@@ -35,12 +35,14 @@ public class ForumService {
 
         public List<ForumTopikDTO> getTopikByGuruMapel(Long guruMapelId) {
                 return forumTopikRepository.findByGuruMapelIdOrderByPinnedDescCreatedAtDesc(guruMapelId).stream()
+                                .filter(t -> !Boolean.TRUE.equals(t.getIsGuruOnly()))
                                 .map(this::mapTopikToDTO)
                                 .collect(Collectors.toList());
         }
 
         public List<ForumTopikDTO> getTopikByKelas(Long kelasId) {
                 return forumTopikRepository.findByGuruMapel_Kelas_IdOrderByPinnedDescCreatedAtDesc(kelasId).stream()
+                                .filter(t -> !Boolean.TRUE.equals(t.getIsGuruOnly()))
                                 .map(this::mapTopikToDTO)
                                 .collect(Collectors.toList());
         }
@@ -51,16 +53,33 @@ public class ForumService {
                                 .orElseThrow(() -> new RuntimeException("Topik tidak ditemukan"));
         }
 
+        public List<ForumTopikDTO> getTopikGuruOnly() {
+                return forumTopikRepository.findByIsGuruOnlyTrueOrderByPinnedDescCreatedAtDesc().stream()
+                                .map(this::mapTopikToDTO)
+                                .collect(Collectors.toList());
+        }
+
         @Transactional
         public ForumTopikDTO createTopik(ForumTopikDTO dto) {
-                GuruMapel gm = guruMapelRepository.findById(dto.getGuruMapelId())
-                                .orElseThrow(() -> new RuntimeException("Guru Mapel tidak ditemukan"));
+                GuruMapel gm = null;
+                if (dto.getGuruMapelId() != null) {
+                        gm = guruMapelRepository.findById(dto.getGuruMapelId())
+                                        .orElseThrow(() -> new RuntimeException("Guru Mapel tidak ditemukan"));
+                }
+
+                Users creator = null;
+                if (dto.getCreatorUserId() != null) {
+                        creator = userRepository.findById(dto.getCreatorUserId()).orElse(null);
+                }
 
                 ForumTopik topik = ForumTopik.builder()
                                 .judul(dto.getJudul())
                                 .konten(dto.getKonten())
                                 .pinned(dto.getIsPinned() != null ? dto.getIsPinned() : false)
+                                .closed(false)
+                                .isGuruOnly(dto.getIsGuruOnly() != null ? dto.getIsGuruOnly() : false)
                                 .guruMapel(gm)
+                                .creator(creator)
                                 .build();
 
                 return mapTopikToDTO(forumTopikRepository.save(topik));
@@ -153,25 +172,43 @@ public class ForumService {
         }
 
         private ForumTopikDTO mapTopikToDTO(ForumTopik t) {
-                return ForumTopikDTO.builder()
+                ForumTopikDTO.ForumTopikDTOBuilder builder = ForumTopikDTO.builder()
                                 .id(t.getId())
                                 .judul(t.getJudul())
                                 .isPinned(t.getPinned() != null && t.getPinned())
                                 .isClosed(t.getClosed() != null && t.getClosed())
                                 .konten(t.getKonten())
-                                .guruMapelId(t.getGuruMapel().getId())
-                                .namaGuru(t.getGuruMapel().getGuru().getNamaLengkap())
-                                .namaGuruEmail(t.getGuruMapel().getGuru().getUser().getEmail())
-                                .namaMapel(t.getGuruMapel().getMapel().getNamaMapel())
-                                .namaKelas(t.getGuruMapel().getKelas() != null
-                                                ? t.getGuruMapel().getKelas().getNamaKelas()
-                                                : "-")
+                                .isGuruOnly(t.getIsGuruOnly() != null && t.getIsGuruOnly())
                                 .createdAt(t.getCreatedAt())
                                 .updatedAt(t.getUpdatedAt())
-                                // In a real app we might use a count query, but for simplicity:
                                 .jumlahKomentar((long) forumKomentarRepository
-                                                .findByTopikIdOrderByCreatedAtAsc(t.getId()).size())
-                                .build();
+                                                .findByTopikIdOrderByCreatedAtAsc(t.getId()).size());
+
+                if (t.getCreator() != null) {
+                        builder.creatorUserId(t.getCreator().getId());
+                }
+
+                if (t.getGuruMapel() != null) {
+                        builder.guruMapelId(t.getGuruMapel().getId())
+                               .namaGuru(t.getGuruMapel().getGuru().getNamaLengkap())
+                               .namaGuruEmail(t.getGuruMapel().getGuru().getUser().getEmail())
+                               .namaMapel(t.getGuruMapel().getMapel().getNamaMapel())
+                               .namaKelas(t.getGuruMapel().getKelas() != null
+                                                ? t.getGuruMapel().getKelas().getNamaKelas()
+                                                : "-");
+                } else if (t.getCreator() != null) {
+                        builder.namaGuru(t.getCreator().getNamaLengkap())
+                               .namaGuruEmail(t.getCreator().getEmail())
+                               .namaMapel("Forum Khusus Guru & TU")
+                               .namaKelas("-");
+                } else {
+                        builder.namaGuru("Sistem")
+                               .namaGuruEmail("admin@baknus.sch.id")
+                               .namaMapel("Forum Khusus Guru & TU")
+                               .namaKelas("-");
+                }
+
+                return builder.build();
         }
 
         private ForumKomentarDTO mapKomentarToDTO(ForumKomentar k) {

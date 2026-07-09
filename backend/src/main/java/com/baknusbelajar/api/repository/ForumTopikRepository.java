@@ -11,4 +11,6 @@ public interface ForumTopikRepository extends JpaRepository<ForumTopik, Long> {
     List<ForumTopik> findByGuruMapelIdOrderByPinnedDescCreatedAtDesc(Long guruMapelId);
 
     List<ForumTopik> findByGuruMapel_Kelas_IdOrderByPinnedDescCreatedAtDesc(Long kelasId);
+
+    List<ForumTopik> findByIsGuruOnlyTrueOrderByPinnedDescCreatedAtDesc();
 }
