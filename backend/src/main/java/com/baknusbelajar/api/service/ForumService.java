@@ -28,6 +28,7 @@ public class ForumService {
         private final ForumKomentarRepository forumKomentarRepository;
         private final GuruMapelRepository guruMapelRepository;
         private final UserRepository userRepository;
+        private final com.baknusbelajar.api.repository.GuruRepository guruRepository;
         private final SimpMessagingTemplate messagingTemplate;
         private final GeminiService geminiService;
         private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -74,9 +75,10 @@ public class ForumService {
 
                 if (Boolean.TRUE.equals(dto.getIsGuruOnly())) {
                         if (creator != null) {
-                                String role = creator.getRole().name();
+                                String role = creator.getRole();
                                 if ("GURU".equals(role)) {
-                                        if (creator.getGuru() == null || creator.getGuru().getIsCoAdmin() == null || creator.getGuru().getIsCoAdmin() == 0) {
+                                        com.baknusbelajar.api.entity.Guru guru = guruRepository.findByUserId(creator.getId()).orElse(null);
+                                        if (guru == null || guru.getIsCoAdmin() == null || guru.getIsCoAdmin() == 0) {
                                                 throw new RuntimeException("Akses Ditolak: Hanya Co-Admin yang dapat membuat diskusi internal Guru.");
                                         }
                                 } else if ("SISWA".equals(role)) {
