@@ -431,7 +431,10 @@ const ForumDiscussion = () => {
                         </>
                     )}
                 </div>
-                {(user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU') && view === 'topics' && (
+                {view === 'topics' && (
+                    (forumTab === 'class' && (user.role === 'GURU' || user.role === 'ADMIN' || user.role === 'TU')) ||
+                    (forumTab === 'guru' && (user.role === 'ADMIN' || user.role === 'TU' || user.isCoAdmin))
+                ) && (
                     <button className="create-topic-btn" onClick={() => setShowCreateModal(true)}>
                         <Plus size={20} />
                         <span>Buat Topik Baru</span>
