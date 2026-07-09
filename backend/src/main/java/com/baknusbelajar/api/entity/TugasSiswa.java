@@ -42,4 +42,14 @@ public class TugasSiswa {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bab_id")
     private Bab bab;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tugas_guru_id")
+    private TugasGuru tugasGuru;
+
+    @Column(name = "nilai")
+    private Integer nilai;
+
+    @Column(name = "catatan_guru", columnDefinition = "TEXT")
+    private String catatanGuru;
 }

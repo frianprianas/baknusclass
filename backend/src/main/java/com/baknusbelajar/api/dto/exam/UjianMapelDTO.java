@@ -22,4 +22,7 @@ public class UjianMapelDTO {
     private Double nilaiAkhir; // Hanya untuk SISWA jika dipublikasikan
     private java.util.List<Long> kelasIds;
     private String namaKelas; // Comma separated list of kelas names
+    
+    private String jenisUjian;
+    private Long pembuatGuruId;
 }

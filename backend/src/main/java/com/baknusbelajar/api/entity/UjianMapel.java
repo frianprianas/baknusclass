@@ -20,8 +20,9 @@ public class UjianMapel {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "event_id", nullable = false)
+    @JoinColumn(name = "event_id")
     private EventUjian eventUjian;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mapel_id")
@@ -30,6 +31,16 @@ public class UjianMapel {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guru_id")
     private Guru guru;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "jenis_ujian", nullable = false)
+    @Builder.Default
+    private JenisUjian jenisUjian = JenisUjian.UJIAN_UTAMA;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pembuat_guru_id")
+    private Guru pembuatGuru;
+
 
     @Column(name = "waktu_mulai", nullable = false)
     private LocalDateTime waktuMulai;

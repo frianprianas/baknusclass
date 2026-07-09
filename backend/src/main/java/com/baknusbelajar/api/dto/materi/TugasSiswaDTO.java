@@ -20,4 +20,6 @@ public class TugasSiswaDTO {
     private LocalDateTime submittedAt;
     private Long babId;
     private String babName;
+    private Integer nilai;
+    private String catatanGuru;
 }

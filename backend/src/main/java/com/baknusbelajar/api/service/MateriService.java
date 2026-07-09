@@ -249,6 +249,8 @@ public class MateriService {
                 .submittedAt(t.getSubmittedAt())
                 .babId(t.getBab() != null ? t.getBab().getId() : null)
                 .babName(t.getBab() != null ? t.getBab().getNamaBab() : "Lainnya")
+                .nilai(t.getNilai())
+                .catatanGuru(t.getCatatanGuru())
                 .build();
     }
 

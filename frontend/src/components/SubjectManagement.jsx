@@ -58,8 +58,48 @@ const SubjectManagement = () => {
     const [attendance, setAttendance] = useState({}); // { babId: [attendances] }
     const [isSyncing, setIsSyncing] = useState({}); // { babId: boolean }
 
+    // LMS Tabs & Penilaian & Kuis
+    const [activeTab, setActiveTab] = useState('materi');
+    const [tugasList, setTugasList] = useState([]);
+    const [showTugasModal, setShowTugasModal] = useState(false);
+    const [tugasForm, setTugasForm] = useState({
+        judulTugas: '',
+        deskripsi: '',
+        batasWaktu: ''
+    });
+    
+    const [showGradeModal, setShowGradeModal] = useState(false);
+    const [selectedStudentTask, setSelectedStudentTask] = useState(null);
+    const [gradeForm, setGradeForm] = useState({
+        nilai: '',
+        catatanGuru: ''
+    });
+
+    const [ulanganList, setUlanganList] = useState([]);
+    const [showUlanganModal, setShowUlanganModal] = useState(false);
+    const [ulanganForm, setUlanganForm] = useState({
+        id: null,
+        waktuMulai: '',
+        waktuSelesai: '',
+        durasi: 60,
+        tampilkanNilai: false,
+        token: ''
+    });
+
+    const [selectedQuiz, setSelectedQuiz] = useState(null);
+    const [showQuestionsModal, setShowQuestionsModal] = useState(false);
+    const [quizQuestions, setQuizQuestions] = useState({ pg: [], essay: [] });
+    const [newQuestionType, setNewQuestionType] = useState('pg');
+    const [newQuestionForm, setNewQuestionForm] = useState({
+        pertanyaan: '',
+        bobot: 10,
+        pilA: '', pilB: '', pilC: '', pilD: '',
+        kunciPG: 'A'
+    });
+
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
+
 
     useEffect(() => {
         fetchAssignments();
@@ -171,7 +211,177 @@ const SubjectManagement = () => {
         fetchMaterials(assignment.id);
         fetchBabs(assignment.id);
         fetchStudentTasks(assignment.namaMapel);
+        fetchTugasHarian(assignment.id);
+        fetchUlanganHarian(assignment);
     };
+
+    const fetchTugasHarian = async (guruMapelId) => {
+        try {
+            const res = await axios.get(`/api/guru/tugas/mapel/${guruMapelId}`, { headers });
+            setTugasList(res.data);
+        } catch (err) {
+            console.error('Failed to fetch tugas harian:', err);
+        }
+    };
+
+    const fetchUlanganHarian = async (assignment) => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const guruId = user.profileId;
+            if (!guruId) return;
+            const res = await axios.get(`/api/exam/ujian-mapel/guru/${guruId}`, { headers });
+            const filtered = res.data.filter(u => 
+                (u.jenisUjian === 'ULANGAN_HARIAN' || !u.eventId) && 
+                u.mapelId === assignment.mapelId
+            );
+            setUlanganList(filtered);
+        } catch (err) {
+            console.error('Failed to fetch ulangan harian:', err);
+        }
+    };
+
+    const handleSaveTugas = async (e) => {
+        e.preventDefault();
+        try {
+            const payload = {
+                guruMapelId: selectedAssignment.id,
+                judulTugas: tugasForm.judulTugas,
+                deskripsi: tugasForm.deskripsi,
+                batasWaktu: tugasForm.batasWaktu ? new Date(tugasForm.batasWaktu).toISOString() : null
+            };
+            await axios.post('/api/guru/tugas', payload, { headers });
+            setShowTugasModal(false);
+            setTugasForm({ judulTugas: '', deskripsi: '', batasWaktu: '' });
+            fetchTugasHarian(selectedAssignment.id);
+            alert('Tugas berhasil dibuat!');
+        } catch (err) {
+            alert('Gagal membuat tugas');
+        }
+    };
+
+    const handleGradeTugas = async (e) => {
+        e.preventDefault();
+        try {
+            const payload = {
+                tugasSiswaId: selectedStudentTask.id,
+                nilai: parseInt(gradeForm.nilai),
+                catatanGuru: gradeForm.catatanGuru
+            };
+            await axios.post('/api/guru/tugas/grade', payload, { headers });
+            setShowGradeModal(false);
+            setSelectedStudentTask(null);
+            setGradeForm({ nilai: '', catatanGuru: '' });
+            fetchStudentTasks(selectedAssignment.namaMapel);
+            alert('Nilai berhasil disimpan!');
+        } catch (err) {
+            alert('Gagal memproses nilai');
+        }
+    };
+
+    const handleSaveUlangan = async (e) => {
+        e.preventDefault();
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const payload = {
+                id: ulanganForm.id,
+                eventId: null,
+                mapelId: selectedAssignment.mapelId,
+                guruId: user.profileId,
+                waktuMulai: new Date(ulanganForm.waktuMulai).toISOString(),
+                waktuSelesai: new Date(ulanganForm.waktuSelesai).toISOString(),
+                durasi: parseInt(ulanganForm.durasi),
+                tampilkanNilai: ulanganForm.tampilkanNilai,
+                token: ulanganForm.token || undefined,
+                kelasIds: [selectedAssignment.kelasId],
+                jenisUjian: 'ULANGAN_HARIAN',
+                pembuatGuruId: user.profileId
+            };
+            
+            if (ulanganForm.id) {
+                await axios.put(`/api/exam/ujian-mapel/${ulanganForm.id}`, payload, { headers });
+            } else {
+                await axios.post('/api/exam/ujian-mapel', payload, { headers });
+            }
+            
+            setShowUlanganModal(false);
+            setUlanganForm({ id: null, waktuMulai: '', waktuSelesai: '', durasi: 60, tampilkanNilai: false, token: '' });
+            fetchUlanganHarian(selectedAssignment);
+            alert('Ulangan Harian berhasil disimpan!');
+        } catch (err) {
+            alert('Gagal menyimpan ulangan harian: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const handleDeleteUlangan = async (id) => {
+        if (!window.confirm('Yakin ingin menghapus ulangan harian ini?')) return;
+        try {
+            await axios.delete(`/api/exam/ujian-mapel/${id}`, { headers });
+            fetchUlanganHarian(selectedAssignment);
+            alert('Ulangan Harian berhasil dihapus!');
+        } catch (err) {
+            alert('Gagal menghapus ulangan harian');
+        }
+    };
+
+    const fetchQuizQuestions = async (quizId) => {
+        try {
+            const [resEssay, resPG] = await Promise.all([
+                axios.get(`/api/exam/soal-essay/ujian/${quizId}`, { headers }),
+                axios.get(`/api/exam/soal-pg/ujian/${quizId}`, { headers })
+            ]);
+            setQuizQuestions({ essay: resEssay.data, pg: resPG.data });
+        } catch (err) {
+            console.error('Failed to fetch quiz questions:', err);
+        }
+    };
+    
+    const handleOpenQuestions = (quiz) => {
+        setSelectedQuiz(quiz);
+        fetchQuizQuestions(quiz.id);
+        setShowQuestionsModal(true);
+    };
+
+    const handleAddQuestion = async (e) => {
+        e.preventDefault();
+        try {
+            if (newQuestionType === 'essay') {
+                const payload = {
+                    ujianMapelId: selectedQuiz.id,
+                    pertanyaan: newQuestionForm.pertanyaan,
+                    bobotNilai: parseFloat(newQuestionForm.bobot)
+                };
+                await axios.post('/api/exam/soal-essay', payload, { headers });
+            } else {
+                const payload = {
+                    ujianMapelId: selectedQuiz.id,
+                    pertanyaan: newQuestionForm.pertanyaan,
+                    opsiA: newQuestionForm.pilA,
+                    opsiB: newQuestionForm.pilB,
+                    opsiC: newQuestionForm.pilC,
+                    opsiD: newQuestionForm.pilD,
+                    kunciJawaban: newQuestionForm.kunciPG
+                };
+                await axios.post('/api/exam/soal-pg', payload, { headers });
+            }
+            alert('Soal berhasil ditambahkan!');
+            setNewQuestionForm({ pertanyaan: '', bobot: 10, pilA: '', pilB: '', pilC: '', pilD: '', kunciPG: 'A' });
+            fetchQuizQuestions(selectedQuiz.id);
+        } catch (err) {
+            alert('Gagal menambahkan soal');
+        }
+    };
+
+    const handleDeleteQuestion = async (id, type) => {
+        if (!window.confirm('Yakin ingin menghapus soal ini?')) return;
+        try {
+            const endpoint = type === 'essay' ? `/api/exam/soal-essay/${id}` : `/api/exam/soal-pg/${id}`;
+            await axios.delete(endpoint, { headers });
+            fetchQuizQuestions(selectedQuiz.id);
+        } catch (err) {
+            alert('Gagal menghapus soal');
+        }
+    };
+
 
     const handleSaveBab = async (e) => {
         e.preventDefault();
@@ -318,13 +528,61 @@ const SubjectManagement = () => {
                                     <h2>{selectedAssignment.namaMapel}</h2>
                                     <p>Kelas: {selectedAssignment.namaKelas}</p>
                                 </div>
-                                <button className="btn-upload-toggle" onClick={() => document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' })}>
-                                    <Plus size={18} />
-                                    <span>Unggah Baru</span>
+                                {activeTab === 'materi' && (
+                                    <button className="btn-upload-toggle" onClick={() => document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' })}>
+                                        <Plus size={18} />
+                                        <span>Unggah Baru</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Tab Navigation */}
+                            <div className="tab-navigation" style={{ display: 'flex', gap: '15px', borderBottom: '2px solid #e2e8f0', marginBottom: '25px', paddingBottom: '10px' }}>
+                                <button 
+                                    type="button"
+                                    className={`tab-btn ${activeTab === 'materi' ? 'active' : ''}`} 
+                                    onClick={() => setActiveTab('materi')}
+                                    style={{
+                                        background: 'none', border: 'none', padding: '10px 15px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer',
+                                        color: activeTab === 'materi' ? '#3b82f6' : '#64748b',
+                                        borderBottom: activeTab === 'materi' ? '3px solid #3b82f6' : 'none',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    Materi & KBM
+                                </button>
+                                <button 
+                                    type="button"
+                                    className={`tab-btn ${activeTab === 'tugas' ? 'active' : ''}`} 
+                                    onClick={() => setActiveTab('tugas')}
+                                    style={{
+                                        background: 'none', border: 'none', padding: '10px 15px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer',
+                                        color: activeTab === 'tugas' ? '#3b82f6' : '#64748b',
+                                        borderBottom: activeTab === 'tugas' ? '3px solid #3b82f6' : 'none',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    Tugas & Penilaian
+                                </button>
+                                <button 
+                                    type="button"
+                                    className={`tab-btn ${activeTab === 'ulangan' ? 'active' : ''}`} 
+                                    onClick={() => setActiveTab('ulangan')}
+                                    style={{
+                                        background: 'none', border: 'none', padding: '10px 15px', fontSize: '1rem', fontWeight: '700', cursor: 'pointer',
+                                        color: activeTab === 'ulangan' ? '#3b82f6' : '#64748b',
+                                        borderBottom: activeTab === 'ulangan' ? '3px solid #3b82f6' : 'none',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    Ulangan Harian
                                 </button>
                             </div>
 
-                            <div className="materials-list">
+                            {activeTab === 'materi' && (
+                                <>
+                                    <div className="materials-list">
+
                                 <div className="section-header-bab">
                                     <h3>Struktur Materi & Bab</h3>
                                     <button className="btn-manage-bab" onClick={() => {
@@ -732,10 +990,225 @@ const SubjectManagement = () => {
                                             </>
                                         )}
                                     </button>
-                                </form>
-                            </div>
+                                        </form>
+                                    </div>
+                                </>
+                            )}
+
+                            {activeTab === 'tugas' && (
+                                <div className="tugas-tab-content">
+                                    <div className="section-header-bab" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                        <h3>Daftar Tugas Harian (Guru)</h3>
+                                        <button className="btn-manage-bab" onClick={() => setShowTugasModal(true)}>
+                                            <Plus size={16} />
+                                            <span>Buat Tugas Baru</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="tugas-guru-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+                                        {tugasList.map((tg) => (
+                                            <div key={tg.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px' }}>
+                                                <h4 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: '#1e293b' }}>{tg.judulTugas}</h4>
+                                                <p style={{ margin: '0 0 12px 0', color: '#64748b', fontSize: '0.9rem' }}>{tg.deskripsi}</p>
+                                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Clock size={12} />
+                                                    <span>Batas: {tg.batasWaktu ? new Date(tg.batasWaktu).toLocaleString('id-ID') : 'Tidak ada'}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {tugasList.length === 0 && (
+                                            <p className="no-materi-bab" style={{ gridColumn: '1/-1' }}>Belum ada tugas guru yang dibuat.</p>
+                                        )}
+                                    </div>
+
+                                    <div className="student-tasks-section">
+                                        <div className="section-header">
+                                            <div className="header-title">
+                                                <div className="icon-pill primary">
+                                                    <Upload size={20} />
+                                                </div>
+                                                <h3>Pengumpulan & Penilaian Tugas Siswa</h3>
+                                            </div>
+                                            <div className="view-stats">
+                                                <span>Total {studentTasks.length} Pengiriman</span>
+                                            </div>
+                                        </div>
+
+                                        {studentTasks.length === 0 ? (
+                                            <div className="empty-history">
+                                                <div className="empty-icon-wrapper blue">
+                                                    <FileText size={40} />
+                                                </div>
+                                                <p>Belum ada siswa yang mengumpulkan tugas.</p>
+                                                <span>Daftar pengumpulan tugas akan muncul di sini setelah siswa mengunggah file.</span>
+                                            </div>
+                                        ) : (
+                                            <div className="tasks-grid">
+                                                {studentTasks.map((task, idx) => (
+                                                    <div key={idx} className="task-card-premium" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                                        <div>
+                                                            <div className="card-top">
+                                                                <div className={`student-avatar color-${idx % 5}`}>
+                                                                    {task.studentName.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <div className="student-info">
+                                                                    <span className="student-name">{task.studentName}</span>
+                                                                    <span className="student-email">{task.studentEmail}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="file-info-box" style={{ margin: '15px 0' }}>
+                                                                <div className="file-icon-mini">
+                                                                    <FileText size={16} />
+                                                                </div>
+                                                                <div className="file-meta">
+                                                                    <span className="file-name" title={task.fileName}>{task.fileName}</span>
+                                                                    <span className="submitted-at">
+                                                                        {new Date(task.submittedAt).toLocaleString('id-ID', {
+                                                                            day: '2-digit',
+                                                                            month: 'short',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit'
+                                                                        })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {task.nilai !== null && task.nilai !== undefined && (
+                                                                <div className="score-box" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px', borderRadius: '12px', marginBottom: '15px' }}>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                        <span style={{ color: '#166534', fontWeight: '700', fontSize: '0.9rem' }}>Nilai Tugas</span>
+                                                                        <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '800' }}>{task.nilai}</span>
+                                                                    </div>
+                                                                    {task.catatanGuru && (
+                                                                        <p style={{ margin: '8px 0 0 0', color: '#4b5563', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                                                                            "{task.catatanGuru}"
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                                            <a
+                                                                href={task.driveLink}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="btn-review-task"
+                                                                style={{ flex: 1, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                            >
+                                                                <ExternalLink size={14} className="mr-1" />
+                                                                <span>Buka File</span>
+                                                            </a>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedStudentTask(task);
+                                                                    setGradeForm({
+                                                                        nilai: task.nilai !== null ? task.nilai.toString() : '',
+                                                                        catatanGuru: task.catatanGuru || ''
+                                                                    });
+                                                                    setShowGradeModal(true);
+                                                                }}
+                                                                className="btn-save"
+                                                                style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '700', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#3b82f6', color: 'white', cursor: 'pointer' }}
+                                                            >
+                                                                <Check size={14} />
+                                                                <span>{task.nilai !== null ? 'Ubah Nilai' : 'Beri Nilai'}</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'ulangan' && (
+                                <div className="ulangan-tab-content">
+                                    <div className="section-header-bab" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                        <h3>Daftar Ulangan Harian (Kuis)</h3>
+                                        <button className="btn-manage-bab" onClick={() => {
+                                            setUlanganForm({ id: null, waktuMulai: '', waktuSelesai: '', durasi: 60, tampilkanNilai: false, token: '' });
+                                            setShowUlanganModal(true);
+                                        }}>
+                                            <Plus size={16} />
+                                            <span>Buat Ulangan Baru</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="ulangan-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                                        {ulanganList.map((ul) => (
+                                            <div key={ul.id} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                                        <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700' }}>
+                                                            TOKEN: {ul.token || 'N/A'}
+                                                        </span>
+                                                        <span style={{ fontSize: '0.8rem', color: ul.tampilkanNilai ? '#166534' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Eye size={12} />
+                                                            {ul.tampilkanNilai ? 'Nilai Rilis' : 'Nilai Privat'}
+                                                        </span>
+                                                    </div>
+                                                    <h4 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '1.1rem' }}>Ulangan Harian {selectedAssignment.namaMapel}</h4>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.85rem', color: '#475569', marginBottom: '15px' }}>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Clock size={14} className="text-slate-400" />
+                                                            Durasi: {ul.durasi} Menit
+                                                        </span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Clock size={14} className="text-slate-400" />
+                                                            Mulai: {new Date(ul.waktuMulai).toLocaleString('id-ID')}
+                                                        </span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Clock size={14} className="text-slate-400" />
+                                                            Selesai: {new Date(ul.waktuSelesai).toLocaleString('id-ID')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '15px' }}>
+                                                    <button 
+                                                        onClick={() => handleOpenQuestions(ul)}
+                                                        className="btn-edit-bab" 
+                                                        style={{ flex: 1, padding: '8px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.8rem' }}
+                                                    >
+                                                        <FileText size={14} />
+                                                        Soal
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setUlanganForm({
+                                                                id: ul.id,
+                                                                waktuMulai: ul.waktuMulai ? ul.waktuMulai.substring(0, 16) : '',
+                                                                waktuSelesai: ul.waktuSelesai ? ul.waktuSelesai.substring(0, 16) : '',
+                                                                durasi: ul.durasi,
+                                                                tampilkanNilai: ul.tampilkanNilai,
+                                                                token: ul.token
+                                                            });
+                                                            setShowUlanganModal(true);
+                                                        }}
+                                                        className="btn-edit-bab" 
+                                                        style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem' }}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteUlangan(ul.id)}
+                                                        className="btn-delete-bab" 
+                                                        style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem' }}
+                                                    >
+                                                        Hapus
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {ulanganList.length === 0 && (
+                                            <p className="no-materi-bab" style={{ gridColumn: '1/-1' }}>Belum ada ulangan harian yang dibuat.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
+
                 </div>
             </div>
 
@@ -818,6 +1291,302 @@ const SubjectManagement = () => {
                     </div>
                 </div>
             )}
+
+            {/* Tugas Management Modal */}
+            {showTugasModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content-bab">
+                        <div className="modal-header">
+                            <h2>Buat Tugas Baru</h2>
+                            <button className="btn-close" onClick={() => setShowTugasModal(false)}><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleSaveTugas}>
+                            <div className="form-group-bab">
+                                <label>Judul Tugas</label>
+                                <input
+                                    type="text"
+                                    placeholder="Contoh: Tugas Mandiri Pertemuan 1"
+                                    value={tForm => tugasForm.judulTugas}
+                                    onChange={(e) => setTugasForm({ ...tugasForm, judulTugas: e.target.value })}
+                                    required
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
+                                <label>Deskripsi Tugas</label>
+                                <textarea
+                                    placeholder="Jelaskan petunjuk pengerjaan tugas..."
+                                    value={tForm => tugasForm.deskripsi}
+                                    onChange={(e) => setTugasForm({ ...tugasForm, deskripsi: e.target.value })}
+                                    rows="4"
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
+                                <label>Batas Waktu (Deadline)</label>
+                                <input
+                                    type="datetime-local"
+                                    value={tForm => tugasForm.batasWaktu}
+                                    onChange={(e) => setTugasForm({ ...tugasForm, batasWaktu: e.target.value })}
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn-cancel" onClick={() => setShowTugasModal(false)}>Batal</button>
+                                <button type="submit" className="btn-save">Simpan Tugas</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Grade Modal */}
+            {showGradeModal && selectedStudentTask && (
+                <div className="modal-overlay">
+                    <div className="modal-content-bab">
+                        <div className="modal-header">
+                            <h2>Penilaian Tugas - {selectedStudentTask.studentName}</h2>
+                            <button className="btn-close" onClick={() => { setShowGradeModal(false); setSelectedStudentTask(null); }}><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleGradeTugas}>
+                            <div className="form-group-bab">
+                                <label>Nilai (0-100)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    placeholder="Masukkan nilai"
+                                    value={gradeForm.nilai}
+                                    onChange={(e) => setGradeForm({ ...gradeForm, nilai: e.target.value })}
+                                    required
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
+                                <label>Catatan Guru (Feedback)</label>
+                                <textarea
+                                    placeholder="Tulis masukan untuk siswa..."
+                                    value={gradeForm.catatanGuru}
+                                    onChange={(e) => setGradeForm({ ...gradeForm, catatanGuru: e.target.value })}
+                                    rows="4"
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn-cancel" onClick={() => { setShowGradeModal(false); setSelectedStudentTask(null); }}>Batal</button>
+                                <button type="submit" className="btn-save">Simpan Nilai</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Ulangan Management Modal */}
+            {showUlanganModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content-bab">
+                        <div className="modal-header">
+                            <h2>{ulanganForm.id ? 'Edit Ulangan Harian' : 'Buat Ulangan Harian Baru'}</h2>
+                            <button className="btn-close" onClick={() => setShowUlanganModal(false)}><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleSaveUlangan}>
+                            <div className="form-group-bab">
+                                <label>Waktu Mulai</label>
+                                <input
+                                    type="datetime-local"
+                                    value={ulanganForm.waktuMulai}
+                                    onChange={(e) => setUlanganForm({ ...ulanganForm, waktuMulai: e.target.value })}
+                                    required
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
+                                <label>Waktu Selesai</label>
+                                <input
+                                    type="datetime-local"
+                                    value={ulanganForm.waktuSelesai}
+                                    onChange={(e) => setUlanganForm({ ...ulanganForm, waktuSelesai: e.target.value })}
+                                    required
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
+                                <label>Durasi (Menit)</label>
+                                <input
+                                    type="number"
+                                    value={ulanganForm.durasi}
+                                    onChange={(e) => setUlanganForm({ ...ulanganForm, durasi: e.target.value })}
+                                    required
+                                    min="1"
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px' }}>
+                                <label>Token Ujian (Maksimal 6 karakter)</label>
+                                <input
+                                    type="text"
+                                    value={ulanganForm.token}
+                                    onChange={(e) => setUlanganForm({ ...ulanganForm, token: e.target.value })}
+                                    maxLength="6"
+                                    placeholder="Contoh: BIO123 (Jika kosong, digenerate otomatis)"
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '2px solid #e2e8f0' }}
+                                />
+                            </div>
+                            <div className="form-group-bab" style={{ marginTop: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="tampilkanNilai"
+                                    checked={ulanganForm.tampilkanNilai}
+                                    onChange={(e) => setUlanganForm({ ...ulanganForm, tampilkanNilai: e.target.checked })}
+                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                <label htmlFor="tampilkanNilai" style={{ margin: 0, cursor: 'pointer', fontWeight: '600' }}>Tampilkan Nilai ke Siswa Setelah Selesai</label>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn-cancel" onClick={() => setShowUlanganModal(false)}>Batal</button>
+                                <button type="submit" className="btn-save">Simpan Ulangan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Questions Management Modal */}
+            {showQuestionsModal && selectedQuiz && (
+                <div className="modal-overlay">
+                    <div className="modal-content-bab" style={{ maxWidth: '800px', width: '90%' }}>
+                        <div className="modal-header">
+                            <h2>Kelola Soal - Ulangan Harian</h2>
+                            <button className="btn-close" onClick={() => { setShowQuestionsModal(false); setSelectedQuiz(null); }}><X size={20} /></button>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>
+                            {/* Left Column: Question List */}
+                            <div>
+                                <h3 style={{ fontSize: '1.1rem', marginBottom: '15px' }}>Daftar Soal</h3>
+                                
+                                <div style={{ marginBottom: '15px' }}>
+                                    <h4 style={{ fontSize: '0.9rem', color: '#64748b' }}>Pilihan Ganda ({quizQuestions.pg.length})</h4>
+                                    {quizQuestions.pg.map((q, idx) => (
+                                        <div key={q.id} style={{ padding: '10px', background: '#f8fafc', borderRadius: '10px', margin: '5px 0', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div>
+                                                <strong>{idx + 1}. {q.pertanyaan}</strong>
+                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                                                    Kunci: {q.kunciJawaban}
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleDeleteQuestion(q.id, 'pg')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div>
+                                    <h4 style={{ fontSize: '0.9rem', color: '#64748b' }}>Essay ({quizQuestions.essay.length})</h4>
+                                    {quizQuestions.essay.map((q, idx) => (
+                                        <div key={q.id} style={{ padding: '10px', background: '#f8fafc', borderRadius: '10px', margin: '5px 0', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div>
+                                                <strong>{idx + 1}. {q.pertanyaan}</strong>
+                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                                                    Bobot: {q.bobotNilai}
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleDeleteQuestion(q.id, 'essay')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right Column: Add Question Form */}
+                            <div style={{ borderLeft: '1px solid #e2e8f0', paddingLeft: '20px' }}>
+                                <h3 style={{ fontSize: '1.1rem', marginBottom: '15px' }}>Tambah Soal Baru</h3>
+                                
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setNewQuestionType('pg')}
+                                        style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', background: newQuestionType === 'pg' ? '#eff6ff' : 'white', color: newQuestionType === 'pg' ? '#1d4ed8' : '#475569', fontWeight: '700', cursor: 'pointer' }}
+                                    >
+                                        Pilihan Ganda
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setNewQuestionType('essay')}
+                                        style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', background: newQuestionType === 'essay' ? '#eff6ff' : 'white', color: newQuestionType === 'essay' ? '#1d4ed8' : '#475569', fontWeight: '700', cursor: 'pointer' }}
+                                    >
+                                        Essay
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleAddQuestion}>
+                                    <div className="form-group-bab">
+                                        <label>Pertanyaan</label>
+                                        <textarea
+                                            value={newQuestionForm.pertanyaan}
+                                            onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pertanyaan: e.target.value })}
+                                            required
+                                            rows="3"
+                                            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                                        />
+                                    </div>
+
+                                    {newQuestionType === 'essay' ? (
+                                        <div className="form-group-bab" style={{ marginTop: '10px' }}>
+                                            <label>Bobot Nilai</label>
+                                            <input
+                                                type="number"
+                                                value={newQuestionForm.bobot}
+                                                onChange={(e) => setNewQuestionForm({ ...newQuestionForm, bobot: parseFloat(e.target.value) })}
+                                                required
+                                                min="1"
+                                                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                                                <div>
+                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan A</label>
+                                                    <input type="text" value={newQuestionForm.pilA} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilA: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan B</label>
+                                                    <input type="text" value={newQuestionForm.pilB} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilB: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan C</label>
+                                                    <input type="text" value={newQuestionForm.pilC} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilC: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan D</label>
+                                                    <input type="text" value={newQuestionForm.pilD} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilD: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                                                </div>
+                                            </div>
+                                            <div className="form-group-bab" style={{ marginTop: '10px' }}>
+                                                <label>Kunci Jawaban</label>
+                                                <select value={newQuestionForm.kunciPG} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, kunciPG: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                                                    <option value="A">A</option>
+                                                    <option value="B">B</option>
+                                                    <option value="C">C</option>
+                                                    <option value="D">D</option>
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <button type="submit" className="btn-save" style={{ width: '100%', marginTop: '15px', padding: '10px', border: 'none', borderRadius: '10px', background: '#2563eb', color: 'white', fontWeight: '700', cursor: 'pointer' }}>
+                                        Tambah Soal
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             <style>{`
                 .subject-mgmt { padding: 0; }

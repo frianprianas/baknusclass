@@ -164,8 +164,12 @@ public class UjianMapelService {
     }
 
     public UjianMapelDTO createUjianMapel(UjianMapelDTO dto) {
-        EventUjian event = eventUjianRepository.findById(dto.getEventId())
-                .orElseThrow(() -> new RuntimeException("Event Ujian not found"));
+        EventUjian event = null;
+        if (dto.getEventId() != null) {
+            event = eventUjianRepository.findById(dto.getEventId())
+                    .orElseThrow(() -> new RuntimeException("Event Ujian not found"));
+        }
+
         com.baknusbelajar.api.entity.Mapel mapel = mapelRepository.findById(dto.getMapelId())
                 .orElseThrow(() -> new RuntimeException("Mapel not found"));
         com.baknusbelajar.api.entity.Guru guru = guruRepository.findById(dto.getGuruId())
@@ -174,6 +178,20 @@ public class UjianMapelService {
         UjianMapel entity = new UjianMapel();
         entity.setKelasList(new java.util.HashSet<>());
         entity.setEventUjian(event);
+        
+        if (dto.getJenisUjian() != null) {
+            try {
+                entity.setJenisUjian(com.baknusbelajar.api.entity.JenisUjian.valueOf(dto.getJenisUjian()));
+            } catch (Exception e) {
+                entity.setJenisUjian(com.baknusbelajar.api.entity.JenisUjian.UJIAN_UTAMA);
+            }
+        }
+        
+        if (dto.getPembuatGuruId() != null) {
+            com.baknusbelajar.api.entity.Guru pembuat = guruRepository.findById(dto.getPembuatGuruId()).orElse(null);
+            entity.setPembuatGuru(pembuat);
+        }
+
         entity.setMapel(mapel);
         entity.setGuru(guru);
         entity.setWaktuMulai(dto.getWaktuMulai());
@@ -196,8 +214,10 @@ public class UjianMapelService {
 
         // Notify BaknusDrive to create subject folder
         try {
-            if (event.getNamaEvent() != null && mapel != null) {
+            if (event != null && event.getNamaEvent() != null && mapel != null) {
                 baknusDriveService.createSubjectFolder(event.getNamaEvent(), mapel.getNamaMapel());
+            } else if (mapel != null && entity.getJenisUjian() == com.baknusbelajar.api.entity.JenisUjian.ULANGAN_HARIAN) {
+                baknusDriveService.createSubjectFolder("Ulangan Harian", mapel.getNamaMapel());
             }
         } catch (Exception e) {
             log.error("Failed to trigger subject folder creation in BaknusDrive: {}", e.getMessage());
@@ -317,6 +337,14 @@ public class UjianMapelService {
             dto.setGuruId(entity.getGuru().getId());
             dto.setNamaGuru(entity.getGuru().getNamaLengkap());
         }
+        
+        if (entity.getJenisUjian() != null) {
+            dto.setJenisUjian(entity.getJenisUjian().name());
+        }
+        if (entity.getPembuatGuru() != null) {
+            dto.setPembuatGuruId(entity.getPembuatGuru().getId());
+        }
+
         
         if (entity.getKelasList() != null && !entity.getKelasList().isEmpty()) {
             dto.setKelasIds(entity.getKelasList().stream().map(com.baknusbelajar.api.entity.Kelas::getId).collect(Collectors.toList()));
