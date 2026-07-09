@@ -355,7 +355,7 @@ const UserManagement = () => {
                                                 >
                                                     {(user.active || user.isActive) ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
                                                 </button>
-                                                {user.role === 'GURU' && JSON.parse(localStorage.getItem('user') || '{}').role === 'ADMIN' && (
+                                                 {user.role === 'GURU' && JSON.parse(localStorage.getItem('user') || '{}').role?.toUpperCase() === 'ADMIN' && (
                                                     <button
                                                         style={{
                                                             backgroundColor: user.isCoAdmin ? '#d97706' : '#64748b',
