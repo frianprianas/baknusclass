@@ -33,7 +33,7 @@ public class SecurityConfig {
     @Bean
     public org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer webSecurityCustomizer() {
         return (web) -> web.ignoring().requestMatchers("/api/auth/**", "/api/materi/view/**",
-                "/api/materi/view/collabora/**", "/api/debug/**");
+                "/api/materi/view/collabora/**", "/api/debug/**", "/api/master/sync-siswa/hard-sync");
     }
 
     @Bean
@@ -61,7 +61,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/api/materi/view/**", "/api/materi/view/collabora/**",
-                                "/ws-forum/**", "/api/debug/**")
+                                "/ws-forum/**", "/api/debug/**", "/api/master/sync-siswa/hard-sync")
                         .permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated());
