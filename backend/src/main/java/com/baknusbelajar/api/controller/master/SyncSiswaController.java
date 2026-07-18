@@ -303,29 +303,39 @@ public class SyncSiswaController {
                 String nama = parts[2].trim();
                 String kelasStr = parts[3].trim();
                 String email = parts[4].trim();
-                String pass = parts[5].trim();
+                
+                // Ganti RPL jadi PPLG jika ada
+                String kelasStrNormalized = kelasStr.replaceAll("(?i)\\bRPL\\b", "PPLG");
                 
                 // 1. Resolve Kelas
-                Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(kelasStr).orElse(null);
+                Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(kelasStrNormalized).orElse(null);
                 if (kelas == null) {
-                    String tingkat = kelasStr.split(" ")[0]; // "XI"
-                    String jurusanStr = kelasStr.substring(tingkat.length()).trim(); // "AKT", "Animasi", etc.
+                    String tingkat = kelasStrNormalized.split(" ")[0]; // "XII"
+                    String jurusanStr = kelasStrNormalized.substring(tingkat.length()).trim(); // "PPLG 1" or "PPLG"
+                    
+                    // Ekstrak nama prodi tanpa nomor
+                    String prodiName = jurusanStr.replaceAll("\\s+\\d+$", "").trim();
+                    if (prodiName.equalsIgnoreCase("RPL")) {
+                        prodiName = "PPLG";
+                    }
+                    
+                    final String targetProdi = prodiName;
                     
                     // fetch all and ignore case
                     java.util.List<Jurusan> allJurusans = jurusanRepository.findAll();
                     Jurusan jurusan = allJurusans.stream()
-                            .filter(j -> j.getKodeJurusan().equalsIgnoreCase(jurusanStr))
+                            .filter(j -> j.getKodeJurusan().equalsIgnoreCase(targetProdi))
                             .findFirst().orElse(null);
                             
                     if (jurusan == null) {
                         Jurusan j = new Jurusan();
-                        j.setKodeJurusan(jurusanStr);
-                        j.setNamaJurusan(jurusanStr);
+                        j.setKodeJurusan(prodiName);
+                        j.setNamaJurusan(prodiName);
                         jurusan = jurusanRepository.save(j);
                     }
                     
                     kelas = new Kelas();
-                    kelas.setNamaKelas(kelasStr);
+                    kelas.setNamaKelas(kelasStrNormalized);
                     kelas.setTingkat(tingkat);
                     kelas.setJurusan(jurusan);
                     kelas = kelasRepository.save(kelas);
@@ -337,15 +347,16 @@ public class SyncSiswaController {
                     user = userRepository.findByEmail(email).orElse(null);
                 }
                 
-                if (user == null) {
+                boolean isNewUser = (user == null);
+                if (isNewUser) {
                     user = new Users();
                     user.setUsername(nis);
+                    user.setPasswordHash(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
                 }
                 user.setEmail(email);
                 user.setNamaLengkap(nama);
                 user.setRole("SISWA");
                 user.setIsActive(true);
-                user.setPasswordHash(passwordEncoder.encode(pass));
                 user = userRepository.save(user);
                 
                 // 3. Resolve Siswa
