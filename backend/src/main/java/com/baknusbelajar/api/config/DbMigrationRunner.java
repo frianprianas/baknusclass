@@ -45,7 +45,7 @@ public class DbMigrationRunner implements CommandLineRunner {
             // Perform mapel one-time deletion check
             boolean alreadyCleared = false;
             try {
-                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_app_settings WHERE config_key = 'mapel_cleared'")) {
+                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_app_settings WHERE config_key = 'mapel_cleared_v2'")) {
                     if (rs.next() && rs.getInt(1) > 0) {
                         alreadyCleared = true;
                     }
@@ -88,7 +88,7 @@ public class DbMigrationRunner implements CommandLineRunner {
                 }
 
                 try {
-                    stmt.executeUpdate("INSERT INTO tb_app_settings (config_key, config_value) VALUES ('mapel_cleared', 'true')");
+                    stmt.executeUpdate("INSERT INTO tb_app_settings (config_key, config_value) VALUES ('mapel_cleared_v2', 'true')");
                     System.out.println("One-Time Delete Flag saved successfully to tb_app_settings.");
                 } catch (Exception e) {
                     System.out.println("One-Time Delete Flag save failed: " + e.getMessage());

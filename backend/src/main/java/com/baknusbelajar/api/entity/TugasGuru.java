@@ -26,7 +26,8 @@ public class TugasGuru {
     @Column(name = "judul_tugas", nullable = false)
     private String judulTugas;
 
-    @Column(name = "deskripsi", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "deskripsi")
     private String deskripsi;
 
     @Column(name = "batas_waktu")

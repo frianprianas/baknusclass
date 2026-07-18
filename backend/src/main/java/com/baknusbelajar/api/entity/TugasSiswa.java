@@ -50,6 +50,7 @@ public class TugasSiswa {
     @Column(name = "nilai")
     private Integer nilai;
 
-    @Column(name = "catatan_guru", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "catatan_guru")
     private String catatanGuru;
 }
