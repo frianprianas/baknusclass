@@ -24,7 +24,10 @@ public class DbMigrationRunner implements CommandLineRunner {
             "ALTER TABLE tb_forum_topik ADD is_guru_only NUMBER(1) DEFAULT 0 NOT NULL",
             "ALTER TABLE tb_forum_topik ADD creator_user_id NUMBER(19)",
             "ALTER TABLE tb_forum_topik ADD CONSTRAINT fk_forum_topik_creator FOREIGN KEY (creator_user_id) REFERENCES tb_users(id)",
-            "ALTER TABLE tb_forum_topik MODIFY guru_mapel_id NULL"
+            "ALTER TABLE tb_forum_topik MODIFY guru_mapel_id NULL",
+            "ALTER TABLE tb_ujian_mapel ADD jenis_ujian VARCHAR2(50) DEFAULT 'UJIAN_UTAMA' NOT NULL",
+            "ALTER TABLE tb_ujian_mapel ADD pembuat_guru_id NUMBER(19)",
+            "ALTER TABLE tb_ujian_mapel ADD CONSTRAINT fk_ujian_mapel_pembuat FOREIGN KEY (pembuat_guru_id) REFERENCES tb_guru(id)"
         };
 
         try (Connection conn = dataSource.getConnection();
