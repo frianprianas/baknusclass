@@ -548,7 +548,7 @@ const ForumDiscussion = () => {
                             <div className="message-user">
                                 <div className={`user-initials ${selectedTopic.roleGuru?.toLowerCase() || 'guru'}`} style={{ position: 'relative', overflow: 'hidden' }}>
                                     <img
-                                        src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${selectedTopic.namaGuruEmail}`}
+                                        src={`${BAKNUS_MAIL_URL}/api/public/avatar/${selectedTopic.namaGuruEmail}`}
                                         alt=""
                                         style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                                         onError={(e) => {
@@ -579,7 +579,7 @@ const ForumDiscussion = () => {
                                 <div className={`message-user ${comment.userId === user.userId ? 'rtl' : ''}`}>
                                     <div className={`user-initials ${comment.roleUser.toLowerCase()}`} style={{ position: 'relative', overflow: 'hidden' }}>
                                         <img
-                                            src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${comment.email}`}
+                                            src={`${BAKNUS_MAIL_URL}/api/public/avatar/${comment.email}`}
                                             alt=""
                                             style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                                             onError={(e) => {

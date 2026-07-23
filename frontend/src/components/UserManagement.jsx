@@ -285,7 +285,7 @@ const UserManagement = () => {
                                             <div className="user-cell">
                                                 <div className="user-avatar-small" style={{ position: 'relative', overflow: 'hidden' }}>
                                                     <img
-                                                        src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${user.email}`}
+                                                        src={`${BAKNUS_MAIL_URL}/api/public/avatar/${user.email}`}
                                                         alt=""
                                                         style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                                                         onError={(e) => {

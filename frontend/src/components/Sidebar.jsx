@@ -138,7 +138,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
         <div className="user-info">
           <div className="user-avatar" style={{ position: 'relative', overflow: 'hidden' }}>
             <img
-              src={`${BAKNUS_MAIL_URL}/api/auth/avatar/${userEmail}`}
+              src={`${BAKNUS_MAIL_URL}/api/public/avatar/${userEmail}`}
               alt=""
               style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
               onError={(e) => {
