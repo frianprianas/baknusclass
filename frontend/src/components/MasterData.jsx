@@ -15,6 +15,7 @@ import {
     Download,
     Users
 } from 'lucide-react';
+import { BAKNUS_MAIL_URL } from '../config';
 
 const MasterData = () => {
     const [activeTab, setActiveTab] = useState('jurusan');
@@ -393,8 +394,16 @@ const MasterData = () => {
                                     return (
                                         <div key={guru.id} className="guru-card">
                                             <div className="guru-card-header">
-                                                <div className="guru-avatar">
-                                                    {(guru.namaLengkap || guru.username || 'G').charAt(0).toUpperCase()}
+                                                <div className="guru-avatar" style={{ position: 'relative', overflow: 'hidden' }}>
+                                                    <img
+                                                        src={`${BAKNUS_MAIL_URL}/api/public/avatar/${guru.email}`}
+                                                        alt=""
+                                                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            e.target.parentElement.innerText = (guru.namaLengkap || guru.username || 'G').charAt(0).toUpperCase();
+                                                        }}
+                                                    />
                                                 </div>
                                                 <div className="guru-info">
                                                     <h4>{guru.namaLengkap || guru.username}</h4>
