@@ -9,6 +9,7 @@ const SyncSiswa = () => {
   const [total, setTotal] = useState(0);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({ success: 0, failed: 0 });
+  const [syncMode, setSyncMode] = useState('normal'); // 'normal' or 'hard'
   
   const terminalRef = useRef(null);
 
@@ -66,6 +67,38 @@ const SyncSiswa = () => {
     } catch (err) {
       setStatus('error');
       addLog(`Upload gagal: ${err.response?.data?.message || err.message}`, 'error');
+    }
+  };
+  
+  const handleHardSync = async () => {
+    if (!file) {
+      alert("Pilih file CSV terlebih dahulu.");
+      return;
+    }
+
+    setStatus('uploading');
+    addLog("Mengunggah file CSV untuk Hard Sync...", 'info');
+    
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await axios.post('/api/master/sync-siswa/hard-sync', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      setStatus('complete');
+      setStats({ success: res.data.success, failed: 0 });
+      addLog(`[OK] Hard Sync selesai: ${res.data.message}`, 'success');
+      addLog(`Berhasil memproses ${res.data.success} baris data dari CSV.`, 'success');
+    } catch (err) {
+      setStatus('error');
+      addLog(`Hard Sync gagal: ${err.response?.data?.message || err.message}`, 'error');
     }
   };
 
@@ -141,9 +174,41 @@ const SyncSiswa = () => {
           <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Upload size={18} /> Upload CSV
           </h3>
-          <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '16px' }}>
-            Format: Nama, Kelas (Pemisah koma atau titik koma). <br/>Contoh: <br/>Budi Santoso, X RPL 1<br/>Andi, X TKJ 1
-          </p>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+              Mode Sinkronisasi
+            </label>
+            <select 
+              value={syncMode} 
+              onChange={(e) => {
+                setSyncMode(e.target.value);
+                setStatus('idle');
+                setProgress(0);
+                setTotal(0);
+                setLogs([]);
+                setStats({ success: 0, failed: 0 });
+              }}
+              disabled={status === 'uploading' || status === 'syncing'}
+              style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff', fontSize: '0.9rem' }}
+            >
+              <option value="normal">Sinkronisasi Normal (Update Kelas Saja)</option>
+              <option value="hard">Hard Sync (Impor Data & Akun Siswa Baru/Lama)</option>
+            </select>
+          </div>
+
+          {syncMode === 'normal' ? (
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '16px' }}>
+              <strong>Normal Mode</strong>: Mencocokkan nama dan hanya mengupdate kelas.<br/>
+              Format: Nama, Kelas (Pemisah koma atau titik koma). <br/>
+              Contoh: <br/>Budi Santoso, XI PPLG 1
+            </p>
+          ) : (
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '16px' }}>
+              <strong>Hard Sync Mode</strong>: Membuat/mengupdate user, password, kelas & siswa.<br/>
+              Format: NO;NIS;Nama;Kelas;EMAIL;PASSWORD (Titik koma). <br/>
+              Contoh: <br/>1;2526011119001;ALFIRA NUR REVANDA;XI AKT;2526011119001@smk.baktinusantara666.sch.id;36853792
+            </p>
+          )}
           
           <input 
             type="file" 
@@ -161,7 +226,7 @@ const SyncSiswa = () => {
 
           <button 
             className="primary-btn" 
-            onClick={handleSync}
+            onClick={syncMode === 'normal' ? handleSync : handleHardSync}
             disabled={!file || status === 'uploading' || status === 'syncing'}
             style={{ 
               width: '100%', 

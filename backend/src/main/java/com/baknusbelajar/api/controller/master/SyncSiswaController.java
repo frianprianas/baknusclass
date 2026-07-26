@@ -351,8 +351,14 @@ public class SyncSiswaController {
                 if (isNewUser) {
                     user = new Users();
                     user.setUsername(nis);
+                }
+                
+                if (parts.length >= 6 && !parts[5].trim().isEmpty()) {
+                    user.setPasswordHash(passwordEncoder.encode(parts[5].trim()));
+                } else if (isNewUser || user.getPasswordHash() == null) {
                     user.setPasswordHash(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
                 }
+                
                 user.setEmail(email);
                 user.setNamaLengkap(nama);
                 user.setRole("SISWA");
