@@ -38,6 +38,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - GEMINI_KEYS=${GEMINI_KEYS}
       - FALLBACK_AI_KEYS=${FALLBACK_AI_KEYS}
+      - MAILCOW_URL=${MAILCOW_URL:-https://mail.smk.baktinusantara666.sch.id}
       - MAILCOW_API_KEY=${MAILCOW_API_KEY}
       - BAKNUS_DRIVE_API_KEY=${BAKNUS_DRIVE_API_KEY}
     depends_on:

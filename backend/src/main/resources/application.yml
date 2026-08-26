@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 8088
   error:
     include-message: always
@@ -39,7 +39,7 @@ jwt:
   expirationMs: 86400000
 
 mailcow:
-  url: http://mail.smk.baktinusantara666.sch.id
+  url: ${MAILCOW_URL:https://mail.smk.baktinusantara666.sch.id}
   api-key: ${MAILCOW_API_KEY:REDACTED}
 
 gemini:
