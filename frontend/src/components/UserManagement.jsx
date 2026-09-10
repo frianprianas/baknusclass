@@ -13,7 +13,9 @@ import {
     Shield,
     Edit,
     ExternalLink,
-    MessageCircle
+    MessageCircle,
+    Layers,
+    X
 } from 'lucide-react';
 
 const UserManagement = () => {
@@ -21,6 +23,8 @@ const UserManagement = () => {
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedKelas, setSelectedKelas] = useState('');
+    const [selectedRole, setSelectedRole] = useState('');
     const [formData, setFormData] = useState({
         namaLengkap: '',
         kelasId: '',
@@ -68,6 +72,32 @@ const UserManagement = () => {
         fetchUsers();
         fetchMasterData();
     }, []);
+
+    // Urutkan kelas berdasarkan tingkat & nama kelas
+    const sortedClassList = React.useMemo(() => {
+        return [...classList].sort((a, b) => {
+            const tingkatA = a.tingkat || '';
+            const tingkatB = b.tingkat || '';
+            if (tingkatA !== tingkatB) return tingkatA.localeCompare(tingkatB, undefined, { numeric: true });
+            return (a.namaKelas || '').localeCompare(b.namaKelas || '', undefined, { numeric: true });
+        });
+    }, [classList]);
+
+    // Hitung jumlah siswa per kelas
+    const studentCountByKelas = React.useMemo(() => {
+        const counts = {};
+        users.forEach(u => {
+            if (u.kelasId) {
+                counts[u.kelasId] = (counts[u.kelasId] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [users]);
+
+    // Hitung siswa yang belum punya kelas
+    const unassignedStudentCount = React.useMemo(() => {
+        return users.filter(u => u.role === 'SISWA' && !u.kelasId).length;
+    }, [users]);
 
     const handleSync = async () => {
         setSyncing(true);
@@ -137,11 +167,28 @@ const UserManagement = () => {
         }
     };
 
-    const filteredUsers = users.filter(u =>
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.namaLengkap?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredUsers = users.filter(u => {
+        const term = searchTerm.toLowerCase().trim();
+        const matchesSearch = !term || (
+            u.email?.toLowerCase().includes(term) ||
+            u.username?.toLowerCase().includes(term) ||
+            u.namaLengkap?.toLowerCase().includes(term) ||
+            u.namaKelas?.toLowerCase().includes(term) ||
+            u.nisn?.toLowerCase().includes(term) ||
+            u.nip?.toLowerCase().includes(term)
+        );
+
+        const matchesRole = !selectedRole || u.role?.toUpperCase() === selectedRole.toUpperCase();
+
+        let matchesKelas = true;
+        if (selectedKelas === 'none') {
+            matchesKelas = u.role === 'SISWA' && !u.kelasId;
+        } else if (selectedKelas) {
+            matchesKelas = String(u.kelasId) === String(selectedKelas);
+        }
+
+        return matchesSearch && matchesRole && matchesKelas;
+    });
 
     // Pagination logic
     const indexOfLastUser = currentPage * rowsPerPage;
@@ -155,7 +202,7 @@ const UserManagement = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, selectedKelas, selectedRole]);
 
     const handleToggleStatus = async (user) => {
         const action = (user.active || user.isActive) ? 'menonaktifkan' : 'mengaktifkan';
@@ -253,13 +300,85 @@ const UserManagement = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="filters">
-                        <button className="filter-btn">
-                            <Filter size={18} />
-                            <span>Filter</span>
-                        </button>
+                    <div className="filters-group">
+                        {/* Filter Kelas */}
+                        <div className="filter-select-wrapper" title="Filter berdasarkan Kelas">
+                            <Layers size={16} className="filter-icon" />
+                            <select
+                                value={selectedKelas}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSelectedKelas(val);
+                                    if (val && (selectedRole === 'GURU' || selectedRole === 'TU' || selectedRole === 'ADMIN')) {
+                                        setSelectedRole('');
+                                    }
+                                }}
+                                className="filter-select"
+                            >
+                                <option value="">Semua Kelas</option>
+                                {sortedClassList.map(k => (
+                                    <option key={k.id} value={k.id}>
+                                        {k.tingkat ? `${k.tingkat} - ` : ''}{k.namaKelas} ({studentCountByKelas[k.id] || 0} siswa)
+                                    </option>
+                                ))}
+                                <option value="none">Siswa Belum Ada Kelas ({unassignedStudentCount})</option>
+                            </select>
+                        </div>
+
+                        {/* Filter Role */}
+                        <div className="filter-select-wrapper" title="Filter berdasarkan Role">
+                            <Filter size={16} className="filter-icon" />
+                            <select
+                                value={selectedRole}
+                                onChange={(e) => setSelectedRole(e.target.value)}
+                                className="filter-select"
+                            >
+                                <option value="">Semua Role</option>
+                                <option value="SISWA">Siswa</option>
+                                <option value="GURU">Guru</option>
+                                <option value="TU">TU</option>
+                                <option value="ADMIN">Admin</option>
+                            </select>
+                        </div>
+
+                        {/* Reset Filter Button */}
+                        {(selectedKelas || selectedRole || searchTerm) && (
+                            <button
+                                type="button"
+                                className="btn-reset-filter"
+                                onClick={() => {
+                                    setSelectedKelas('');
+                                    setSelectedRole('');
+                                    setSearchTerm('');
+                                }}
+                                title="Reset semua filter"
+                            >
+                                <X size={15} />
+                                <span>Reset</span>
+                            </button>
+                        )}
                     </div>
                 </div>
+
+                {/* Active Filter Indicator Bar */}
+                {(selectedKelas || selectedRole) && (
+                    <div className="active-filter-bar">
+                        <span className="active-filter-title">Filter aktif:</span>
+                        {selectedKelas && (
+                            <span className="active-filter-pill">
+                                Kelas: {selectedKelas === 'none' ? 'Belum Ada Kelas' : (sortedClassList.find(k => String(k.id) === String(selectedKelas)) ? `${sortedClassList.find(k => String(k.id) === String(selectedKelas)).tingkat ? sortedClassList.find(k => String(k.id) === String(selectedKelas)).tingkat + ' - ' : ''}${sortedClassList.find(k => String(k.id) === String(selectedKelas)).namaKelas}` : selectedKelas)}
+                                <button type="button" onClick={() => setSelectedKelas('')} title="Hapus filter kelas"><X size={12} /></button>
+                            </span>
+                        )}
+                        {selectedRole && (
+                            <span className="active-filter-pill">
+                                Role: {selectedRole}
+                                <button type="button" onClick={() => setSelectedRole('')} title="Hapus filter role"><X size={12} /></button>
+                            </span>
+                        )}
+                        <span className="active-filter-count">({filteredUsers.length} user ditemukan)</span>
+                    </div>
+                )}
 
                 <div className="table-responsive">
                     <table className="user-table">
@@ -556,10 +675,12 @@ const UserManagement = () => {
                         align-items: flex-start;
                     }
                     .sync-btn { width: 100%; justify-content: center; }
-                    .table-actions { flex-direction: column; gap: 15px; }
+                    .table-actions { flex-direction: column; gap: 15px; align-items: stretch; }
                     .search-box { width: 100% !important; }
-                    .filters { width: 100%; }
-                    .filter-btn { width: 100%; justify-content: center; }
+                    .filters-group { width: 100%; flex-direction: column; align-items: stretch; }
+                    .filter-select-wrapper { width: 100%; }
+                    .filter-select { width: 100%; max-width: none; }
+                    .btn-reset-filter { width: 100%; justify-content: center; }
                 }
 
                 .page-header h1 {
@@ -608,6 +729,8 @@ const UserManagement = () => {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
+                    flex-wrap: wrap;
+                    gap: 12px;
                 }
 
                 .search-box {
@@ -617,8 +740,15 @@ const UserManagement = () => {
                     border: 1px solid #e2e8f0;
                     padding: 8px 14px;
                     border-radius: 10px;
-                    width: 300px;
+                    width: 280px;
                     color: #94a3b8;
+                    transition: all 0.2s;
+                }
+
+                .search-box:focus-within {
+                    border-color: #3b82f6;
+                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+                    background: white;
                 }
 
                 .search-box input {
@@ -630,16 +760,115 @@ const UserManagement = () => {
                     color: #1e293b;
                 }
 
-                .filter-btn {
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    padding: 8px 16px;
-                    border-radius: 10px;
+                .filters-group {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                }
+
+                .filter-select-wrapper {
                     display: flex;
                     align-items: center;
                     gap: 8px;
+                    background: white;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 10px;
+                    padding: 0 10px;
+                    transition: all 0.2s;
+                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                }
+
+                .filter-select-wrapper:hover, .filter-select-wrapper:focus-within {
+                    border-color: #3b82f6;
+                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+                }
+
+                .filter-icon {
+                    color: #64748b;
+                    flex-shrink: 0;
+                }
+
+                .filter-select {
+                    border: none;
+                    outline: none;
+                    background: transparent;
+                    padding: 8px 4px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    color: #1e293b;
+                    cursor: pointer;
+                    max-width: 220px;
+                }
+
+                .btn-reset-filter {
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                    background: #f1f5f9;
+                    color: #475569;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 7px 12px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .btn-reset-filter:hover {
+                    background: #fee2e2;
+                    color: #ef4444;
+                    border-color: #fca5a5;
+                }
+
+                .active-filter-bar {
+                    padding: 8px 20px;
+                    background: #eff6ff;
+                    border-bottom: 1px solid #dbeafe;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                    font-size: 0.8rem;
+                }
+
+                .active-filter-title {
+                    color: #1e40af;
+                    font-weight: 600;
+                }
+
+                .active-filter-pill {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: white;
+                    color: #2563eb;
+                    border: 1px solid #bfdbfe;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    font-size: 0.75rem;
+                }
+
+                .active-filter-pill button {
+                    background: none;
+                    border: none;
+                    color: #64748b;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    padding: 0;
+                }
+
+                .active-filter-pill button:hover {
+                    color: #ef4444;
+                }
+
+                .active-filter-count {
                     color: #64748b;
                     font-weight: 500;
+                    margin-left: auto;
                 }
 
                 .table-responsive {
@@ -995,6 +1224,64 @@ const UserManagement = () => {
                 [data-theme="dark"] .page-btn:hover:not(:disabled), [data-theme="dark"] .page-num:hover {
                     border-color: #3b82f6;
                     color: #3b82f6;
+                }
+
+                [data-theme="dark"] .filter-select-wrapper {
+                    background: #0f172a;
+                    border-color: #334155;
+                }
+
+                [data-theme="dark"] .filter-icon {
+                    color: #94a3b8;
+                }
+
+                [data-theme="dark"] .filter-select {
+                    color: #f1f5f9;
+                    background: #0f172a;
+                }
+
+                [data-theme="dark"] .filter-select option {
+                    background: #0f172a;
+                    color: #f1f5f9;
+                }
+
+                [data-theme="dark"] .btn-reset-filter {
+                    background: #1e293b;
+                    border-color: #334155;
+                    color: #cbd5e1;
+                }
+
+                [data-theme="dark"] .btn-reset-filter:hover {
+                    background: #7f1d1d;
+                    color: #fca5a5;
+                    border-color: #991b1b;
+                }
+
+                [data-theme="dark"] .active-filter-bar {
+                    background: #1e293b;
+                    border-bottom-color: #334155;
+                }
+
+                [data-theme="dark"] .active-filter-title {
+                    color: #93c5fd;
+                }
+
+                [data-theme="dark"] .active-filter-pill {
+                    background: #0f172a;
+                    color: #93c5fd;
+                    border-color: #1d4ed8;
+                }
+
+                [data-theme="dark"] .active-filter-pill button {
+                    color: #94a3b8;
+                }
+
+                [data-theme="dark"] .active-filter-pill button:hover {
+                    color: #fca5a5;
+                }
+
+                [data-theme="dark"] .active-filter-count {
+                    color: #94a3b8;
                 }
 
                 .animate-spin {
