@@ -81,18 +81,23 @@ public class SyncSiswaController {
         }
     }
 
-    @GetMapping("/stream/{jobId}")
-    public SseEmitter streamProgress(@PathVariable("jobId") String jobId) {
+    @GetMapping(value = {"/stream", "/stream/{jobId}"})
+    public SseEmitter streamProgress(
+            @RequestParam(value = "jobId", required = false) String paramJobId,
+            @PathVariable(value = "jobId", required = false) String pathJobId
+    ) {
+        String jobId = (paramJobId != null && !paramJobId.trim().isEmpty()) ? paramJobId : pathJobId;
         SseEmitter emitter = new SseEmitter(10 * 60 * 1000L); // 10 minutes timeout
 
-        List<String> lines = jobs.remove(jobId);
-        if (lines == null) {
+        if (jobId == null || !jobs.containsKey(jobId)) {
             try {
                 emitter.send(SseEmitter.event().name("error").data("ID Job tidak valid atau sudah kadaluwarsa"));
                 emitter.complete();
             } catch (Exception ignored) {}
             return emitter;
         }
+
+        List<String> lines = jobs.remove(jobId);
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         executor.execute(() -> {
