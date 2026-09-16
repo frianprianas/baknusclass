@@ -1648,7 +1648,7 @@ const ExamManagement = () => {
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <span className="duration-badge">{exam.durasi || 0} Menit</span>
+                                                            <span className="duration-badge">{Number(exam.durasi) === 0 ? "♾️ Tanpa Batas" : `${exam.durasi} Menit`}</span>
                                                         </td>
                                                         <td>
                                                             <div className="token-cell">
@@ -1906,7 +1906,7 @@ const ExamManagement = () => {
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>Durasi (Menit)</label>
+                                            <label>Durasi (Menit) <span style={{ fontSize: "0.78rem", color: "#64748b", textTransform: "none", fontWeight: 500 }}>(Isi 0 jika Tanpa Batas Waktu / Ujian Latihan)</span></label>
                                             <input type="number" value={examForm.durasi} onChange={(e) => setExamForm({ ...examForm, durasi: e.target.value })} required />
                                         </div>
                                     </div>

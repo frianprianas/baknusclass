@@ -20,6 +20,8 @@ import {
     Check,
     Award,
     Sparkles,
+    RotateCcw,
+    HelpCircle,
     RefreshCw,
     Brush
 } from 'lucide-react';
@@ -57,6 +59,8 @@ const StudentExams = () => {
 
     // CBT Design State
     const [showNav, setShowNav] = useState(false);
+    const [showPracticeResult, setShowPracticeResult] = useState(false);
+    const [practiceResult, setPracticeResult] = useState(null);
     const [fontSizeScale, setFontSizeScale] = useState(1);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -172,6 +176,85 @@ const StudentExams = () => {
         } finally {
             setAiLoading(false);
         }
+    };
+
+
+    const handleStartPractice = () => {
+        const practiceExam = {
+            id: 'practice_default_simulasi',
+            namaMapel: 'Simulasi & Latihan Ujian CBT',
+            namaEvent: 'Latihan Mandiri Tanpa Batas Waktu',
+            durasi: 0,
+            isPractice: true,
+            isFinished: false
+        };
+
+        const sampleQuestions = [
+            {
+                id: 'prak_q1',
+                nomorSoal: 1,
+                qType: 'pg',
+                tipeSoal: 'PG_BIASA',
+                pertanyaan: '<p>Berdasarkan letak astronomisnya di antara 6° LU – 11° LS, Indonesia berada di kawasan beriklim...</p>',
+                pilihanA: 'Tropis dengan penyinaran matahari sepanjang tahun',
+                pilihanB: 'Kutub dingin abadi',
+                pilihanC: 'Gurun subtropis gersang',
+                pilihanD: 'Sedang dengan 4 musim berbeda',
+                pilihanE: 'Tundra pegunungan',
+                kunciJawaban: 'A',
+                bobotNilai: 25,
+                pembahasan: 'Indonesia dilalui oleh garis khatulistiwa sehingga beriklim tropis dengan temperatur hangat dan curah hujan cukup.'
+            },
+            {
+                id: 'prak_q2',
+                nomorSoal: 2,
+                qType: 'pg',
+                tipeSoal: 'PG_KOMPLEKS',
+                pertanyaan: '<p>Manakah di antara protokol berikut yang <strong>menggunakan enkripsi kriptografi untuk keamanan data</strong>? <em>(Pilihan Ganda Kompleks: Anda dapat memilih lebih dari satu jawaban yang benar)</em></p>',
+                pilihanA: 'HTTPS (Port 443 - Enkripsi TLS/SSL)',
+                pilihanB: 'HTTP biasa (Port 80 - Plaintext tidak terenkripsi)',
+                pilihanC: 'SSH (Port 22 - Secure Shell dengan public/private key)',
+                pilihanD: 'Telnet (Port 23 - Plaintext tanpa enkripsi)',
+                pilihanE: 'TFTP tanpa autentikasi',
+                kunciJawaban: 'A,C',
+                bobotNilai: 25,
+                pembahasan: 'HTTPS dan SSH adalah protokol yang menerapkan enkripsi kriptografi modern untuk melindungi kerahasiaan komunikasi data.'
+            },
+            {
+                id: 'prak_q3',
+                nomorSoal: 3,
+                qType: 'pg',
+                tipeSoal: 'BENAR_SALAH',
+                pertanyaan: '<p><strong>Pernyataan:</strong><br/>RAM (Random Access Memory) adalah media penyimpanan yang bersifat <em>non-volatile</em>, artinya seluruh file dan aplikasi akan tetap tersimpan aman saat komputer dimatikan.</p>',
+                pilihanA: 'Benar',
+                pilihanB: 'Salah',
+                kunciJawaban: 'B',
+                bobotNilai: 25,
+                pembahasan: 'Pernyataan ini SALAH. RAM bersifat volatile (data terhapus saat daya listrik mati). Penyimpanan non-volatile adalah Harddisk atau SSD.'
+            },
+            {
+                id: 'prak_q4',
+                nomorSoal: 4,
+                qType: 'essay',
+                pertanyaan: '<p>Jelaskan fungsi perangkat <strong>Switch</strong> dalam topologi jaringan LAN, dan silakan klik tombol <strong>"Buka Whiteboard Corat-coret"</strong> di bawah untuk menggambar sketsa sederhana koneksi antara Switch ke PC Client!</p>',
+                kunciJawaban: 'Switch berfungsi sebagai sentral penghubung perangkat pada jaringan lokal (LAN) dan menyaring lalu lintas data berdasarkan MAC address.',
+                bobotNilai: 25,
+                pembahasan: 'Fitur Whiteboard memungkinkan siswa dan guru mencorat-coret skema topologi atau rumus matematika secara langsung!'
+            }
+        ];
+
+        setQuestions(sampleQuestions);
+        setCurrentExam(practiceExam);
+        setCurrentIndex(0);
+        setTimer(0);
+
+        const initialAnswers = {};
+        sampleQuestions.forEach(q => {
+            initialAnswers[q.id] = '';
+        });
+        setAnswers(initialAnswers);
+        setRaguState({});
+        setWhiteboards({});
     };
 
     const handleStartClick = (exam) => {
@@ -329,12 +412,12 @@ const StudentExams = () => {
     // Timer Logic
     useEffect(() => {
         let interval = null;
-        if (currentExam && timer > 0) {
+        if (currentExam && currentExam.durasi > 0 && timer > 0) {
             interval = setInterval(() => {
                 setTimer(prev => prev - 1);
             }, 1000);
-        } else if (timer === 0 && currentExam) {
-            confirmFinishExam(true); // force finish
+        } else if (timer === 0 && currentExam && currentExam.durasi > 0) {
+            confirmFinishExam(true); // force finish only for timed exams
         }
         return () => clearInterval(interval);
     }, [currentExam, timer]);
@@ -551,8 +634,16 @@ const StudentExams = () => {
                                 </div>
 
                                 <div className="cbt-topbar-right">
-                                    <div className={`cbt-timer ${timer < 300 ? 'cbt-timer-urgent' : ''}`}>
-                                        Sisa Waktu: {formatTime(timer)}
+                                    <div className={`cbt-timer ${(currentExam?.durasi > 0 && timer < 300) ? 'cbt-timer-urgent' : ''} ${currentExam?.durasi === 0 ? 'cbt-timer-unlimited' : ''}`}>
+                                        {currentExam?.durasi === 0 ? (
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <Sparkles size={14} color="#0284c7" />
+                                                <strong>Tanpa Batas Waktu</strong>
+                                                <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>(Mode Latihan)</span>
+                                            </span>
+                                        ) : (
+                                            <span>Sisa Waktu: {formatTime(timer)}</span>
+                                        )}
                                     </div>
                                     <button className="cbt-nav-toggle-btn" onClick={() => setShowNav(true)}>
                                         Daftar Soal
@@ -750,6 +841,64 @@ const StudentExams = () => {
                     </main>
                 </div>
 
+
+                {/* Modal Hasil Latihan & Pembahasan */}
+                {showPracticeResult && practiceResult && (
+                    <div className="modal-overlay">
+                        <div className="modal-content practice-result-modal">
+                            <div className="practice-modal-header">
+                                <div className="practice-score-circle">
+                                    <span className="score-num">{practiceResult.totalScore}</span>
+                                    <span className="score-max">/ {practiceResult.maxScore}</span>
+                                </div>
+                                <h2>Hasil Latihan & Uji Coba CBT</h2>
+                                <p>Hebat! Anda telah mencoba seluruh tipe soal CBT BaknusClass. Berikut ulasan jawaban Anda:</p>
+                            </div>
+
+                            <div className="practice-review-list">
+                                {practiceResult.reviewDetails.map((item, idx) => (
+                                    <div key={item.id || idx} className={`review-card ${item.isCorrect ? 'is-correct' : 'is-wrong'}`}>
+                                        <div className="review-card-head">
+                                            <span className="review-q-num">Soal #{idx + 1}</span>
+                                            <span className="review-q-type">
+                                                {item.tipeSoal === 'BENAR_SALAH' ? 'Benar / Salah' : item.tipeSoal === 'PG_KOMPLEKS' ? 'PG Kompleks' : item.qType === 'pg' ? 'Pilihan Ganda' : 'Essay + Whiteboard'}
+                                            </span>
+                                            <span className={`review-status ${item.isCorrect ? 'text-green' : 'text-orange'}`}>
+                                                {item.isCorrect ? '✅ Tepat / Dijawab' : '❌ Perlu Diperbaiki'} (+{item.scoreEarned} Poin)
+                                            </span>
+                                        </div>
+                                        <div className="review-pertanyaan" dangerouslySetInnerHTML={{ __html: item.pertanyaan }}></div>
+                                        <div className="review-ans-grid">
+                                            <div className="review-ans-box user">
+                                                <label>Jawaban Anda:</label>
+                                                <span>{item.jawabanSiswa || '(Tidak dijawab)'}</span>
+                                            </div>
+                                            <div className="review-ans-box key">
+                                                <label>Kunci Jawaban:</label>
+                                                <span>{item.kunciJawaban}</span>
+                                            </div>
+                                        </div>
+                                        {item.pembahasan && (
+                                            <div className="review-pembahasan">
+                                                <strong>💡 Pembahasan:</strong> {item.pembahasan}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="practice-modal-actions">
+                                <button className="btn-retry-practice" onClick={handleStartPractice}>
+                                    <RotateCcw size={16} /> Coba Latihan Lagi
+                                </button>
+                                <button className="btn-close-practice" onClick={() => setShowPracticeResult(false)}>
+                                    <Check size={16} /> Tutup & Kembali
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {showFinishConfirm && (
                     <div className="modal-overlay">
                         <div className="modal-content token-modal" style={{ maxWidth: '500px', textAlign: 'center' }}>
@@ -781,6 +930,86 @@ const StudentExams = () => {
 
                 <style>{`
                     
+                    
+                    /* Practice Banner */
+                    .practice-banner-card {
+                        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0284c7 100%);
+                        border-radius: 20px;
+                        padding: 24px 32px;
+                        margin-bottom: 28px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        color: white;
+                        box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.35);
+                        gap: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .practice-banner-left { display: flex; align-items: center; gap: 20px; flex: 1; min-width: 280px; }
+                    .practice-icon-circle {
+                        width: 56px; height: 56px; min-width: 56px; border-radius: 16px;
+                        background: rgba(255, 255, 255, 0.2);
+                        backdrop-filter: blur(8px);
+                        display: flex; align-items: center; justify-content: center;
+                        color: #fef08a; border: 1.5px solid rgba(255, 255, 255, 0.3);
+                    }
+                    .practice-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.18); padding: 4px 12px; border-radius: 50px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 6px; }
+                    .practice-title { font-size: 1.4rem; font-weight: 900; margin: 0 0 6px 0; letter-spacing: -0.5px; }
+                    .practice-desc { font-size: 0.9rem; margin: 0; opacity: 0.95; line-height: 1.5; max-width: 680px; }
+                    .practice-start-btn {
+                        background: white; color: #1d4ed8; border: none; padding: 14px 28px; border-radius: 14px;
+                        font-weight: 900; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+                        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    .practice-start-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); background: #f8fafc; }
+
+                    /* Practice Timer & Unlimited Tag */
+                    .cbt-timer-unlimited { background: #f0fdf4 !important; border-color: #86efac !important; color: #166534 !important; }
+                    .duration-tag.unlimited { background: #ecfdf5 !important; color: #047857 !important; border: 1px solid #a7f3d0 !important; font-weight: 800; }
+
+                    /* Practice Review Modal */
+                    .practice-result-modal { max-width: 780px !important; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 0 !important; border-radius: 24px !important; }
+                    .practice-modal-header { background: #f8fafc; padding: 28px 32px; border-bottom: 2px solid #f1f5f9; text-align: center; }
+                    .practice-score-circle { width: 84px; height: 84px; border-radius: 50%; background: #eff6ff; border: 3px solid #3b82f6; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0 auto 16px auto; }
+                    .practice-score-circle .score-num { font-size: 2rem; font-weight: 950; color: #1d4ed8; line-height: 1; }
+                    .practice-score-circle .score-max { font-size: 0.8rem; color: #64748b; font-weight: 700; }
+                    .practice-modal-header h2 { margin: 0 0 6px 0; font-size: 1.5rem; font-weight: 900; color: #0f172a; }
+                    .practice-modal-header p { margin: 0; color: #64748b; font-size: 0.9rem; }
+                    
+                    .practice-review-list { padding: 24px 32px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+                    .review-card { border: 2px solid #e2e8f0; border-radius: 16px; padding: 18px 22px; background: white; }
+                    .review-card.is-correct { border-color: #86efac; background: #f0fdf4; }
+                    .review-card.is-wrong { border-color: #fed7aa; background: #fff7ed; }
+                    .review-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85rem; font-weight: 800; gap: 8px; flex-wrap: wrap; }
+                    .review-q-num { color: #475569; background: white; padding: 3px 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+                    .review-q-type { color: #6366f1; background: #eef2ff; padding: 3px 10px; border-radius: 8px; }
+                    .review-status.text-green { color: #15803d; }
+                    .review-status.text-orange { color: #c2410c; }
+                    .review-pertanyaan { font-size: 1rem; color: #1e293b; font-weight: 600; margin-bottom: 12px; }
+                    .review-ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+                    .review-ans-box { padding: 10px 14px; border-radius: 10px; font-size: 0.9rem; }
+                    .review-ans-box.user { background: white; border: 1px solid #cbd5e1; }
+                    .review-ans-box.key { background: #f8fafc; border: 1.5px dashed #94a3b8; color: #0f172a; font-weight: 700; }
+                    .review-ans-box label { display: block; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
+                    .review-pembahasan { font-size: 0.88rem; color: #475569; background: rgba(255, 255, 255, 0.7); padding: 10px 14px; border-radius: 10px; line-height: 1.5; border-left: 4px solid #3b82f6; }
+
+                    .practice-modal-actions { padding: 18px 32px; background: #f8fafc; border-top: 2px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 12px; }
+                    .btn-retry-practice { background: #eff6ff; color: #1d4ed8; border: 2px solid #bfdbfe; padding: 10px 20px; border-radius: 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+                    .btn-retry-practice:hover { background: #dbeafe; }
+                    .btn-close-practice { background: #10b981; color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+                    .btn-close-practice:hover { background: #059669; }
+
+                    /* Dark mode overrides */
+                    [data-theme="dark"] .practice-banner-card { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); }
+                    [data-theme="dark"] .practice-result-modal { background: #1e293b; color: #f8fafc; }
+                    [data-theme="dark"] .practice-modal-header { background: #0f172a; border-color: #334155; }
+                    [data-theme="dark"] .practice-modal-header h2 { color: #f8fafc; }
+                    [data-theme="dark"] .practice-modal-actions { background: #0f172a; border-color: #334155; }
+                    [data-theme="dark"] .review-card { background: #0f172a; border-color: #334155; }
+                    [data-theme="dark"] .review-pertanyaan { color: #f8fafc; }
+                    [data-theme="dark"] .review-ans-box.user { background: #1e293b; border-color: #475569; color: #f8fafc; }
+                    [data-theme="dark"] .review-ans-box.key { background: #1e293b; border-color: #64748b; color: #38bdf8; }
+
                     /* Type Badges */
                     .cbt-badge-type { font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px; }
                     .cbt-badge-type.badge-pg { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
@@ -1098,6 +1327,29 @@ const StudentExams = () => {
                             </div>
                         </div>
                     )}
+                    {/* Banner Ujian Latihan Default */}
+                    <div className="practice-banner-card">
+                        <div className="practice-banner-left">
+                            <div className="practice-icon-circle">
+                                <Sparkles size={28} />
+                            </div>
+                            <div className="practice-text-content">
+                                <div className="practice-tag">
+                                    <Shield size={13} />
+                                    <span>SIMULASI CBT RESMI & LATIHAN MANDIRI</span>
+                                </div>
+                                <h3 className="practice-title">Coba Ujian Latihan (Tanpa Batas Waktu)</h3>
+                                <p className="practice-desc">
+                                    Coba pengerjaan <strong>4 Tipe Soal Lengkap</strong> (Pilihan Ganda Biasa, PG Kompleks, Benar / Salah, dan Essay dengan Whiteboard Corat-coret) tanpa batas waktu dan tanpa perlu token pengawas.
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" className="practice-start-btn" onClick={handleStartPractice}>
+                            <Play size={18} />
+                            Mulai Coba Latihan
+                        </button>
+                    </div>
+
                     <div className="exams-grid">
                         {exams.map(ex => (
                             <div key={ex.id} className="student-exam-card">
@@ -1105,7 +1357,7 @@ const StudentExams = () => {
                                     <div className="subject-icon">
                                         <BookOpen size={24} />
                                     </div>
-                                    <div className="duration-tag">{ex.durasi} Menit</div>
+                                    <div className={`duration-tag ${ex.durasi === 0 ? "unlimited" : ""}`}>{ex.durasi === 0 ? "♾️ Tanpa Batas" : `${ex.durasi} Menit`}</div>
                                     {ex.tampilkanNilai && ex.nilaiAkhir !== null && (
                                         <div className="score-badge" style={{ background: '#ecfdf5', color: '#059669', padding: '6px 14px', borderRadius: '50px', fontSize: '0.9rem', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #10b981', boxShadow: '0 2px 4px rgba(16,185,129,0.1)' }}>
                                             <Award size={16} /> {ex.nilaiAkhir}
