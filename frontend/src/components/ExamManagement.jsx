@@ -1135,7 +1135,17 @@ const ExamManagement = () => {
                     .q-btn-edit:hover { color: #3b82f6; border-color: #3b82f6; background: #eff6ff; }
                     .btn-delete:hover { color: #ef4444; border-color: #fca5a5; background: #fef2f2; }
 
-                    .q-text-v2 { font-size: 1.15rem; color: #0f172a; line-height: 1.6; font-weight: 700; margin-bottom: 24px; }
+                    
+                    .q-text-v2 img {
+                        max-width: 100%;
+                        height: auto;
+                        border-radius: 10px;
+                        display: block;
+                        margin: 12px 0;
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+                    }
+                    .q-text-v2 { font-size: 1.15rem; color: #0f172a; line-height: 1.6; font-weight: 700; margin-bottom: 24px; unicode-bidi: plaintext; }
+
                     
                     .q-options-v2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
                     .opt-item-v2 { padding: 14px 18px; background: #f8fafc; border-radius: 16px; border: 2px solid #f1f5f9; display: flex; gap: 12px; align-items: center; }

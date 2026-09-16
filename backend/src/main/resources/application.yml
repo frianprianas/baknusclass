@@ -16,6 +16,12 @@ spring:
     username: ${DB_USERNAME:sys as sysdba}
     password: ${DB_PASSWORD:REDACTED}
     driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:50}
+      minimum-idle: ${DB_POOL_MIN:15}
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
   
   servlet:
     multipart:
@@ -25,8 +31,14 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${SHOW_SQL:false}
     database-platform: org.hibernate.dialect.OracleDialect
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   data:
     redis:

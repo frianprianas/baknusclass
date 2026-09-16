@@ -1123,7 +1123,35 @@ const StudentExams = () => {
                     .cbt-content-area { padding: 40px; flex: 1; border-bottom: 2px solid #f1f5f9; display: flex; justify-content: center; background: #fff; }
                     .cbt-question-box { width: 100%; max-width: 1000px; padding: 32px; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); height: fit-content; }
                     .cbt-instruction { color: #0ea5e9; font-weight: 600; font-size: 1.15rem; margin-bottom: 24px; margin-top: 0; }
-                    .cbt-question-text { color: #1e293b; line-height: 1.7; margin-bottom: 32px; font-weight: 500; font-size: 1.15rem; }
+                    
+                    /* Multimedia (Images, Arabic RTL, Japanese CJK) */
+                    .cbt-question-text {
+                        color: #1e293b;
+                        line-height: 1.8;
+                        margin-bottom: 32px;
+                        font-weight: 500;
+                        font-size: 1.15rem;
+                        unicode-bidi: plaintext;
+                        word-break: break-word;
+                    }
+                    .cbt-question-text img {
+                        max-width: 100%;
+                        height: auto;
+                        border-radius: 12px;
+                        display: block;
+                        margin: 16px auto;
+                        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+                        border: 1px solid #e2e8f0;
+                    }
+                    .cbt-opt-text img {
+                        max-width: 100%;
+                        max-height: 180px;
+                        height: auto;
+                        border-radius: 8px;
+                        margin-top: 8px;
+                        display: block;
+                    }
+
                     .cbt-question-text.text-lg { font-size: 1.3rem; }
                     .cbt-question-text.text-xl { font-size: 1.5rem; }
                     
