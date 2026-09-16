@@ -130,32 +130,49 @@ const StudentExams = () => {
         setLoading(true);
         setAiSaran(null);
 
-        // Instant mock exam for Practice Event so students can test immediately without teacher assignment
-        if (event.id === 'event_latihan_cbt' || (event.kodeEvent && event.kodeEvent.toUpperCase() === 'SIMULASI_CBT')) {
-            const practiceExamsList = [
-                {
-                    id: 'practice_default_simulasi',
-                    namaMapel: 'Simulasi Ujian CBT (Coba Semua Tipe Soal)',
-                    namaGuru: 'Sistem CBT BaknusClass',
-                    durasi: 0,
-                    waktuMulai: new Date().toISOString(),
-                    waktuSelesai: new Date(Date.now() + 864000000).toISOString(),
-                    isPractice: true,
-                    tampilkanNilai: true,
-                    nilaiAkhir: null
-                }
-            ];
-            setExams(practiceExamsList);
+        const isLatihanEvent = event.id === 'event_latihan_cbt' || 
+            (event.kodeEvent && event.kodeEvent.toUpperCase() === 'SIMULASI_CBT') ||
+            (event.namaEvent && (event.namaEvent.toLowerCase().includes('latihan') || event.namaEvent.toLowerCase().includes('simulasi')));
+
+        const defaultSimulasiExam = {
+            id: 'practice_default_simulasi',
+            namaMapel: 'Simulasi CBT Standar (Coba Semua Tipe Soal)',
+            namaGuru: 'Sistem CBT BaknusClass',
+            durasi: 0,
+            waktuMulai: new Date().toISOString(),
+            waktuSelesai: new Date(Date.now() + 864000000).toISOString(),
+            isPractice: true,
+            tampilkanNilai: true,
+            nilaiAkhir: null
+        };
+
+        if (event.id === 'event_latihan_cbt') {
+            setExams([defaultSimulasiExam]);
             setLoading(false);
             return;
         }
 
         try {
             const resp = await axios.get(`/api/exam/ujian-mapel/siswa?eventId=${event.id}`, { headers });
-            setExams(resp.data);
-            generateAiSaran(resp.data);
+            let examList = resp.data || [];
+
+            // If it's a Latihan / Simulasi event:
+            // Display real teacher exams + provide default CBT simulation sandbox if empty or alongside
+            if (isLatihanEvent) {
+                if (examList.length === 0) {
+                    examList = [defaultSimulasiExam];
+                } else {
+                    examList = [...examList, defaultSimulasiExam];
+                }
+            }
+
+            setExams(examList);
+            generateAiSaran(examList);
         } catch (err) {
             console.error('Error fetching student exams:', err);
+            if (isLatihanEvent) {
+                setExams([defaultSimulasiExam]);
+            }
         } finally {
             setLoading(false);
         }
@@ -305,6 +322,15 @@ const StudentExams = () => {
             handleStartPractice();
             return;
         }
+
+        const isLatihan = (selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi'))) || Number(exam.durasi) === 0;
+
+        // Practice exams can be started directly without waiting for proctor token
+        if (isLatihan) {
+            startExam(exam);
+            return;
+        }
+
         setTokenInput('');
         setShowTokenOverlay(exam);
     };
@@ -382,6 +408,12 @@ const StudentExams = () => {
     const startExam = async (exam) => {
         setLoading(true);
         try {
+            if (!exam.isPractice && exam.id !== 'practice_default_simulasi') {
+                let deviceId = localStorage.getItem('deviceId') || ('dev_' + Math.random().toString(36).substring(2) + Date.now());
+                localStorage.setItem('deviceId', deviceId);
+                await axios.post(`/api/exam/ujian-mapel/${exam.id}/validate-token?ujianToken=${exam.token || 'LATIHAN'}&deviceId=${deviceId}`, {}, { headers }).catch(e => console.warn('Bypass validateToken:', e));
+            }
+
             // Fetch both PG and Essay questions in parallel
             const [pgResp, essayResp] = await Promise.all([
                 axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
@@ -1454,21 +1486,31 @@ const StudentExams = () => {
                                 </div>
 
                                 {ex.isFinished || JSON.parse(localStorage.getItem('finishedExams') || '{}')[`${user.profileId}_${ex.id}`] ? (
-                                    ex.tampilkanNilai ? (
-                                        <button className="start-btn" style={{ background: '#ecfdf5', color: '#10b981', borderColor: '#10b981' }} onClick={() => handleViewTranscript(ex)}>
-                                            <Award size={18} />
-                                            Lihat Transkrip Nilai
-                                        </button>
-                                    ) : (
-                                        <button className="start-btn" style={{ background: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} disabled>
-                                            <CheckCircle size={18} />
-                                            Selesai Dikerjakan
-                                        </button>
-                                    )
+                                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                        {ex.tampilkanNilai && (
+                                            <button className="start-btn" style={{ flex: 1, background: '#ecfdf5', color: '#10b981', borderColor: '#10b981' }} onClick={() => handleViewTranscript(ex)}>
+                                                <Award size={18} />
+                                                Lihat Nilai
+                                            </button>
+                                        )}
+                                        {((selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi'))) || Number(ex.durasi) === 0 || ex.isPractice) ? (
+                                            <button className="start-btn" style={{ flex: 1, background: '#eff6ff', color: '#2563eb', borderColor: '#3b82f6' }} onClick={() => handleStartClick(ex)}>
+                                                <Play size={18} />
+                                                Coba Ujian Lagi
+                                            </button>
+                                        ) : (
+                                            !ex.tampilkanNilai && (
+                                                <button className="start-btn" style={{ background: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }} disabled>
+                                                    <CheckCircle size={18} />
+                                                    Selesai Dikerjakan
+                                                </button>
+                                            )
+                                        )}
+                                    </div>
                                 ) : (
                                     <button className="start-btn" onClick={() => handleStartClick(ex)}>
                                         <Play size={18} />
-                                        Ikuti Ujian
+                                        {((selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi'))) || Number(ex.durasi) === 0 || ex.isPractice) ? 'Mulai Ujian Latihan' : 'Ikuti Ujian'}
                                     </button>
                                 )}
                             </div>

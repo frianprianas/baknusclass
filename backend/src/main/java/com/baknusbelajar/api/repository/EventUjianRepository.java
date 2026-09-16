@@ -10,5 +10,9 @@ import java.util.Optional;
 public interface EventUjianRepository extends JpaRepository<EventUjian, Long> {
     Optional<EventUjian> findByStatusAktifTrue();
 
+    Optional<EventUjian> findFirstByStatusAktifTrueOrderByIdDesc();
+
+    Optional<EventUjian> findFirstByNamaEventContainingIgnoreCase(String keyword);
+
     long countByStatusAktifTrue();
 }

@@ -240,7 +240,12 @@ public class UjianMapelService {
         UjianMapel entity = ujianMapelRepository.findById(ujianId)
                 .orElseThrow(() -> new RuntimeException("Ujian not found"));
 
-        boolean isValid = entity.getToken() != null && entity.getToken().equalsIgnoreCase(token);
+        boolean isLatihan = (entity.getEventUjian() != null && entity.getEventUjian().getNamaEvent() != null &&
+                (entity.getEventUjian().getNamaEvent().toUpperCase().contains("LATIHAN") ||
+                 entity.getEventUjian().getNamaEvent().toUpperCase().contains("SIMULASI"))) ||
+                (entity.getDurasi() != null && entity.getDurasi() == 0);
+
+        boolean isValid = isLatihan || (entity.getToken() != null && entity.getToken().equalsIgnoreCase(token));
 
         if (isValid && userId != null) {
             var siswa = siswaRepository.findByUserId(userId)
@@ -252,12 +257,15 @@ public class UjianMapelService {
                         com.baknusbelajar.api.entity.SiswaUjianStatus newStatus = new com.baknusbelajar.api.entity.SiswaUjianStatus();
                         newStatus.setSiswa(siswa);
                         newStatus.setUjianMapel(entity);
-                        newStatus.setWaktuMulaiSiswa(java.time.LocalDateTime.now());
                         return newStatus;
                     });
 
-            // If already started before, do NOT overwrite waktuMulaiSiswa.
-            if (status.getWaktuMulaiSiswa() == null) {
+            // For practice exams, reset finished status so students can re-attempt freely
+            if (isLatihan) {
+                status.setStatusSelesai(false);
+                status.setWaktuSelesai(null);
+                status.setWaktuMulaiSiswa(java.time.LocalDateTime.now());
+            } else if (status.getWaktuMulaiSiswa() == null) {
                 status.setWaktuMulaiSiswa(java.time.LocalDateTime.now());
             }
 

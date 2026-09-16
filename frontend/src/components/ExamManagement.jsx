@@ -94,6 +94,7 @@ const QuillEditor = ({ value, onChange, placeholder, isSimple }) => {
 const ExamManagement = () => {
     const [activeTab, setActiveTab] = useState('events'); // 'events' or 'exams'
     const [events, setEvents] = useState([]);
+    const [allMapels, setAllMapels] = useState([]);
     const [myAssignments, setMyAssignments] = useState([]);
     const [exams, setExams] = useState([]);
     const [teachers, setTeachers] = useState([]);
@@ -303,6 +304,13 @@ const ExamManagement = () => {
             const eventData = res.data;
             setEvents(eventData);
 
+            try {
+                const mapelRes = await axios.get('/api/master/mapel', { headers });
+                setAllMapels(mapelRes.data || []);
+            } catch (e) {
+                console.error("Error fetching master mapels", e);
+            }
+
             // Auto-select first active event if nothing selected
             if (eventData.length > 0 && !examForm.eventId) {
                 const activeEvent = eventData.find(e => e.statusAktif) || eventData[0];
@@ -386,21 +394,28 @@ const ExamManagement = () => {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
-        // Calculate waktuSelesai from waktuMulai + durasi
-        const startDate = new Date(examForm.waktuMulai);
-        const endDate = new Date(startDate.getTime() + (examForm.durasi || 0) * 60 * 1000);
+        const ev = events.find(e => e.id == examForm.eventId);
+        const isLatihan = ev?.namaEvent && (ev.namaEvent.toLowerCase().includes('latihan') || ev.namaEvent.toLowerCase().includes('simulasi'));
+
+        let startIso = examForm.waktuMulai;
+        if (!startIso && isLatihan) {
+            startIso = new Date().toISOString().substring(0, 16);
+        }
+
+        const startDate = new Date(startIso);
+        const endDate = new Date(startDate.getTime() + (Number(examForm.durasi) || 0) * 60 * 1000);
 
         const payload = {
             ...examForm,
+            waktuMulai: startDate.toISOString(),
             mapelId: Number(examForm.mapelId),
             guruId: Number(examForm.guruId),
             waktuSelesai: endDate.toISOString(),
             durasi: Number(examForm.durasi)
         };
 
-        // Validation against Event Range
-        const ev = events.find(e => e.id == examForm.eventId);
-        if (ev && ev.tanggalMulai && ev.tanggalSelesai) {
+        // Validation against Event Range (skip for Latihan events)
+        if (!isLatihan && ev && ev.tanggalMulai && ev.tanggalSelesai) {
             const evStart = new Date(ev.tanggalMulai + "T00:00");
             const evEnd = new Date(ev.tanggalSelesai + "T23:59");
             if (startDate < evStart || startDate > evEnd) {
@@ -1575,12 +1590,26 @@ const ExamManagement = () => {
                                 <option value="">-- Pilih Event Ujian --</option>
                                 {events.map(e => <option key={e.id} value={e.id}>{e.namaEvent}</option>)}
                             </select>
-                            {examForm.eventId && (userRole === 'ADMIN' || userRole === 'TU') && (
+                            {examForm.eventId && (userRole === 'ADMIN' || userRole === 'TU' || userRole === 'GURU') && (
                                 <button
                                     className="btn-primary"
                                     onClick={() => {
                                         setEditMode(false);
-                                        setExamForm({ eventId: examForm.eventId, mapelId: '', guruId: '', waktuMulai: '', waktuSelesai: '', durasi: 90, token: '', kelasIds: [] });
+                                        const ev = events.find(e => e.id == examForm.eventId);
+                                        const isLatihan = ev?.namaEvent && (ev.namaEvent.toLowerCase().includes('latihan') || ev.namaEvent.toLowerCase().includes('simulasi'));
+                                        const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                        const myFirstAssignment = myAssignments.find(a => a.guruId == user.profileId) || myAssignments[0];
+
+                                        setExamForm({
+                                            eventId: examForm.eventId,
+                                            mapelId: myFirstAssignment ? myFirstAssignment.mapelId : (allMapels[0]?.id || ''),
+                                            guruId: userRole === 'GURU' ? (user.profileId || '') : (myFirstAssignment?.guruId || ''),
+                                            waktuMulai: isLatihan ? new Date().toISOString().substring(0, 16) : '',
+                                            waktuSelesai: '',
+                                            durasi: isLatihan ? 0 : 90,
+                                            token: isLatihan ? 'LATIHAN' : '',
+                                            kelasIds: []
+                                        });
                                         setIsModalOpen(true);
                                     }}
                                 >
@@ -1693,7 +1722,7 @@ const ExamManagement = () => {
                                                                     <CloudUpload size={14} style={{ marginRight: '4px' }} />
                                                                     Upload Drive
                                                                 </button>
-                                                                {(userRole === 'ADMIN' || userRole === 'TU') && (
+                                                                {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && exam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId)) && (
                                                                     <>
                                                                         <button
                                                                             className="btn-icon-outline"
@@ -1704,10 +1733,10 @@ const ExamManagement = () => {
                                                                                     ...examForm,
                                                                                     mapelId: exam.mapelId,
                                                                                     guruId: exam.guruId,
-                                                                                    waktuMulai: exam.waktuMulai.substring(0, 16),
-                                                                                    waktuSelesai: exam.waktuSelesai.substring(0, 16),
-                                                                                    durasi: exam.durasi || 90,
-                                                                                    token: exam.token,
+                                                                                    waktuMulai: exam.waktuMulai ? exam.waktuMulai.substring(0, 16) : '',
+                                                                                    waktuSelesai: exam.waktuSelesai ? exam.waktuSelesai.substring(0, 16) : '',
+                                                                                    durasi: exam.durasi !== undefined ? exam.durasi : 90,
+                                                                                    token: exam.token || '',
                                                                                     kelasIds: exam.kelasIds || []
                                                                                 });
                                                                                 setIsModalOpen(true);
@@ -1823,26 +1852,39 @@ const ExamManagement = () => {
                             ) : (
                                 <>
                                     <div className="form-group">
-                                        <label>{(userRole === 'GURU' && !JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) ? 'Mata Pelajaran Anda' : 'Pilih Mata Pelajaran & Guru'}</label>
+                                        <label>{(userRole === 'GURU' && !JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) ? 'Mata Pelajaran' : 'Pilih Mata Pelajaran & Guru'}</label>
                                         <select
-                                            value={examForm.mapelId && examForm.guruId ? `${examForm.mapelId}-${examForm.guruId}` : ''}
+                                            value={examForm.mapelId && examForm.guruId ? `${examForm.mapelId}-${examForm.guruId}` : (examForm.mapelId ? `${examForm.mapelId}` : '')}
                                             onChange={(e) => {
                                                 const val = e.target.value;
-                                                if(val) {
-                                                    const [mId, gId] = val.split('-');
-                                                    setExamForm({ ...examForm, mapelId: mId, guruId: gId });
+                                                if (val) {
+                                                    if (val.includes('-')) {
+                                                        const [mId, gId] = val.split('-');
+                                                        setExamForm({ ...examForm, mapelId: mId, guruId: gId });
+                                                    } else {
+                                                        const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                                        setExamForm({ ...examForm, mapelId: val, guruId: userRole === 'GURU' ? (user.profileId || '') : (teachers[0]?.profileId || '') });
+                                                    }
                                                 } else {
                                                     setExamForm({ ...examForm, mapelId: '', guruId: '' });
                                                 }
                                             }}
                                             required
                                         >
-                                            <option value="">-- Pilih Mapel & Guru --</option>
-                                            {Array.from(new Map(myAssignments.map(a => [`${a.mapelId}-${a.guruId}`, a])).values()).map(a => (
-                                                <option key={`${a.mapelId}-${a.guruId}`} value={`${a.mapelId}-${a.guruId}`}>
-                                                    {a.namaMapel} ({a.namaGuru})
-                                                </option>
-                                            ))}
+                                            <option value="">-- Pilih Mata Pelajaran --</option>
+                                            {myAssignments.length > 0 ? (
+                                                Array.from(new Map(myAssignments.map(a => [`${a.mapelId}-${a.guruId}`, a])).values()).map(a => (
+                                                    <option key={`${a.mapelId}-${a.guruId}`} value={`${a.mapelId}-${a.guruId}`}>
+                                                        {a.namaMapel} ({a.namaGuru})
+                                                    </option>
+                                                ))
+                                            ) : (
+                                                allMapels.map(m => (
+                                                    <option key={m.id} value={`${m.id}`}>
+                                                        {m.namaMapel}
+                                                    </option>
+                                                ))
+                                            )}
                                         </select>
                                     </div>
 
@@ -1904,7 +1946,7 @@ const ExamManagement = () => {
                                                     if (!ev || !ev.tanggalMulai) return '';
                                                     const isInvalid = new Date(ev.tanggalSelesai) < new Date(ev.tanggalMulai);
                                                     // Jika invalid, jangan batasi min agar user tetap bisa pilih (admin bisa fix nanti)
-                                                    return isInvalid ? '' : `${ev.tanggalMulai} T00:00`;
+                                                    return isInvalid ? '' : `${ev.tanggalMulai}T00:00`;
                                                 })()}
                                                 max={(() => {
                                                     const ev = events.find(e => e.id == examForm.eventId);

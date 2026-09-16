@@ -100,14 +100,14 @@ public class DbMigrationRunner implements CommandLineRunner {
             
             // Ensure default Latihan / Simulasi Event exists in tb_event_ujian
             try {
-                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_event_ujian WHERE kode_event = 'SIMULASI_CBT'")) {
+                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_event_ujian WHERE UPPER(nama_event) LIKE '%LATIHAN%' OR UPPER(nama_event) LIKE '%SIMULASI%'")) {
                     if (rs.next() && rs.getInt(1) == 0) {
-                        stmt.executeUpdate("INSERT INTO tb_event_ujian (nama_event, kode_event, status_aktif, deskripsi, tanggal_dibuat) VALUES ('Simulasi & Latihan CBT', 'SIMULASI_CBT', 1, 'Event latihan mandiri tanpa batas waktu untuk mencoba sistem dan seluruh format soal CBT', CURRENT_TIMESTAMP)");
+                        stmt.executeUpdate("INSERT INTO tb_event_ujian (nama_event, semester, tahun_ajaran, tanggal_mulai, tanggal_selesai, status_aktif) VALUES ('Simulasi & Latihan CBT', 'GANJIL', '2025/2026', TO_DATE('2025-01-01', 'YYYY-MM-DD'), TO_DATE('2035-12-31', 'YYYY-MM-DD'), 1)");
                         System.out.println("Oracle Migration: Default Event LATIHAN created successfully in tb_event_ujian.");
                     }
                 }
             } catch (Exception e) {
-                System.out.println("Oracle Migration: Check/Insert tb_event_ujian ignored: " + e.getMessage());
+                System.out.println("Oracle Migration: Check/Insert tb_event_ujian error: " + e.getMessage());
             }
 
             System.out.println("====== Oracle DB Schema Migration Completed Successfully ======");

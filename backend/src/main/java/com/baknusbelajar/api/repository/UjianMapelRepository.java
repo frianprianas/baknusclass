@@ -15,6 +15,7 @@ public interface UjianMapelRepository extends JpaRepository<UjianMapel, Long> {
     long countByGuruIdAndEventUjian_StatusAktifTrue(Long guruId);
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT u FROM UjianMapel u LEFT JOIN u.kelasList k WHERE u.eventUjian.id = :eventId AND (" +
+           "UPPER(u.eventUjian.namaEvent) LIKE '%LATIHAN%' OR UPPER(u.eventUjian.namaEvent) LIKE '%SIMULASI%' OR u.durasi = 0 OR " +
            "k.id = (SELECT s.kelas.id FROM com.baknusbelajar.api.entity.Siswa s WHERE s.id = :siswaId) OR " +
            "EXISTS (SELECT 1 FROM com.baknusbelajar.api.entity.GuruMapel gm WHERE gm.mapel.id = u.mapel.id AND gm.guru.id = u.guru.id " +
            "AND gm.kelas.id = (SELECT s.kelas.id FROM com.baknusbelajar.api.entity.Siswa s WHERE s.id = :siswaId)))")

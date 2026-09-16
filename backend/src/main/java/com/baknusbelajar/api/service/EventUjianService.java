@@ -34,7 +34,7 @@ public class EventUjianService {
     }
 
     public com.baknusbelajar.api.dto.exam.EventUjianDTO getActiveEvent() {
-        return eventUjianRepository.findByStatusAktifTrue().map(this::mapToDTO)
+        return eventUjianRepository.findFirstByStatusAktifTrueOrderByIdDesc().map(this::mapToDTO)
                 .orElseThrow(() -> new RuntimeException("No active Event Ujian found"));
     }
 
