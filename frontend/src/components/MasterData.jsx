@@ -131,7 +131,20 @@ const MasterData = () => {
             await axios.delete(`/api/master/${activeTab}/${id}`, { headers });
             fetchData();
         } catch (err) {
-            alert('Gagal menghapus data.');
+            alert('Gagal menghapus data: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const handleCleanupInvalidKelas = async () => {
+        if (!window.confirm('Bersihkan semua kelas dengan format tidak valid (seperti format eksponen 2,42518E+11)? Siswa yang terhubung akan dilepas status kelasnya sementara agar bisa disinkronkan ulang.')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            const res = await axios.post('/api/master/kelas/cleanup-invalid', {}, { headers });
+            alert(res.data.message || 'Pembersihan kelas berhasil.');
+            fetchData();
+        } catch (err) {
+            alert('Gagal membersihkan kelas: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -347,10 +360,34 @@ const MasterData = () => {
                     <p>Kelola konfigurasi dasar sistem pendidikan</p>
                 </div>
                 {activeTab !== 'pengampu' && (
-                    <button className="primary-btn" onClick={() => { resetForms(); setIsModalOpen(true); }}>
-                        <Plus size={18} />
-                        <span>Tambah {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {activeTab === 'kelas' && (
+                            <button
+                                style={{
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '10px 16px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontWeight: 500,
+                                    fontSize: '0.875rem'
+                                }}
+                                onClick={handleCleanupInvalidKelas}
+                                title="Hapus semua kelas yang formatnya tidak valid (misal: 2,42518E+11)"
+                            >
+                                <Trash2 size={16} />
+                                <span>Bersihkan Kelas Rusak</span>
+                            </button>
+                        )}
+                        <button className="primary-btn" onClick={() => { resetForms(); setIsModalOpen(true); }}>
+                            <Plus size={18} />
+                            <span>Tambah {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</span>
+                        </button>
+                    </div>
                 )}
             </div>
 

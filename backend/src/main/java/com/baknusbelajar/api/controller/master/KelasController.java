@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/master/kelas")
@@ -43,5 +44,15 @@ public class KelasController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         kelasService.deleteKelas(id);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/cleanup-invalid")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU')")
+    public ResponseEntity<?> cleanupInvalid() {
+        int deleted = kelasService.cleanupInvalidKelas();
+        return ResponseEntity.ok(Map.of(
+            "message", "Berhasil membersihkan " + deleted + " data kelas yang tidak valid/rusak",
+            "deletedCount", deleted
+        ));
     }
 }
