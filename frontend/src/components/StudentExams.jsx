@@ -130,7 +130,129 @@ const StudentExams = () => {
             const hasilPerMapel = await Promise.all(
                 examsWithScores.map(async (ex) => {
                     try {
-                                    // Fetch both PG and Essay questions in parallel
+                        // Fetch questions
+                        const qResp = await axios.get(`/api/exam/soal-essay/ujian/${ex.id}`, { headers });
+                        const qs = qResp.data;
+
+                        // Fetch student answers for this exam
+                        const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
+                        const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
+
+                        // Strip HTML tags for cleaner AI context
+                        const stripHtml = (html) => html ? html.replace(/<[^>]*>/g, '').trim() : '';
+
+                        const daftarJawaban = qs.map(q => {
+                            const ans = userAnswers.find(a => a.soalId === q.id) || {};
+                            return {
+                                soal: stripHtml(q.pertanyaan),
+                                jawabSiswa: ans.teksJawaban || '(Tidak ada jawaban)',
+                                skor: ans.skorFinalGuru !== undefined && ans.skorFinalGuru !== null ? ans.skorFinalGuru : null,
+                                bobotMaksimal: q.bobotNilai || 100
+                            };
+                        });
+
+                        return {
+                            namaMapel: ex.namaMapel,
+                            nilaiAkhir: ex.nilaiAkhir,
+                            daftarJawaban
+                        };
+                    } catch (err) {
+                        // Fallback: just send the score if fetching Q&A fails
+                        return { namaMapel: ex.namaMapel, nilaiAkhir: ex.nilaiAkhir, daftarJawaban: [] };
+                    }
+                })
+            );
+
+            const namaSiswa = user.namaLengkap || user.username || 'Siswa';
+            const resp = await axios.post('/api/exam/saran-nilai/generate', { namaSiswa, hasilPerMapel }, { headers });
+            setAiSaran(resp.data);
+            setAiGenerated(prev => ({ ...prev, [cacheKey]: resp.data }));
+        } catch (err) {
+            console.error('Error generating AI recommendation:', err);
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const handleStartClick = (exam) => {
+        setTokenInput('');
+        setShowTokenOverlay(exam);
+    };
+
+    const handleViewTranscript = async (exam) => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // Fetch questions
+            const qResp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
+            const qs = qResp.data;
+
+            // Fetch answers
+            const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
+            const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
+
+            const compiledList = qs.map((q, i) => {
+                const ans = userAnswers.find(a => a.soalId === q.id) || {};
+                return {
+                    no: i + 1,
+                    pertanyaan: q.pertanyaan,
+                    bobot: q.bobotNilai,
+                    jawabanSiswa: ans.teksJawaban || 'Tidak ada jawaban',
+                    skorGuru: ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined ? ans.skorFinalGuru : null,
+                    saranAi: ans.alasanAi || 'Tidak ada catatan'
+                };
+            });
+
+            let totalSkor = 0;
+            let fullyGraded = true;
+            compiledList.forEach(item => {
+                if (item.skorGuru !== null) totalSkor += item.skorGuru;
+                else fullyGraded = false;
+            });
+            const finalScore = qs.length > 0 ? (totalSkor / qs.length).toFixed(1) : 0;
+
+            setTranscriptData({ exam, compiledList, finalScore, fullyGraded });
+            setShowTranscript(true);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal memuat transkrip nilai.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyToken = async (e) => {
+        setIsSubmitting(true);
+        try {
+            let deviceId = localStorage.getItem('deviceId');
+            if (!deviceId) {
+                deviceId = 'dev_' + Math.random().toString(36).substring(2) + Date.now();
+                localStorage.setItem('deviceId', deviceId);
+            }
+
+            const trimmedToken = tokenInput.trim();
+            const resp = await axios.post(`/api/exam/ujian-mapel/${showTokenOverlay.id}/validate-token?ujianToken=${trimmedToken}&deviceId=${deviceId}`, {}, { headers });
+            if (resp.data === true) {
+                startExam(showTokenOverlay);
+                setShowTokenOverlay(null);
+            } else {
+                alert('Token Ujian Salah!');
+            }
+        } catch (err) {
+            if (err.response && err.response.data && typeof err.response.data === 'string') {
+                alert(err.response.data);
+            } else {
+                alert('Gagal verifikasi token. ' + (err.response?.data?.message || ''));
+            }
+        }
+    };
+
+    const startExam = async (exam) => {
+        setLoading(true);
+        try {
+            // Fetch both PG and Essay questions in parallel
             const [pgResp, essayResp] = await Promise.all([
                 axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
                 axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
@@ -219,7 +341,6 @@ const StudentExams = () => {
 
     const [isSaving, setIsSaving] = useState(false);
 
-    
     const saveAnswerPG = async (soalId, selectedOption, isRagu = false) => {
         if (!user.profileId) return;
         setIsSaving(true);
@@ -347,8 +468,8 @@ const StudentExams = () => {
                             <BookOpen size={24} color="#1e88e5" />
                         </div>
                         <div className="cbt-title">
-                            <strong>IT Support Baknus 666</strong>
-                            <span>Application</span>
+                            <strong>{currentExam?.namaMapel || 'Ujian CBT BaknusClass'}</strong>
+                            <span>{currentExam?.namaEvent || 'SMK Bakti Nusantara 666'}</span>
                         </div>
                     </div>
                     <div className="cbt-userinfo">
@@ -358,10 +479,20 @@ const StudentExams = () => {
                 </header>
 
                 <div className="cbt-body">
-                    <aside className="cbt-sidebar">
-                        <div className="sidebar-title">
-                            <LayoutGrid size={18} />
-                            <span>Nomor Soal</span>
+                    <aside className={`cbt-sidebar ${showNav ? 'mobile-open' : ''}`}>
+                        <div className="sidebar-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <LayoutGrid size={18} />
+                                <span>Nomor Soal</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="sidebar-close-mobile"
+                                onClick={() => setShowNav(false)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                            >
+                                <X size={20} />
+                            </button>
                         </div>
                         <div className="sidebar-grid">
                             {questions.map((sq, idx) => {
@@ -389,6 +520,7 @@ const StudentExams = () => {
                             <div className="legend-item"><span className="dot empty"></span> Belum Diisi</div>
                         </div>
                     </aside>
+                    {showNav && <div className="cbt-sidebar-backdrop" onClick={() => setShowNav(false)}></div>}
 
                     <main className="cbt-main">
                         <div className="cbt-container">
@@ -648,7 +780,6 @@ const StudentExams = () => {
                 )}
 
                 <style>{`
-                    
                     
                     /* Type Badges */
                     .cbt-badge-type { font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px; }
