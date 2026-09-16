@@ -16,4 +16,5 @@ public class SoalPGDTO implements Serializable {
     private String pilihanE;
     private String kunciJawaban;
     private Double bobotNilai;
+    private String tipeSoal; // "PG_BIASA", "PG_KOMPLEKS", "BENAR_SALAH"
 }

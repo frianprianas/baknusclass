@@ -9,6 +9,7 @@ import {
     ChevronRight,
     ShieldCheck,
     CheckCircle2,
+    CheckSquare,
     XCircle,
     Trash2,
     Book,
@@ -137,6 +138,7 @@ const ExamManagement = () => {
     });
     const [questionFormPG, setQuestionFormPG] = useState({
         pertanyaan: '',
+        tipeSoal: 'PG_BIASA',
         pilihanA: '',
         pilihanB: '',
         pilihanC: '',
@@ -252,356 +254,21 @@ const ExamManagement = () => {
     const resetQuestionForm = () => {
         setQuestionForm({ pertanyaan: '', kunciJawaban: '', bobotNilai: 10 });
         setQuestionFormPG({
-            pertanyaan: '',
-            pilihanA: '', pilihanB: '', pilihanC: '', pilihanD: '', pilihanE: '',
-            kunciJawaban: 'A', bobotNilai: 2
-        });
-        setEditingQuestion(null);
-    };
-
-    useEffect(() => {
-        if (isModalOpen || isKartuModalOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => { document.body.style.overflow = 'unset'; };
-    }, [isModalOpen, isKartuModalOpen]);
-
-    useEffect(() => {
-        const userStr = localStorage.getItem('user');
-        let role = 'GURU';
-        if (userStr) {
-            const userObj = JSON.parse(userStr);
-            role = userObj.role || 'GURU';
-            setUserRole(role);
-        } else {
-            setUserRole('GURU');
-        }
-
-        const userObj = JSON.parse(userStr || '{}');
-        const isCoAdmin = userObj.isCoAdmin;
-        if (role === 'GURU' && !isCoAdmin) {
-            setActiveTab('exams');
-        }
-
-
-        fetchData(role);
-        fetchMyAssignments(role); // ✅ pass role directly, tidak pakai state yg belum ready
-    }, []);
-
-    const fetchData = async (role) => {
-        const effectiveRole = role || userRole;
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        try {
-            const res = await axios.get('/api/exam/event', { headers });
-            const eventData = res.data;
-            setEvents(eventData);
-
-            // Auto-select first active event if nothing selected
-            if (eventData.length > 0 && !examForm.eventId) {
-                const activeEvent = eventData.find(e => e.statusAktif) || eventData[0];
-                setExamForm(prev => ({ ...prev, eventId: activeEvent.id }));
-                fetchExams(activeEvent.id);
-            }
-
-            if (effectiveRole === 'ADMIN' || effectiveRole === 'TU' || JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) {
-                try {
-                    const usersRes = await axios.get('/api/users', { headers });
-                    // Filter only teachers to assign as proktor
-                    const guruUsers = usersRes.data.filter(u => u.role === 'GURU');
-                    setTeachers(guruUsers);
-
-                    const kelasRes = await axios.get('/api/master/kelas', { headers });
-                    setKelasList(kelasRes.data);
-                } catch (e) {
-                    console.error("Error fetching master data", e);
-                }
-            }
-        } catch (err) {
-            console.error('Fetch error:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchMyAssignments = async (role) => {
-        // role bisa dari parameter (pertama kali) atau dari state (refresh)
-        const effectiveRole = role || userRole;
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        try {
-            // ADMIN/TU: ambil semua. GURU: ambil punya sendiri via /my
-            const endpoint = (effectiveRole === 'ADMIN' || effectiveRole === 'TU' || user.isCoAdmin)
-                ? '/api/enrollment/guru-mapel'
-                : '/api/enrollment/guru-mapel/my';
-            const res = await axios.get(endpoint, { headers });
-            setMyAssignments(res.data);
-        } catch (err) {
-            console.error('Fetch assignments error:', err);
-        }
-    };
-
-
-    const fetchExams = async (eventId) => {
-        const token = localStorage.getItem('token');
-        try {
-            const res = await axios.get(`/api/exam/ujian-mapel/event/${eventId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setExams(res.data);
-        } catch (err) {
-            console.error('Fetch exams error:', err);
-        }
-    };
-
-    const handleSaveEvent = async (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        try {
-            if (new Date(eventForm.tanggalSelesai) < new Date(eventForm.tanggalMulai)) {
-                alert('Tanggal Selesai tidak boleh sebelum Tanggal Mulai');
-                return;
-            }
-            if (editMode) {
-                await axios.put(`/api/exam/event/${selectedItem.id}`, eventForm, { headers });
-            } else {
-                await axios.post('/api/exam/event', eventForm, { headers });
-            }
-            setIsModalOpen(false);
-            fetchData();
-        } catch (err) {
-            alert('Gagal menyimpan event');
-        }
-    };
-
-    const handleSaveExam = async (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-
-        // Calculate waktuSelesai from waktuMulai + durasi
-        const startDate = new Date(examForm.waktuMulai);
-        const endDate = new Date(startDate.getTime() + (examForm.durasi || 0) * 60 * 1000);
-
-        const payload = {
-            ...examForm,
-            mapelId: Number(examForm.mapelId),
-            guruId: Number(examForm.guruId),
-            waktuSelesai: endDate.toISOString(),
-            durasi: Number(examForm.durasi)
-        };
-
-        // Validation against Event Range
-        const ev = events.find(e => e.id == examForm.eventId);
-        if (ev && ev.tanggalMulai && ev.tanggalSelesai) {
-            const evStart = new Date(ev.tanggalMulai + "T00:00");
-            const evEnd = new Date(ev.tanggalSelesai + "T23:59");
-            if (startDate < evStart || startDate > evEnd) {
-                alert(`Waktu mulai harus berada dalam rentang event: ${ev.tanggalMulai} s/d ${ev.tanggalSelesai}`);
-                return;
-            }
-        }
-
-        try {
-            if (editMode) {
-                await axios.put(`/api/exam/ujian-mapel/${selectedItem.id}`, payload, { headers });
-            } else {
-                await axios.post('/api/exam/ujian-mapel', payload, { headers });
-            }
-            setIsModalOpen(false);
-            fetchExams(examForm.eventId);
-        } catch (err) {
-            console.error(err);
-            const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Unknown error';
-            alert('Gagal menyimpan ujian: ' + errorMsg);
-        }
-    };
-
-    const handleRefreshToken = async (id) => {
-        if (!window.confirm('Generate ulang token ujian ini?')) return;
-        const token = localStorage.getItem('token');
-        try {
-            await axios.post(`/api/exam/ujian-mapel/${id}/refresh-token`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            fetchExams(examForm.eventId);
-            alert('Token berhasil diperbarui!');
-        } catch (err) {
-            alert('Gagal refresh token');
-        }
-    };
-
-    const handleDeleteExam = async (id) => {
-        alert('DEBUG: Clicked Hapus Jadwal Ujian ID ' + id);
-        if (!window.confirm('Hapus jadwal ujian ini? Data soal akan tetap ada tetapi tidak lagi terjadwal.')) return;
-        const token = localStorage.getItem('token');
-        try {
-            await axios.delete(`/api/exam/ujian-mapel/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            fetchExams(examForm.eventId);
-            alert('Jadwal ujian berhasil dihapus');
-        } catch (err) {
-            alert('Gagal hapus jadwal ujian');
-        }
-    };
-
-    const handleDeleteEvent = async (id, force = false) => {
-        alert('DEBUG: Clicked Hapus Event ID ' + id + ', Force: ' + force);
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-
-        if (!force) {
-            if (!window.confirm('Hapus event ini?')) return;
-        }
-
-        try {
-            console.log(`Menghapus event ID: ${id}, force: ${force}`);
-            const res = await axios.delete(`/api/exam/event/${id}${force ? '?force=true' : ''}`, { headers });
-            console.log('Hapus response:', res.data);
-            alert('Event berhasil dihapus');
-            fetchData();
-        } catch (err) {
-            console.error('Hapus Error:', err);
-            if (err.response?.status === 409) {
-                const msg = err.response.data;
-                const messageString = typeof msg === 'string' ? msg : (msg.message || JSON.stringify(msg));
-
-                if (messageString.includes('CONTAINS_DATA|')) {
-                    const count = messageString.split('|')[1];
-                    if (window.confirm(`PERINGATAN: Event ini memiliki ${count} jadwal ujian aktif. Jika Anda menghapus event ini, semua jadwal ujian di dalamnya juga akan terhapus. Lanjutkan (Konfirmasi ke-2)?`)) {
-                        handleDeleteEvent(id, true);
-                    }
-                } else {
-                    alert('Gagal menghapus (Conflict): ' + messageString);
-                }
-            } else {
-                const errorMsg = err.response?.data?.message || err.response?.data || err.message;
-                alert('Gagal menghapus: ' + errorMsg);
-            }
-        }
-    };
-
-    const handleToggleEventStatus = async (id) => {
-        const token = localStorage.getItem('token');
-        try {
-            await axios.put(`/api/exam/event/${id}/toggle-status`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            fetchData();
-        } catch (err) {
-            alert('Gagal mengubah status event');
-        }
-    };
-
-    const handleDeleteAllEvents = async () => {
-        alert('DEBUG: Clicked Hapus Semua Event');
-        if (!window.confirm('YAKIN INGIN MENGHAPUS SEMUA RINCIAN EVENT BESERTA JADWAL UJIAN? Keputusan ini tidak bisa dibatalkan!')) return;
-        const token = localStorage.getItem('token');
-        try {
-            await axios.get(`/api/exam/event/delete-all`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            alert('Sukses. Semua Events Ujian telah dihapus.');
-            fetchData();
-        } catch (err) {
-            alert('Gagal menghapus semua event');
-        }
-    };
-
-    const openEditModal = (item) => {
-        setSelectedItem(item);
-        setEditMode(true);
-        if (activeTab === 'events') {
-            setEventForm({
-                namaEvent: item.namaEvent,
-                semester: item.semester,
-                tahunAjaran: item.tahunAjaran,
-                tanggalMulai: item.tanggalMulai || '',
-                tanggalSelesai: item.tanggalSelesai || '',
-                statusAktif: item.statusAktif,
-                proktorIds: item.proktorIds || []
-            });
-        }
-        setIsModalOpen(true);
-    };
-
-
-
-    const handleManageQuestions = async (exam) => {
-        setViewingQuestions(exam);
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        try {
-            const [essayRes, pgRes] = await Promise.all([
-                axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }),
-                axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers })
-            ]);
-            setQuestions(essayRes.data);
-            setQuestionsPG(pgRes.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const handleSaveQuestion = async (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
-        const headers = { Authorization: `Bearer ${token}` };
-        try {
-            if (qType === 'essay') {
-                const body = { ...questionForm, ujianMapelId: viewingQuestions.id };
-                if (editingQuestion) {
-                    await axios.put(`/api/exam/soal-essay/${editingQuestion.id}`, body, { headers });
-                } else {
-                    await axios.post('/api/exam/soal-essay', body, { headers });
-                }
-            } else {
-                const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id };
-                if (editingQuestion) {
-                    await axios.put(`/api/exam/soal-pg/${editingQuestion.id}`, body, { headers });
-                } else {
-                    await axios.post('/api/exam/soal-pg', body, { headers });
-                }
-            }
-            resetQuestionForm();
-            handleManageQuestions(viewingQuestions);
-        } catch (err) {
-            console.error(err);
-            const msg = err.response?.data?.message || err.message || 'Gagal simpan soal';
-            alert('Error Simpan: ' + msg);
-        }
-    };
-
-    const handleEditSoal = (q, type) => {
-        setQType(type);
-        setEditingQuestion(q);
-        if (type === 'essay') {
-            setQuestionForm({
                 pertanyaan: q.pertanyaan,
-                kunciJawaban: q.kunciJawaban,
-                bobotNilai: q.bobotNilai
-            });
-        } else {
-            setQuestionFormPG({
-                pertanyaan: q.pertanyaan,
-                pilihanA: q.pilihanA,
-                pilihanB: q.pilihanB,
-                pilihanC: q.pilihanC,
-                pilihanD: q.pilihanD,
-                pilihanE: q.pilihanE,
-                kunciJawaban: q.kunciJawaban,
-                bobotNilai: q.bobotNilai
+                tipeSoal: q.tipeSoal || 'PG_BIASA',
+                pilihanA: q.pilihanA || '',
+                pilihanB: q.pilihanB || '',
+                pilihanC: q.pilihanC || '',
+                pilihanD: q.pilihanD || '',
+                pilihanE: q.pilihanE || '',
+                kunciJawaban: q.kunciJawaban || 'A',
+                bobotNilai: q.bobotNilai || 2
             });
         }
     };
 
     const handleDeleteSoal = async (id, type) => {
-        alert('DEBUG: Clicked Hapus Soal ID ' + id + ', Type: ' + type);
+        
         if (!window.confirm('Hapus soal ini?')) return;
         const token = localStorage.getItem('token');
         try {
@@ -730,28 +397,119 @@ const ExamManagement = () => {
 
                                     {qType === 'pg' && (
                                         <div className="options-section-v2">
-                                            <label className="section-label">Opsi Jawaban & Kunci</label>
-                                            <div className="space-y-3">
-                                                {['A', 'B', 'C', 'D', 'E'].map(opt => (
-                                                    <div key={opt} className={`opt - input - v2 ${questionFormPG.kunciJawaban === opt ? 'selected' : ''} `}>
-                                                        <button
-                                                            type="button"
-                                                            className="opt-check"
-                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, kunciJawaban: opt })}
-                                                            title="Jadikan sebagai kunci jawaban"
-                                                        >
-                                                            {opt}
-                                                        </button>
-                                                        <input
-                                                            type="text"
-                                                            value={questionFormPG[`pilihan${opt} `]}
-                                                            onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt} `]: e.target.value })}
-                                                            placeholder={`Pilihan ${opt}...`}
-                                                            required={opt !== 'E'}
-                                                        />
-                                                    </div>
-                                                ))}
+                                            <div style={{ marginBottom: '18px' }}>
+                                                <label className="section-label" style={{ display: 'block', marginBottom: '8px' }}>Pilih Format Soal Objektif</label>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn-type-toggle ${(questionFormPG.tipeSoal || 'PG_BIASA') === 'PG_BIASA' ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            const firstKey = (questionFormPG.kunciJawaban || 'A').split(',')[0].trim() || 'A';
+                                                            setQuestionFormPG({ ...questionFormPG, tipeSoal: 'PG_BIASA', kunciJawaban: firstKey });
+                                                        }}
+                                                    >
+                                                        🔘 Pilihan Ganda Biasa (1 Kunci)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn-type-toggle ${questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'active' : ''}`}
+                                                        onClick={() => setQuestionFormPG({ ...questionFormPG, tipeSoal: 'PG_KOMPLEKS' })}
+                                                    >
+                                                        ☑️ Pilihan Ganda Kompleks (Banyak Kunci)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn-type-toggle ${questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'active' : ''}`}
+                                                        onClick={() => setQuestionFormPG({
+                                                            ...questionFormPG,
+                                                            tipeSoal: 'BENAR_SALAH',
+                                                            pilihanA: 'Benar',
+                                                            pilihanB: 'Salah',
+                                                            pilihanC: '',
+                                                            pilihanD: '',
+                                                            pilihanE: '',
+                                                            kunciJawaban: questionFormPG.kunciJawaban === 'B' ? 'B' : 'A'
+                                                        })}
+                                                    >
+                                                        ⚖️ Pernyataan Benar / Salah
+                                                    </button>
+                                                </div>
                                             </div>
+
+                                            {questionFormPG.tipeSoal === 'BENAR_SALAH' ? (
+                                                <div className="true-false-selection">
+                                                    <label className="section-label" style={{ display: 'block', marginBottom: '10px' }}>Kunci Jawaban Pernyataan Ini:</label>
+                                                    <div style={{ display: 'flex', gap: '16px' }}>
+                                                        <div
+                                                            className={`tf-card tf-true ${questionFormPG.kunciJawaban === 'A' ? 'selected' : ''}`}
+                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, kunciJawaban: 'A', pilihanA: 'Benar', pilihanB: 'Salah' })}
+                                                        >
+                                                            <div className="tf-badge">A</div>
+                                                            <div className="tf-label">BENAR</div>
+                                                            {questionFormPG.kunciJawaban === 'A' && <CheckCircle2 className="tf-check" size={20} />}
+                                                        </div>
+                                                        <div
+                                                            className={`tf-card tf-false ${questionFormPG.kunciJawaban === 'B' ? 'selected' : ''}`}
+                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, kunciJawaban: 'B', pilihanA: 'Benar', pilihanB: 'Salah' })}
+                                                        >
+                                                            <div className="tf-badge">B</div>
+                                                            <div className="tf-label">SALAH</div>
+                                                            {questionFormPG.kunciJawaban === 'B' && <CheckCircle2 className="tf-check" size={20} />}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                        <label className="section-label">Opsi Jawaban & Kunci</label>
+                                                        {questionFormPG.tipeSoal === 'PG_KOMPLEKS' && (
+                                                            <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 600 }}>
+                                                                *Klik tombol opsi (A-E) untuk memilih satu atau lebih kunci jawaban benar
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                            const selectedKeys = (questionFormPG.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                                                            const isSelected = questionFormPG.tipeSoal === 'PG_KOMPLEKS'
+                                                                ? selectedKeys.includes(opt)
+                                                                : questionFormPG.kunciJawaban === opt;
+
+                                                            return (
+                                                                <div key={opt} className={`opt-input-v2 ${isSelected ? 'selected' : ''}`}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="opt-check"
+                                                                        onClick={() => {
+                                                                            if (questionFormPG.tipeSoal === 'PG_KOMPLEKS') {
+                                                                                let newKeys;
+                                                                                if (selectedKeys.includes(opt)) {
+                                                                                    newKeys = selectedKeys.filter(k => k !== opt);
+                                                                                } else {
+                                                                                    newKeys = [...selectedKeys, opt].sort();
+                                                                                }
+                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: newKeys.join(',') || 'A' });
+                                                                            } else {
+                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: opt });
+                                                                            }
+                                                                        }}
+                                                                        title={questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Klik untuk toggle kunci jawaban' : 'Jadikan sebagai kunci jawaban'}
+                                                                    >
+                                                                        {opt}
+                                                                    </button>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={questionFormPG[`pilihan${opt}`]}
+                                                                        onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
+                                                                        placeholder={`Pilihan ${opt}...`}
+                                                                        required={opt !== 'E'}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -838,7 +596,9 @@ const ExamManagement = () => {
                                                 <div className="q-card-header">
                                                     <div className="q-meta">
                                                         <span className="q-number-v2">Soal {idx + 1}</span>
-                                                        <span className="q-badge-pg">Pilihan Ganda</span>
+                                                        <span className="q-badge-pg">
+                                                        {q.tipeSoal === 'BENAR_SALAH' ? 'Benar / Salah' : q.tipeSoal === 'PG_KOMPLEKS' ? 'PG Kompleks' : 'Pilihan Ganda'}
+                                                    </span>
                                                     </div>
                                                     <div className="q-actions-v2">
                                                         <button className="q-btn-edit" onClick={() => handleEditSoal(q, 'pg')} title="Edit Soal">
@@ -853,10 +613,12 @@ const ExamManagement = () => {
                                                     <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
                                                     <div className="q-options-v2">
                                                         {['A', 'B', 'C', 'D', 'E'].map(opt => q[`pilihan${opt} `] && (
-                                                            <div key={opt} className={`opt - item - v2 ${q.kunciJawaban === opt ? 'is-correct' : ''} `}>
+                                                            <div key={opt} className={`opt - item - v2 ${((q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).includes(opt)) ? 'is-correct' : ''} `}>
                                                                 <div className="opt-marker">{opt}</div>
                                                                 <div className="opt-text">{q[`pilihan${opt} `]}</div>
-                                                                {q.kunciJawaban === opt && <div className="correct-check"><CheckCircle2 size={14} /></div>}
+                                                                {((q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).includes(opt)) && (
+                                                                    <div className="correct-check"><CheckCircle2 size={14} /></div>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -919,7 +681,23 @@ const ExamManagement = () => {
                     </div>
 
                     <style>{`
-                    .exam-management { max-width: 1400px; margin: 0 auto; }
+                    .exam-management { max-width: 1400px; margin: 0 auto; } 
+                    /* Tipe Soal Sub-Toggle & True-False UI */
+                    .btn-type-toggle { padding: 8px 14px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+                    .btn-type-toggle:hover { background: #f1f5f9; color: #1e293b; }
+                    .btn-type-toggle.active { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15); }
+                    .true-false-selection { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 16px; margin-bottom: 20px; }
+                    .tf-card { flex: 1; display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-radius: 14px; border: 2px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.2s; user-select: none; }
+                    .tf-card:hover { border-color: #94a3b8; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+                    .tf-card.selected.tf-true { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+                    .tf-card.selected.tf-false { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+                    .tf-badge { width: 36px; height: 36px; border-radius: 10px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem; color: #475569; }
+                    .tf-card.selected.tf-true .tf-badge { background: #10b981; color: white; }
+                    .tf-card.selected.tf-false .tf-badge { background: #ef4444; color: white; }
+                    .tf-label { font-weight: 800; font-size: 1.1rem; flex: 1; }
+                    .tf-check { color: #10b981; }
+                    .tf-card.selected.tf-false .tf-check { color: #ef4444; }
+
 
                     /* Page Header V2 */
                     .page-header-v2 { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; padding: 0 4px; }

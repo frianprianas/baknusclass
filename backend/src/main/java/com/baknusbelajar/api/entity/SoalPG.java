@@ -32,18 +32,22 @@ public class SoalPG {
     @Column(name = "pilihan_b", nullable = false)
     private String pilihanB;
 
-    @Column(name = "pilihan_c", nullable = false)
+    @Column(name = "pilihan_c")
     private String pilihanC;
 
-    @Column(name = "pilihan_d", nullable = false)
+    @Column(name = "pilihan_d")
     private String pilihanD;
 
     @Column(name = "pilihan_e")
     private String pilihanE;
 
-    @Column(name = "kunci_jawaban", nullable = false, length = 1)
-    private String kunciJawaban; // A, B, C, D, or E
+    @Column(name = "kunci_jawaban", nullable = false, length = 50)
+    private String kunciJawaban; // e.g. "A", "A,C", "B"
 
     @Column(name = "bobot_nilai", nullable = false)
     private Double bobotNilai;
+
+    @Column(name = "tipe_soal", length = 20)
+    @Builder.Default
+    private String tipeSoal = "PG_BIASA"; // PG_BIASA, PG_KOMPLEKS, BENAR_SALAH
 }

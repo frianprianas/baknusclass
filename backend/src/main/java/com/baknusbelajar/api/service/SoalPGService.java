@@ -46,6 +46,7 @@ public class SoalPGService {
         entity.setPilihanE(dto.getPilihanE());
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        entity.setTipeSoal(dto.getTipeSoal() != null ? dto.getTipeSoal() : "PG_BIASA");
 
         SoalPG saved = soalPGRepository.save(entity);
         String fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",

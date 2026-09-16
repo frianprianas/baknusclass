@@ -5,6 +5,8 @@ import {
     Clock,
     Play,
     CheckCircle,
+    CheckCircle2,
+    CheckSquare,
     AlertCircle,
     ArrowLeft,
     ChevronLeft,
@@ -128,149 +130,53 @@ const StudentExams = () => {
             const hasilPerMapel = await Promise.all(
                 examsWithScores.map(async (ex) => {
                     try {
-                        // Fetch questions
-                        const qResp = await axios.get(`/api/exam/soal-essay/ujian/${ex.id}`, { headers });
-                        const qs = qResp.data;
+                                    // Fetch both PG and Essay questions in parallel
+            const [pgResp, essayResp] = await Promise.all([
+                axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
+            ]);
 
-                        // Fetch student answers for this exam
-                        const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
-                        const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
+            const pgQuestions = (pgResp.data || []).map(q => ({ ...q, qType: 'pg' }));
+            const essayQuestions = (essayResp.data || []).map(q => ({ ...q, qType: 'essay' }));
+            const allQuestions = [...pgQuestions, ...essayQuestions];
 
-                        // Strip HTML tags for cleaner AI context
-                        const stripHtml = (html) => html ? html.replace(/<[^>]*>/g, '').trim() : '';
-
-                        const daftarJawaban = qs.map(q => {
-                            const ans = userAnswers.find(a => a.soalId === q.id) || {};
-                            return {
-                                soal: stripHtml(q.pertanyaan),
-                                jawabSiswa: ans.teksJawaban || '(Tidak ada jawaban)',
-                                skor: ans.skorFinalGuru !== undefined && ans.skorFinalGuru !== null ? ans.skorFinalGuru : null,
-                                bobotMaksimal: q.bobotNilai || 100
-                            };
-                        });
-
-                        return {
-                            namaMapel: ex.namaMapel,
-                            nilaiAkhir: ex.nilaiAkhir,
-                            daftarJawaban
-                        };
-                    } catch (err) {
-                        // Fallback: just send the score if fetching Q&A fails
-                        return { namaMapel: ex.namaMapel, nilaiAkhir: ex.nilaiAkhir, daftarJawaban: [] };
-                    }
-                })
-            );
-
-            const namaSiswa = user.namaLengkap || user.username || 'Siswa';
-            const resp = await axios.post('/api/exam/saran-nilai/generate', { namaSiswa, hasilPerMapel }, { headers });
-            setAiSaran(resp.data);
-            setAiGenerated(prev => ({ ...prev, [cacheKey]: resp.data }));
-        } catch (err) {
-            console.error('Error generating AI recommendation:', err);
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
-    const handleStartClick = (exam) => {
-        setTokenInput('');
-        setShowTokenOverlay(exam);
-    };
-
-    const handleViewTranscript = async (exam) => {
-        try {
-            setLoading(true);
-            const token = localStorage.getItem('token');
-            const headers = { Authorization: `Bearer ${token}` };
-
-            // Fetch questions
-            const qResp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
-            const qs = qResp.data;
-
-            // Fetch answers
-            const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
-            const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
-
-            const compiledList = qs.map((q, i) => {
-                const ans = userAnswers.find(a => a.soalId === q.id) || {};
-                return {
-                    no: i + 1,
-                    pertanyaan: q.pertanyaan,
-                    bobot: q.bobotNilai,
-                    jawabanSiswa: ans.teksJawaban || 'Tidak ada jawaban',
-                    skorGuru: ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined ? ans.skorFinalGuru : null,
-                    saranAi: ans.alasanAi || 'Tidak ada catatan'
-                };
-            });
-
-            let totalSkor = 0;
-            let fullyGraded = true;
-            compiledList.forEach(item => {
-                if (item.skorGuru !== null) totalSkor += item.skorGuru;
-                else fullyGraded = false;
-            });
-            const finalScore = qs.length > 0 ? (totalSkor / qs.length).toFixed(1) : 0;
-
-            setTranscriptData({ exam, compiledList, finalScore, fullyGraded });
-            setShowTranscript(true);
-        } catch (err) {
-            console.error(err);
-            alert('Gagal memuat transkrip nilai.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleVerifyToken = async (e) => {
-        setIsSubmitting(true);
-        try {
-            let deviceId = localStorage.getItem('deviceId');
-            if (!deviceId) {
-                deviceId = 'dev_' + Math.random().toString(36).substring(2) + Date.now();
-                localStorage.setItem('deviceId', deviceId);
+            if (allQuestions.length === 0) {
+                alert('Ujian ini belum memiliki soal!');
+                setLoading(false);
+                return;
             }
 
-            const trimmedToken = tokenInput.trim();
-            const resp = await axios.post(`/api/exam/ujian-mapel/${showTokenOverlay.id}/validate-token?ujianToken=${trimmedToken}&deviceId=${deviceId}`, {}, { headers });
-            if (resp.data === true) {
-                startExam(showTokenOverlay);
-                setShowTokenOverlay(null);
-            } else {
-                alert('Token Ujian Salah!');
-            }
-        } catch (err) {
-            if (err.response && err.response.data && typeof err.response.data === 'string') {
-                alert(err.response.data);
-            } else {
-                alert('Gagal verifikasi token. ' + (err.response?.data?.message || ''));
-            }
-        }
-    };
-
-    const startExam = async (exam) => {
-        setLoading(true);
-        try {
-            const resp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
-            setQuestions(resp.data);
+            setQuestions(allQuestions);
             setCurrentExam(exam);
             setCurrentIndex(0);
             setTimer(exam.durasi * 60);
 
             // Initialize empty answers
             const initialAnswers = {};
-            resp.data.forEach(q => {
+            allQuestions.forEach(q => {
                 initialAnswers[q.id] = '';
             });
             setAnswers(initialAnswers);
 
-            const answersResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
+            // Fetch existing answers for both Essay and PG
+            const [essayAnswersResp, pgAnswersResp] = await Promise.all([
+                axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban-pg/siswa/${user.profileId}/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
+            ]);
+
             const existingAnswers = {};
             const existingRagu = {};
             const existingWhiteboards = {};
-            answersResp.data.forEach(ans => {
+
+            (essayAnswersResp.data || []).forEach(ans => {
                 existingAnswers[ans.soalId] = ans.teksJawaban;
                 existingRagu[ans.soalId] = ans.raguRagu;
                 existingWhiteboards[ans.soalId] = ans.whiteboardData;
+            });
+
+            (pgAnswersResp.data || []).forEach(ans => {
+                existingAnswers[ans.soalId] = ans.jawabanDipilih;
+                existingRagu[ans.soalId] = ans.raguRagu;
             });
 
             setAnswers(prev => ({ ...prev, ...existingAnswers }));
@@ -313,6 +219,36 @@ const StudentExams = () => {
 
     const [isSaving, setIsSaving] = useState(false);
 
+    
+    const saveAnswerPG = async (soalId, selectedOption, isRagu = false) => {
+        if (!user.profileId) return;
+        setIsSaving(true);
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            const payload = {
+                soalId,
+                siswaId: user.profileId,
+                jawabanDipilih: selectedOption || '',
+                raguRagu: isRagu
+            };
+            await axios.post('/api/exam/jawaban-pg/submit', payload, { headers });
+        } catch (err) {
+            console.error('Auto-save PG failed', err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const saveCurrentAnswer = (soalId, textOrChoice, isRagu, wbData) => {
+        const q = questions.find(item => item.id === soalId);
+        if (q?.qType === 'pg') {
+            return saveAnswerPG(soalId, textOrChoice, isRagu);
+        } else {
+            return saveAnswer(soalId, textOrChoice, isRagu, wbData);
+        }
+    };
+
     const saveAnswer = async (soalId, text, isRagu = false, wbData = null) => {
         if (!user.profileId) return;
         setIsSaving(true);
@@ -333,29 +269,35 @@ const StudentExams = () => {
     };
 
     const handleNext = () => {
-        const qId = questions[currentIndex].id;
-        saveAnswer(qId, answers[qId], raguState[qId], whiteboards[qId]);
+        const q = questions[currentIndex];
+        if (q) {
+            saveCurrentAnswer(q.id, answers[q.id], raguState[q.id], whiteboards[q.id]);
+        }
         setCurrentIndex(prev => prev + 1);
     };
 
     const handlePrev = () => {
-        const qId = questions[currentIndex].id;
-        saveAnswer(qId, answers[qId], raguState[qId], whiteboards[qId]);
+        const q = questions[currentIndex];
+        if (q) {
+            saveCurrentAnswer(q.id, answers[q.id], raguState[q.id], whiteboards[q.id]);
+        }
         setCurrentIndex(prev => prev - 1);
     };
 
     const handleFinishExam = async () => {
-        // Final save before confirmation opens
-        const qId = questions[currentIndex]?.id;
-        await saveAnswer(qId, answers[qId], raguState[qId], whiteboards[qId]);
+        const q = questions[currentIndex];
+        if (q) {
+            await saveCurrentAnswer(q.id, answers[q.id], raguState[q.id], whiteboards[q.id]);
+        }
         setShowFinishConfirm(true);
     };
 
     const toggleRagu = () => {
-        const qId = questions[currentIndex].id;
-        const newRagu = !raguState[qId];
-        setRaguState(prev => ({ ...prev, [qId]: newRagu }));
-        saveAnswer(qId, answers[qId], newRagu, whiteboards[qId]);
+        const q = questions[currentIndex];
+        if (!q) return;
+        const newRagu = !raguState[q.id];
+        setRaguState(prev => ({ ...prev, [q.id]: newRagu }));
+        saveCurrentAnswer(q.id, answers[q.id], newRagu, whiteboards[q.id]);
     };
 
     const confirmFinishExam = async (forced = false) => {
@@ -481,43 +423,163 @@ const StudentExams = () => {
                                     <div className={`cbt-question-text ${fontClass}`} dangerouslySetInnerHTML={{ __html: q?.pertanyaan }}></div>
 
                                     <div className="cbt-answer-area">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                            <h3 className="cbt-instruction" style={{ margin: 0 }}>Ketikkan jawabanmu!</h3>
-                                            <button
-                                                onClick={() => setShowWhiteboard({ ...showWhiteboard, [q.id]: !showWhiteboard[q.id] })}
-                                                style={{ background: showWhiteboard[q.id] ? '#ef4444' : '#1e88e5', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                            >
-                                                <Brush size={16} /> {showWhiteboard[q.id] ? 'Tutup Whiteboard' : 'Buka Whiteboard Corat-coret'}
-                                            </button>
-                                        </div>
+                                        {q?.qType === 'pg' ? (
+                                            <div className="cbt-pg-answer-container">
+                                                {q.tipeSoal === 'BENAR_SALAH' ? (
+                                                    <div className="cbt-tf-options">
+                                                        <p className="cbt-pg-instruction">Tentukan apakah pernyataan di atas Benar atau Salah:</p>
+                                                        <div className="cbt-tf-grid">
+                                                            <button
+                                                                type="button"
+                                                                className={`cbt-tf-btn btn-true ${answers[q.id] === 'A' || answers[q.id] === 'Benar' ? 'selected' : ''}`}
+                                                                onClick={() => {
+                                                                    const val = 'A';
+                                                                    setAnswers({ ...answers, [q.id]: val });
+                                                                    saveAnswerPG(q.id, val, raguState[q.id]);
+                                                                }}
+                                                            >
+                                                                <div className="tf-badge">A</div>
+                                                                <div className="tf-content">
+                                                                    <span className="tf-title">BENAR</span>
+                                                                    <span className="tf-sub">Pernyataan ini sesuai / benar</span>
+                                                                </div>
+                                                                {(answers[q.id] === 'A' || answers[q.id] === 'Benar') && <CheckCircle2 size={24} className="tf-checked-icon" />}
+                                                            </button>
 
-                                        {showWhiteboard[q?.id] && (
-                                            <Whiteboard
-                                                initialData={whiteboards[q?.id]}
-                                                onSave={(data) => {
-                                                    setWhiteboards({ ...whiteboards, [q.id]: data });
-                                                    // Auto-save whiteboard data periodically or upon drawing
-                                                    saveAnswer(q.id, answers[q.id], raguState[q.id], data);
-                                                }}
-                                                onClear={() => {
-                                                    setWhiteboards({ ...whiteboards, [q.id]: null });
-                                                    saveAnswer(q.id, answers[q.id], raguState[q.id], null);
-                                                }}
-                                            />
+                                                            <button
+                                                                type="button"
+                                                                className={`cbt-tf-btn btn-false ${answers[q.id] === 'B' || answers[q.id] === 'Salah' ? 'selected' : ''}`}
+                                                                onClick={() => {
+                                                                    const val = 'B';
+                                                                    setAnswers({ ...answers, [q.id]: val });
+                                                                    saveAnswerPG(q.id, val, raguState[q.id]);
+                                                                }}
+                                                            >
+                                                                <div className="tf-badge">B</div>
+                                                                <div className="tf-content">
+                                                                    <span className="tf-title">SALAH</span>
+                                                                    <span className="tf-sub">Pernyataan ini tidak sesuai / salah</span>
+                                                                </div>
+                                                                {(answers[q.id] === 'B' || answers[q.id] === 'Salah') && <CheckCircle2 size={24} className="tf-checked-icon" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : q.tipeSoal === 'PG_KOMPLEKS' ? (
+                                                    <div className="cbt-complex-options">
+                                                        <div className="cbt-pg-tip-box">
+                                                            <CheckSquare size={16} />
+                                                            <span><strong>Pilihan Ganda Kompleks:</strong> Klik opsi untuk memilih satu atau lebih jawaban yang benar.</span>
+                                                        </div>
+                                                        <div className="cbt-opt-list">
+                                                            {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                                const optText = q[`pilihan${opt}`];
+                                                                if (!optText) return null;
+                                                                const currentKeys = (answers[q.id] || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                                                                const isChecked = currentKeys.includes(opt);
+
+                                                                return (
+                                                                    <div
+                                                                        key={opt}
+                                                                        className={`cbt-opt-row ${isChecked ? 'selected' : ''}`}
+                                                                        onClick={() => {
+                                                                            let newKeys;
+                                                                            if (isChecked) {
+                                                                                newKeys = currentKeys.filter(k => k !== opt);
+                                                                            } else {
+                                                                                newKeys = [...currentKeys, opt].sort();
+                                                                            }
+                                                                            const val = newKeys.join(',');
+                                                                            setAnswers({ ...answers, [q.id]: val });
+                                                                            saveAnswerPG(q.id, val, raguState[q.id]);
+                                                                        }}
+                                                                    >
+                                                                        <div className={`cbt-opt-check ${isChecked ? 'checked' : ''}`}>
+                                                                            {isChecked ? <CheckCircle2 size={20} /> : opt}
+                                                                        </div>
+                                                                        <div className={`cbt-opt-text ${fontClass}`}>
+                                                                            <strong>{opt}.</strong> {optText}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="cbt-single-options">
+                                                        <p className="cbt-pg-instruction">Pilih salah satu jawaban yang paling tepat:</p>
+                                                        <div className="cbt-opt-list">
+                                                            {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                                const optText = q[`pilihan${opt}`];
+                                                                if (!optText) return null;
+                                                                const isSelected = answers[q.id] === opt;
+
+                                                                return (
+                                                                    <div
+                                                                        key={opt}
+                                                                        className={`cbt-opt-row ${isSelected ? 'selected' : ''}`}
+                                                                        onClick={() => {
+                                                                            setAnswers({ ...answers, [q.id]: opt });
+                                                                            saveAnswerPG(q.id, opt, raguState[q.id]);
+                                                                        }}
+                                                                    >
+                                                                        <div className={`cbt-opt-radio ${isSelected ? 'selected' : ''}`}>
+                                                                            {opt}
+                                                                        </div>
+                                                                        <div className={`cbt-opt-text ${fontClass}`}>
+                                                                            <strong>{opt}.</strong> {optText}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="cbt-save-indicator" style={{ marginTop: '20px' }}>
+                                                    <Clock size={12} className={isSaving ? 'animate-spin' : ''} />
+                                                    {isSaving ? 'Sedang menyimpan draft otomatis...' : 'Jawaban tersimpan di server'}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                    <h3 className="cbt-instruction" style={{ margin: 0 }}>Ketikkan jawabanmu!</h3>
+                                                    <button
+                                                        onClick={() => setShowWhiteboard({ ...showWhiteboard, [q.id]: !showWhiteboard[q.id] })}
+                                                        style={{ background: showWhiteboard[q.id] ? '#ef4444' : '#1e88e5', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                                    >
+                                                        <Brush size={16} /> {showWhiteboard[q.id] ? 'Tutup Whiteboard' : 'Buka Whiteboard Corat-coret'}
+                                                    </button>
+                                                </div>
+
+                                                {showWhiteboard[q?.id] && (
+                                                    <Whiteboard
+                                                        initialData={whiteboards[q?.id]}
+                                                        onSave={(data) => {
+                                                            setWhiteboards({ ...whiteboards, [q.id]: data });
+                                                            saveAnswer(q.id, answers[q.id], raguState[q.id], data);
+                                                        }}
+                                                        onClear={() => {
+                                                            setWhiteboards({ ...whiteboards, [q.id]: null });
+                                                            saveAnswer(q.id, answers[q.id], raguState[q.id], null);
+                                                        }}
+                                                    />
+                                                )}
+
+                                                <textarea
+                                                    className={fontClass}
+                                                    value={answers[q?.id] || ''}
+                                                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                                                    placeholder="Ketik jawaban Anda di sini..."
+                                                    rows={showWhiteboard[q.id] ? 4 : 8}
+                                                    style={{ marginTop: showWhiteboard[q.id] ? '16px' : '0' }}
+                                                />
+                                                <div className="cbt-save-indicator">
+                                                    <Clock size={12} className={isSaving ? 'animate-spin' : ''} />
+                                                    {isSaving ? 'Sedang menyimpan draft otomatis...' : 'Jawaban tersimpan di memori server'}
+                                                </div>
+                                            </div>
                                         )}
-
-                                        <textarea
-                                            className={fontClass}
-                                            value={answers[q?.id] || ''}
-                                            onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                                            placeholder="Ketik jawaban Anda di sini..."
-                                            rows={showWhiteboard[q.id] ? 4 : 8}
-                                            style={{ marginTop: showWhiteboard[q.id] ? '16px' : '0' }}
-                                        />
-                                        <div className="cbt-save-indicator">
-                                            <Clock size={12} className={isSaving ? 'animate-spin' : ''} />
-                                            {isSaving ? 'Sedang menyimpan draft otomatis...' : 'Jawaban tersimpan di memori server'}
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -575,6 +637,46 @@ const StudentExams = () => {
                 )}
 
                 <style>{`
+                    
+                    /* CBT Objective (PG / Benar Salah / PG Kompleks) */
+                    .cbt-pg-answer-container { margin-top: 20px; }
+                    .cbt-pg-instruction { font-size: 1rem; font-weight: 700; color: #475569; margin-bottom: 16px; }
+                    .cbt-pg-tip-box { display: flex; align-items: center; gap: 10px; background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1e40af; padding: 10px 16px; border-radius: 12px; margin-bottom: 16px; font-size: 0.9rem; }
+                    .cbt-opt-list { display: flex; flex-direction: column; gap: 12px; }
+                    .cbt-opt-row { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border: 2px solid #e2e8f0; border-radius: 14px; background: white; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); user-select: none; }
+                    .cbt-opt-row:hover { border-color: #38bdf8; background: #f0f9ff; transform: translateX(4px); }
+                    .cbt-opt-row.selected { border-color: #0284c7; background: #e0f2fe; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.12); }
+                    .cbt-opt-radio { width: 38px; height: 38px; min-width: 38px; border-radius: 50%; border: 2px solid #cbd5e1; background: white; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #64748b; font-size: 0.95rem; transition: all 0.2s; }
+                    .cbt-opt-row.selected .cbt-opt-radio { background: #0284c7; border-color: #0284c7; color: white; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3); }
+                    .cbt-opt-check { width: 38px; height: 38px; min-width: 38px; border-radius: 10px; border: 2px solid #cbd5e1; background: white; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #64748b; font-size: 0.95rem; transition: all 0.2s; }
+                    .cbt-opt-check.checked { background: #6366f1; border-color: #6366f1; color: white; box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3); }
+                    .cbt-opt-text { flex: 1; font-size: 1.05rem; color: #1e293b; line-height: 1.5; }
+                    
+                    .cbt-tf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+                    .cbt-tf-btn { display: flex; align-items: center; gap: 16px; padding: 22px 24px; border-radius: 18px; border: 2.5px solid #e2e8f0; background: white; cursor: pointer; text-align: left; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+                    .cbt-tf-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06); }
+                    .cbt-tf-btn .tf-badge { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; color: #475569; }
+                    .cbt-tf-btn .tf-content { flex: 1; display: flex; flex-direction: column; }
+                    .cbt-tf-btn .tf-title { font-size: 1.35rem; font-weight: 900; letter-spacing: 0.5px; }
+                    .cbt-tf-btn .tf-sub { font-size: 0.85rem; color: #64748b; margin-top: 2px; }
+                    .cbt-tf-btn.btn-true.selected { border-color: #10b981; background: #ecfdf5; color: #065f46; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.18); }
+                    .cbt-tf-btn.btn-true.selected .tf-badge { background: #10b981; color: white; }
+                    .cbt-tf-btn.btn-true.selected .tf-sub { color: #047857; }
+                    .cbt-tf-btn.btn-false.selected { border-color: #ef4444; background: #fef2f2; color: #991b1b; box-shadow: 0 8px 25px rgba(239, 68, 68, 0.18); }
+                    .cbt-tf-btn.btn-false.selected .tf-badge { background: #ef4444; color: white; }
+                    .cbt-tf-btn.btn-false.selected .tf-sub { color: #b91c1c; }
+                    .tf-checked-icon { flex-shrink: 0; }
+                    .btn-true.selected .tf-checked-icon { color: #10b981; }
+                    .btn-false.selected .tf-checked-icon { color: #ef4444; }
+
+                    [data-theme="dark"] .cbt-opt-row { background: #0f172a; border-color: #334155; }
+                    [data-theme="dark"] .cbt-opt-row:hover { background: #1e293b; border-color: #38bdf8; }
+                    [data-theme="dark"] .cbt-opt-row.selected { background: #1e3a5f; border-color: #38bdf8; }
+                    [data-theme="dark"] .cbt-opt-text { color: #f8fafc; }
+                    [data-theme="dark"] .cbt-tf-btn { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .cbt-tf-btn.btn-true.selected { background: #064e3b; border-color: #10b981; color: #a7f3d0; }
+                    [data-theme="dark"] .cbt-tf-btn.btn-false.selected { background: #7f1d1d; border-color: #ef4444; color: #fecaca; }
+
                     .cbt-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: #eef2f6; position: fixed; top: 0; left: 0; width: 100%; z-index: 2000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
                     .cbt-header { background: #1e88e5; color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0; }
                     .cbt-logo-circle { background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
