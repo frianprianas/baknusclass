@@ -52,7 +52,7 @@ public class SyncSiswaController {
                     if (line.trim().isEmpty()) continue;
                     if (isFirst) {
                         String lLower = line.toLowerCase();
-                        if (lLower.contains("nama") || lLower.contains("name") || lLower.contains("kelas") || lLower.contains("nis")) {
+                        if (lLower.contains("nama") || lLower.contains("name") || lLower.contains("kelas") || lLower.contains("nis") || lLower.contains("username") || lLower.contains("email")) {
                             isFirst = false;
                             continue;
                         }
@@ -87,7 +87,7 @@ public class SyncSiswaController {
             @PathVariable(value = "jobId", required = false) String pathJobId
     ) {
         String jobId = (paramJobId != null && !paramJobId.trim().isEmpty()) ? paramJobId : pathJobId;
-        SseEmitter emitter = new SseEmitter(10 * 60 * 1000L); // 10 minutes timeout
+        SseEmitter emitter = new SseEmitter(15 * 60 * 1000L); // 15 minutes timeout
 
         if (jobId == null || !jobs.containsKey(jobId)) {
             try {
@@ -116,6 +116,7 @@ public class SyncSiswaController {
                 }
 
                 Map<String, List<Siswa>> nisMap = new HashMap<>();
+                Map<String, List<Siswa>> emailMap = new HashMap<>();
                 Map<String, List<Siswa>> nameMap = new HashMap<>();
 
                 for (Siswa s : allSiswa) {
@@ -125,7 +126,7 @@ public class SyncSiswaController {
                         nisMap.computeIfAbsent(k, x -> new ArrayList<>()).add(s);
                     }
 
-                    // 2. Index by User's username & email (misal: 2526019070001@smk.baktinusantara666.sch.id)
+                    // 2. Index by User's username & email
                     if (s.getUser() != null) {
                         String uName = s.getUser().getUsername();
                         if (uName != null && !uName.trim().isEmpty()) {
@@ -140,6 +141,7 @@ public class SyncSiswaController {
                         String uEmail = s.getUser().getEmail();
                         if (uEmail != null && !uEmail.trim().isEmpty()) {
                             String eClean = uEmail.trim().toLowerCase();
+                            emailMap.computeIfAbsent(eClean, x -> new ArrayList<>()).add(s);
                             nisMap.computeIfAbsent(eClean, x -> new ArrayList<>()).add(s);
                             if (eClean.contains("@")) {
                                 String prefix = eClean.split("@")[0].trim();
@@ -158,8 +160,8 @@ public class SyncSiswaController {
                 for (String line : lines) {
                     try {
                         processed++;
-                        String[] parts = line.split("[;,]");
-                        if (parts.length < 2) {
+                        ParsedRow row = parseRow(line);
+                        if (row == null || row.kelasStr.isEmpty()) {
                             failed++;
                             try {
                                 Map<String, Object> eventData = new HashMap<>();
@@ -171,134 +173,8 @@ public class SyncSiswaController {
                             continue;
                         }
 
-                        String nis = "";
-                        String nama = "";
-                        String kelasStr = "";
-
-                        if (parts.length >= 4) {
-                            // Format 4 kolom: No;NIS;Nama;Kelas
-                            nis = parts[1].trim();
-                            nama = parts[2].trim();
-                            kelasStr = parts[3].trim();
-                        } else if (parts.length == 3) {
-                            // Format 3 kolom: NIS;Nama;Kelas ATAU No;Nama;Kelas
-                            String col0 = parts[0].trim();
-                            String col1 = parts[1].trim();
-                            String col2 = parts[2].trim();
-                            if (col0.matches("^\\d{5,}$")) {
-                                nis = col0;
-                                nama = col1;
-                                kelasStr = col2;
-                            } else {
-                                nama = col1;
-                                kelasStr = col2;
-                            }
-                        } else {
-                            // Format 2 kolom: Nama;Kelas atau NIS;Kelas
-                            String col0 = parts[0].trim();
-                            String col1 = parts[1].trim();
-                            if (col0.matches("^\\d{5,}$")) {
-                                nis = col0;
-                            } else {
-                                nama = col0;
-                            }
-                            kelasStr = col1;
-                        }
-
-                        if (kelasStr.isEmpty()) {
-                            throw new Exception("Nama kelas tidak boleh kosong");
-                        }
-
-                        // Cari siswa: Prioritas 1 = NIS (akurat 100%), Prioritas 2 = Nama Lengkap
-                        List<Siswa> existingSiswa = null;
-
-                        if (!nis.isEmpty()) {
-                            existingSiswa = nisMap.get(nis.toLowerCase());
-                        }
-
-                        if ((existingSiswa == null || existingSiswa.isEmpty()) && !nama.isEmpty()) {
-                            existingSiswa = nameMap.get(nama.toLowerCase());
-                        }
-
-                        if (existingSiswa == null || existingSiswa.isEmpty()) {
-                            failed++;
-                            try {
-                                Map<String, Object> eventData = new HashMap<>();
-                                eventData.put("progress", processed);
-                                eventData.put("total", total);
-                                String ident = !nis.isEmpty() ? ("NIS " + nis + " (" + nama + ")") : nama;
-                                eventData.put("message", "[WARNING] " + ident + " tidak ditemukan di database aplikasi.");
-                                emitter.send(SseEmitter.event().name("progress").data(eventData));
-                            } catch (Exception ex) {}
-                            continue;
-                        }
-
-                        final String finalNis = nis;
-                        final String finalNama = nama;
-                        final String finalKelasStr = kelasStr;
-                        final List<Siswa> targets = existingSiswa;
-
                         // Eksekusi DB update dalam transaksi
-                        String successMsg = txTemplate.execute(status -> {
-                            // Normalisasi nama kelas (misal: RPL -> PPLG)
-                            String normalizedKelasStr = finalKelasStr.replaceAll("(?i)\\bRPL\\b", "PPLG").trim();
-
-                            // Cari atau buat Kelas otomatis
-                            Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(normalizedKelasStr).orElse(null);
-                            if (kelas == null) {
-                                String tingkat = "X";
-                                if (normalizedKelasStr.contains(" ")) {
-                                    tingkat = normalizedKelasStr.split(" ")[0];
-                                } else if (normalizedKelasStr.toUpperCase().startsWith("XII")) {
-                                    tingkat = "XII";
-                                } else if (normalizedKelasStr.toUpperCase().startsWith("XI")) {
-                                    tingkat = "XI";
-                                }
-
-                                String jurusanPart = normalizedKelasStr.substring(tingkat.length()).trim();
-                                String prodiName = jurusanPart.replaceAll("\\s+\\d+$", "").trim();
-                                if (prodiName.equalsIgnoreCase("RPL")) prodiName = "PPLG";
-                                if (prodiName.isEmpty()) prodiName = "UMUM";
-
-                                final String targetProdi = prodiName;
-                                Jurusan jurusan = jurusanRepository.findAll().stream()
-                                        .filter(j -> j.getKodeJurusan().equalsIgnoreCase(targetProdi) || j.getNamaJurusan().equalsIgnoreCase(targetProdi))
-                                        .findFirst().orElse(null);
-
-                                if (jurusan == null) {
-                                    Jurusan j = new Jurusan();
-                                    j.setKodeJurusan(targetProdi.toUpperCase());
-                                    j.setNamaJurusan(targetProdi.toUpperCase());
-                                    jurusan = jurusanRepository.save(j);
-                                }
-
-                                kelas = new Kelas();
-                                kelas.setNamaKelas(normalizedKelasStr);
-                                kelas.setTingkat(tingkat);
-                                kelas.setJurusan(jurusan);
-                                kelas = kelasRepository.save(kelas);
-                            }
-
-                            // Update kelas dan sinkronisasi nama/nisn pada data siswa yang cocok
-                            for (Siswa s : targets) {
-                                Siswa attached = siswaRepository.findById(s.getId()).orElse(s);
-                                attached.setKelas(kelas);
-                                if (!finalNis.isEmpty()) {
-                                    attached.setNisn(finalNis);
-                                }
-                                if (!finalNama.isEmpty() && !finalNama.equalsIgnoreCase(attached.getNamaLengkap())) {
-                                    attached.setNamaLengkap(finalNama);
-                                    if (attached.getUser() != null) {
-                                        attached.getUser().setNamaLengkap(finalNama);
-                                        userRepository.save(attached.getUser());
-                                    }
-                                }
-                                siswaRepository.save(attached);
-                            }
-
-                            String displayLabel = !finalNama.isEmpty() ? finalNama : ("NIS " + finalNis);
-                            return "[OK] Berhasil disinkron: " + displayLabel + (!finalNis.isEmpty() ? (" (" + finalNis + ")") : "") + " -> Kelas " + normalizedKelasStr;
-                        });
+                        String successMsg = txTemplate.execute(status -> syncStudentRow(row, nisMap, emailMap, nameMap));
 
                         success++;
                         Map<String, Object> eventData = new HashMap<>();
@@ -308,7 +184,7 @@ public class SyncSiswaController {
 
                         emitter.send(SseEmitter.event().name("progress").data(eventData));
 
-                        Thread.sleep(60); // Delay untuk visualisasi stream di UI
+                        Thread.sleep(30); // Delay untuk visualisasi stream di UI
 
                     } catch (Exception e) {
                         failed++;
@@ -434,64 +310,45 @@ public class SyncSiswaController {
                 }
             }
             int success = 0;
+
+            List<Siswa> allSiswa = siswaRepository.findAllWithUserAndKelas();
+            Map<String, List<Siswa>> nisMap = new HashMap<>();
+            Map<String, List<Siswa>> emailMap = new HashMap<>();
+            Map<String, List<Siswa>> nameMap = new HashMap<>();
+
+            for (Siswa s : allSiswa) {
+                if (s.getNisn() != null && !s.getNisn().trim().isEmpty()) {
+                    nisMap.computeIfAbsent(s.getNisn().trim().toLowerCase(), x -> new ArrayList<>()).add(s);
+                }
+                if (s.getUser() != null) {
+                    if (s.getUser().getUsername() != null) {
+                        nisMap.computeIfAbsent(s.getUser().getUsername().trim().toLowerCase(), x -> new ArrayList<>()).add(s);
+                    }
+                    if (s.getUser().getEmail() != null) {
+                        emailMap.computeIfAbsent(s.getUser().getEmail().trim().toLowerCase(), x -> new ArrayList<>()).add(s);
+                        nisMap.computeIfAbsent(s.getUser().getEmail().trim().toLowerCase(), x -> new ArrayList<>()).add(s);
+                    }
+                }
+                if (s.getNamaLengkap() != null) {
+                    nameMap.computeIfAbsent(s.getNamaLengkap().trim().toLowerCase(), x -> new ArrayList<>()).add(s);
+                }
+            }
+
+            int startIdx = 0;
+            if (!lines.isEmpty()) {
+                String header = lines.get(0).toLowerCase();
+                if (header.contains("nama") || header.contains("kelas") || header.contains("nis") || header.contains("username") || header.contains("email")) {
+                    startIdx = 1;
+                }
+            }
             
-            for (int i = 1; i < lines.size(); i++) {
+            for (int i = startIdx; i < lines.size(); i++) {
                 String line = lines.get(i);
                 if (line.trim().isEmpty()) continue;
-                String[] parts = line.split("[;,]");
-                if (parts.length < 3) continue;
+                ParsedRow row = parseRow(line);
+                if (row == null || row.kelasStr.isEmpty()) continue;
                 
-                String nis = parts[1].trim();
-                String nama = parts[2].trim();
-                String kelasStr = parts.length >= 4 ? parts[3].trim() : parts[parts.length - 1].trim();
-                
-                String normalizedKelasStr = kelasStr.replaceAll("(?i)\\bRPL\\b", "PPLG").trim();
-                Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(normalizedKelasStr).orElse(null);
-                if (kelas == null) {
-                    String tingkat = "X";
-                    if (normalizedKelasStr.contains(" ")) {
-                        tingkat = normalizedKelasStr.split(" ")[0];
-                    } else if (normalizedKelasStr.toUpperCase().startsWith("XII")) {
-                        tingkat = "XII";
-                    } else if (normalizedKelasStr.toUpperCase().startsWith("XI")) {
-                        tingkat = "XI";
-                    }
-
-                    String jurusanPart = normalizedKelasStr.substring(tingkat.length()).trim();
-                    String prodiName = jurusanPart.replaceAll("\\s+\\d+$", "").trim();
-                    if (prodiName.equalsIgnoreCase("RPL")) prodiName = "PPLG";
-                    if (prodiName.isEmpty()) prodiName = "UMUM";
-
-                    final String targetProdi = prodiName;
-                    Jurusan jurusan = jurusanRepository.findAll().stream()
-                            .filter(j -> j.getKodeJurusan().equalsIgnoreCase(targetProdi) || j.getNamaJurusan().equalsIgnoreCase(targetProdi))
-                            .findFirst().orElse(null);
-
-                    if (jurusan == null) {
-                        Jurusan j = new Jurusan();
-                        j.setKodeJurusan(targetProdi.toUpperCase());
-                        j.setNamaJurusan(targetProdi.toUpperCase());
-                        jurusan = jurusanRepository.save(j);
-                    }
-
-                    kelas = new Kelas();
-                    kelas.setNamaKelas(normalizedKelasStr);
-                    kelas.setTingkat(tingkat);
-                    kelas.setJurusan(jurusan);
-                    kelas = kelasRepository.save(kelas);
-                }
-                
-                java.util.Optional<Siswa> existing = siswaRepository.findByNisn(nis);
-                if (existing.isPresent()) {
-                    Siswa s = existing.get();
-                    s.setKelas(kelas);
-                    s.setNamaLengkap(nama);
-                    if (s.getUser() != null) {
-                        s.getUser().setNamaLengkap(nama);
-                        userRepository.save(s.getUser());
-                    }
-                    siswaRepository.save(s);
-                }
+                syncStudentRow(row, nisMap, emailMap, nameMap);
                 success++;
             }
             
@@ -500,5 +357,290 @@ public class SyncSiswaController {
             log.error("Hard sync error", e);
             return ResponseEntity.status(500).body(Map.of("message", "Gagal hard sync: " + e.getMessage()));
         }
+    }
+
+    public static class ParsedRow {
+        public String nis = "";
+        public String username = "";
+        public String email = "";
+        public String nama = "";
+        public String kelasStr = "";
+        public String password = "";
+    }
+
+    private ParsedRow parseRow(String line) {
+        if (line == null || line.trim().isEmpty()) return null;
+        String[] parts = line.contains(";") ? line.split(";") : line.split(",");
+        if (parts.length < 2) return null;
+
+        String nis = "";
+        String email = "";
+        String nama = "";
+        String kelasStr = "";
+        String password = "";
+
+        if (parts.length >= 6) {
+            if (parts[2].contains("@")) {
+                // Format: No;username;email;Nama;Kelas;Password (sesuai kls x mentah.csv)
+                nis = parts[1].trim();
+                email = parts[2].trim();
+                nama = parts[3].trim();
+                kelasStr = parts[4].trim();
+                password = parts[5].trim();
+            } else if (parts[4].contains("@")) {
+                // Format: No;NIS;Nama;Kelas;Email;Password
+                nis = parts[1].trim();
+                nama = parts[2].trim();
+                kelasStr = parts[3].trim();
+                email = parts[4].trim();
+                password = parts[5].trim();
+            } else {
+                nis = parts[1].trim();
+                email = parts[2].trim();
+                nama = parts[3].trim();
+                kelasStr = parts[4].trim();
+                password = parts[5].trim();
+            }
+        } else if (parts.length == 5) {
+            if (parts[1].contains("@")) {
+                // username;email;Nama;Kelas;Password
+                nis = parts[0].trim();
+                email = parts[1].trim();
+                nama = parts[2].trim();
+                kelasStr = parts[3].trim();
+                password = parts[4].trim();
+            } else if (parts[2].contains("@")) {
+                // No;username;email;Nama;Kelas
+                nis = parts[1].trim();
+                email = parts[2].trim();
+                nama = parts[3].trim();
+                kelasStr = parts[4].trim();
+            } else if (parts[4].contains("@")) {
+                // No;NIS;Nama;Kelas;Email
+                nis = parts[1].trim();
+                nama = parts[2].trim();
+                kelasStr = parts[3].trim();
+                email = parts[4].trim();
+            } else {
+                // No;NIS;Nama;Kelas;Password
+                nis = parts[1].trim();
+                nama = parts[2].trim();
+                kelasStr = parts[3].trim();
+                password = parts[4].trim();
+            }
+        } else if (parts.length == 4) {
+            if (parts[1].contains("@")) {
+                // No;email;Nama;Kelas
+                email = parts[1].trim();
+                nis = email.split("@")[0].trim();
+                nama = parts[2].trim();
+                kelasStr = parts[3].trim();
+            } else if (parts[0].contains("@")) {
+                // email;Nama;Kelas;Password
+                email = parts[0].trim();
+                nis = email.split("@")[0].trim();
+                nama = parts[1].trim();
+                kelasStr = parts[2].trim();
+                password = parts[3].trim();
+            } else {
+                // Standar 4 kolom: No;NIS;Nama;Kelas
+                nis = parts[1].trim();
+                nama = parts[2].trim();
+                kelasStr = parts[3].trim();
+            }
+        } else if (parts.length == 3) {
+            String col0 = parts[0].trim();
+            String col1 = parts[1].trim();
+            String col2 = parts[2].trim();
+            if (col0.contains("@")) {
+                email = col0;
+                nis = email.split("@")[0].trim();
+                nama = col1;
+                kelasStr = col2;
+            } else if (col0.matches("^\\d{5,}$")) {
+                nis = col0;
+                nama = col1;
+                kelasStr = col2;
+            } else {
+                nama = col1;
+                kelasStr = col2;
+            }
+        } else {
+            // 2 kolom
+            String col0 = parts[0].trim();
+            String col1 = parts[1].trim();
+            if (col0.contains("@")) {
+                email = col0;
+                nis = email.split("@")[0].trim();
+            } else if (col0.matches("^\\d{5,}$")) {
+                nis = col0;
+            } else {
+                nama = col0;
+            }
+            kelasStr = col1;
+        }
+
+        if (email.isEmpty() && !nis.isEmpty() && nis.matches("^\\d{5,}$")) {
+            email = nis + "@smk.baktinusantara666.sch.id";
+        }
+        if (nis.isEmpty() && !email.isEmpty()) {
+            nis = email.split("@")[0].trim();
+        }
+        String username = !nis.isEmpty() ? nis : (!email.isEmpty() ? email.split("@")[0].trim() : "");
+
+        ParsedRow row = new ParsedRow();
+        row.nis = nis;
+        row.username = username;
+        row.email = email;
+        row.nama = nama;
+        row.kelasStr = kelasStr;
+        row.password = password;
+        return row;
+    }
+
+    private Kelas getOrCreateKelas(String finalKelasStr) {
+        String normalizedKelasStr = finalKelasStr.replaceAll("(?i)\\bRPL\\b", "PPLG").trim();
+        Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(normalizedKelasStr).orElse(null);
+        if (kelas == null) {
+            String tingkat = "X";
+            if (normalizedKelasStr.contains(" ")) {
+                tingkat = normalizedKelasStr.split(" ")[0];
+            } else if (normalizedKelasStr.toUpperCase().startsWith("XII")) {
+                tingkat = "XII";
+            } else if (normalizedKelasStr.toUpperCase().startsWith("XI")) {
+                tingkat = "XI";
+            }
+
+            String jurusanPart = normalizedKelasStr.substring(tingkat.length()).trim();
+            String prodiName = jurusanPart.replaceAll("\\s+\\d+$", "").trim();
+            if (prodiName.equalsIgnoreCase("RPL")) prodiName = "PPLG";
+            if (prodiName.isEmpty()) prodiName = "UMUM";
+
+            final String targetProdi = prodiName;
+            Jurusan jurusan = jurusanRepository.findAll().stream()
+                    .filter(j -> j.getKodeJurusan().equalsIgnoreCase(targetProdi) || j.getNamaJurusan().equalsIgnoreCase(targetProdi))
+                    .findFirst().orElse(null);
+
+            if (jurusan == null) {
+                Jurusan j = new Jurusan();
+                j.setKodeJurusan(targetProdi.toUpperCase());
+                j.setNamaJurusan(targetProdi.toUpperCase());
+                jurusan = jurusanRepository.save(j);
+            }
+
+            kelas = new Kelas();
+            kelas.setNamaKelas(normalizedKelasStr);
+            kelas.setTingkat(tingkat);
+            kelas.setJurusan(jurusan);
+            kelas = kelasRepository.save(kelas);
+        }
+        return kelas;
+    }
+
+    private String syncStudentRow(ParsedRow row, Map<String, List<Siswa>> nisMap, Map<String, List<Siswa>> emailMap, Map<String, List<Siswa>> nameMap) {
+        Kelas kelas = getOrCreateKelas(row.kelasStr);
+
+        List<Siswa> targets = null;
+        if (row.email != null && !row.email.isEmpty() && emailMap != null) {
+            targets = emailMap.get(row.email.toLowerCase());
+        }
+        if ((targets == null || targets.isEmpty()) && row.nis != null && !row.nis.isEmpty() && nisMap != null) {
+            targets = nisMap.get(row.nis.toLowerCase());
+        }
+        if ((targets == null || targets.isEmpty()) && row.nama != null && !row.nama.isEmpty() && nameMap != null) {
+            targets = nameMap.get(row.nama.toLowerCase());
+        }
+
+        // 1. Jika Siswa sudah ada di database
+        if (targets != null && !targets.isEmpty()) {
+            for (Siswa s : targets) {
+                Siswa attached = siswaRepository.findById(s.getId()).orElse(s);
+                attached.setKelas(kelas);
+                if (row.nis != null && !row.nis.isEmpty()) {
+                    attached.setNisn(row.nis);
+                }
+                if (row.nama != null && !row.nama.isEmpty()) {
+                    attached.setNamaLengkap(row.nama);
+                }
+                if (attached.getUser() != null) {
+                    Users u = attached.getUser();
+                    if (row.nama != null && !row.nama.isEmpty()) u.setNamaLengkap(row.nama);
+                    if (row.username != null && !row.username.isEmpty()) u.setUsername(row.username);
+                    if (row.email != null && !row.email.isEmpty()) u.setEmail(row.email);
+                    if (row.password != null && !row.password.isEmpty()) {
+                        u.setPasswordHash(passwordEncoder.encode(row.password));
+                    }
+                    userRepository.save(u);
+                }
+                siswaRepository.save(attached);
+            }
+            String displayLabel = (row.nama != null && !row.nama.isEmpty()) ? row.nama : ("NIS " + row.nis);
+            String pwdNote = (row.password != null && !row.password.isEmpty()) ? " [Password Diperbarui]" : "";
+            return "[OK] Berhasil disinkron: " + displayLabel + (row.nis != null && !row.nis.isEmpty() ? (" (" + row.nis + ")") : "") + " -> Kelas " + kelas.getNamaKelas() + pwdNote;
+        }
+
+        // 2. Siswa belum terdaftar, cek apakah akun Users sudah ada
+        Users existingUser = null;
+        if (row.email != null && !row.email.isEmpty()) {
+            existingUser = userRepository.findByEmail(row.email).orElse(null);
+        }
+        if (existingUser == null && row.username != null && !row.username.isEmpty()) {
+            existingUser = userRepository.findByUsername(row.username).orElse(null);
+        }
+
+        if (existingUser != null) {
+            if (row.nama != null && !row.nama.isEmpty()) existingUser.setNamaLengkap(row.nama);
+            if (row.username != null && !row.username.isEmpty()) existingUser.setUsername(row.username);
+            if (row.email != null && !row.email.isEmpty()) existingUser.setEmail(row.email);
+            if (row.password != null && !row.password.isEmpty()) {
+                existingUser.setPasswordHash(passwordEncoder.encode(row.password));
+            }
+            existingUser = userRepository.save(existingUser);
+
+            final Users finalU = existingUser;
+            Siswa s = siswaRepository.findByUserId(existingUser.getId()).orElseGet(() -> {
+                Siswa ns = new Siswa();
+                ns.setUser(finalU);
+                return ns;
+            });
+            s.setKelas(kelas);
+            s.setNamaLengkap((row.nama != null && !row.nama.isEmpty()) ? row.nama : finalU.getNamaLengkap());
+            s.setNisn((row.nis != null && !row.nis.isEmpty()) ? row.nis : finalU.getUsername());
+            s = siswaRepository.save(s);
+
+            if (nisMap != null && s.getNisn() != null) nisMap.computeIfAbsent(s.getNisn().toLowerCase(), k -> new ArrayList<>()).add(s);
+            if (emailMap != null && finalU.getEmail() != null) emailMap.computeIfAbsent(finalU.getEmail().toLowerCase(), k -> new ArrayList<>()).add(s);
+            if (nameMap != null && s.getNamaLengkap() != null) nameMap.computeIfAbsent(s.getNamaLengkap().toLowerCase(), k -> new ArrayList<>()).add(s);
+
+            String pwdNote = (row.password != null && !row.password.isEmpty()) ? " [Password Diperbarui]" : "";
+            return "[OK] Akun terhubung: " + s.getNamaLengkap() + " (" + s.getNisn() + ") -> Kelas " + kelas.getNamaKelas() + pwdNote;
+        }
+
+        // 3. Akun Users dan Siswa keduanya belum ada -> Buat baru otomatis
+        Users newUser = new Users();
+        String uname = (row.username != null && !row.username.isEmpty()) ? row.username :
+                ((row.email != null && row.email.contains("@")) ? row.email.split("@")[0] :
+                ((row.nama != null) ? row.nama.replaceAll("\s+", "").toLowerCase() : "user" + System.currentTimeMillis()));
+        newUser.setUsername(uname);
+        newUser.setEmail((row.email != null && !row.email.isEmpty()) ? row.email : (uname + "@smk.baktinusantara666.sch.id"));
+        newUser.setNamaLengkap((row.nama != null && !row.nama.isEmpty()) ? row.nama : uname);
+        newUser.setRole("SISWA");
+        newUser.setIsActive(true);
+        String rawPwd = (row.password != null && !row.password.isEmpty()) ? row.password : uname;
+        newUser.setPasswordHash(passwordEncoder.encode(rawPwd));
+        newUser = userRepository.save(newUser);
+
+        Siswa newSiswa = new Siswa();
+        newSiswa.setUser(newUser);
+        newSiswa.setNisn((row.nis != null && !row.nis.isEmpty()) ? row.nis : newUser.getUsername());
+        newSiswa.setNamaLengkap(newUser.getNamaLengkap());
+        newSiswa.setKelas(kelas);
+        newSiswa = siswaRepository.save(newSiswa);
+
+        if (nisMap != null && newSiswa.getNisn() != null) nisMap.computeIfAbsent(newSiswa.getNisn().toLowerCase(), k -> new ArrayList<>()).add(newSiswa);
+        if (emailMap != null && newUser.getEmail() != null) emailMap.computeIfAbsent(newUser.getEmail().toLowerCase(), k -> new ArrayList<>()).add(newSiswa);
+        if (nameMap != null && newSiswa.getNamaLengkap() != null) nameMap.computeIfAbsent(newSiswa.getNamaLengkap().toLowerCase(), k -> new ArrayList<>()).add(newSiswa);
+
+        return "[OK] Akun baru dibuat & disinkron: " + newSiswa.getNamaLengkap() + " (" + newSiswa.getNisn() + ") -> Kelas " + kelas.getNamaKelas() + " [Password Baru]";
     }
 }

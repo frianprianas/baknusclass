@@ -198,15 +198,15 @@ const SyncSiswa = () => {
 
           {syncMode === 'normal' ? (
             <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '16px' }}>
-              <strong>Normal Mode</strong>: Mencocokkan nama dan hanya mengupdate kelas.<br/>
-              Format: Nama, Kelas (Pemisah koma atau titik koma). <br/>
-              Contoh: <br/>Budi Santoso, XI PPLG 1
+              <strong>Normal Mode (Live Stream)</strong>: Sinkronisasi realtime akun, kelas, dan password siswa.<br/>
+              Format CSV: <code>No;username;email;Nama;Kelas;Password</code> atau <code>Nama;Kelas</code>.<br/>
+              Contoh: <br/><code>1;2627020070001;2627020070001@smk.baktinusantara666.sch.id;ABDILAH MALIK;X PPLG 1;674214</code>
             </p>
           ) : (
             <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '16px' }}>
-              <strong>Hard Sync Mode</strong>: Membuat/mengupdate user, password, kelas & siswa.<br/>
-              Format: NO;NIS;Nama;Kelas;EMAIL;PASSWORD (Titik koma). <br/>
-              Contoh: <br/>1;2526011119001;ALFIRA NUR REVANDA;XI AKT;2526011119001@smk.baktinusantara666.sch.id;36853792
+              <strong>Hard Sync Mode (Instant)</strong>: Impor langsung semua akun, password, dan kelas secara massal.<br/>
+              Format CSV: <code>No;username;email;Nama;Kelas;Password</code>.<br/>
+              Contoh: <br/><code>1;2627020070001;2627020070001@smk.baktinusantara666.sch.id;ABDILAH MALIK;X PPLG 1;674214</code>
             </p>
           )}
           
