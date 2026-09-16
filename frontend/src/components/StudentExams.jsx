@@ -375,7 +375,7 @@ const StudentExams = () => {
                                     <button
                                         key={sq.id}
                                         className={`nav-btn ${currentIndex === idx ? 'active' : ''} ${statusClass}`}
-                                        onClick={() => setCurrentIndex(idx)}
+                                        onClick={() => { setCurrentIndex(idx); setShowNav(false); }}
                                     >
                                         {idx + 1}
                                     </button>
@@ -394,7 +394,18 @@ const StudentExams = () => {
                         <div className="cbt-container">
                             <div className="cbt-topbar">
                                 <div className="cbt-topbar-left">
-                                    <div className="cbt-soal-number">Soal Nomor <strong>{currentIndex + 1}</strong></div>
+                                    <div className="cbt-soal-number" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div>Soal Nomor <strong>{currentIndex + 1}</strong></div>
+                                        <span className={`cbt-badge-type ${
+                                            q?.qType === 'pg'
+                                                ? (q.tipeSoal === 'BENAR_SALAH' ? 'badge-tf' : q.tipeSoal === 'PG_KOMPLEKS' ? 'badge-complex' : 'badge-pg')
+                                                : 'badge-essay'
+                                        }`}>
+                                            {q?.qType === 'pg'
+                                                ? (q.tipeSoal === 'BENAR_SALAH' ? '⚖️ Benar / Salah' : q.tipeSoal === 'PG_KOMPLEKS' ? '☑️ PG Kompleks' : '🔘 Pilihan Ganda')
+                                                : '📝 Essay'}
+                                        </span>
+                                    </div>
                                     <div className="cbt-font-controls">
                                         Ukuran font soal:
                                         <span className={`font-small ${fontSizeScale === 1 ? 'active-font' : ''}`} onClick={() => setFontSizeScale(1)}>A</span>
@@ -468,7 +479,7 @@ const StudentExams = () => {
                                                     <div className="cbt-complex-options">
                                                         <div className="cbt-pg-tip-box">
                                                             <CheckSquare size={16} />
-                                                            <span><strong>Pilihan Ganda Kompleks:</strong> Klik opsi untuk memilih satu atau lebih jawaban yang benar.</span>
+                                                            <span><strong>Pilihan Ganda Kompleks:</strong> Klik opsi untuk memilih satu atau lebih jawaban yang benar. {((answers[q.id] || '').split(',').filter(Boolean).length > 0) && <strong style={{ color: '#4338ca', marginLeft: '6px' }}>({(answers[q.id] || '').split(',').filter(Boolean).length} opsi terpilih)</strong>}</span>
                                                         </div>
                                                         <div className="cbt-opt-list">
                                                             {['A', 'B', 'C', 'D', 'E'].map(opt => {
@@ -638,6 +649,47 @@ const StudentExams = () => {
 
                 <style>{`
                     
+                    
+                    /* Type Badges */
+                    .cbt-badge-type { font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px; }
+                    .cbt-badge-type.badge-pg { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+                    .cbt-badge-type.badge-complex { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+                    .cbt-badge-type.badge-tf { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+                    .cbt-badge-type.badge-essay { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+
+                    .sidebar-close-mobile { display: none; }
+
+                    @media (max-width: 900px) {
+                        .cbt-sidebar {
+                            display: flex !important;
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            height: 100vh;
+                            height: 100dvh;
+                            z-index: 2500;
+                            transform: translateX(-100%);
+                            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+                            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
+                        }
+                        .cbt-sidebar.mobile-open {
+                            transform: translateX(0);
+                        }
+                        .sidebar-close-mobile {
+                            display: flex !important;
+                        }
+                        .cbt-sidebar-backdrop {
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100vw;
+                            height: 100vh;
+                            background: rgba(15, 23, 42, 0.55);
+                            backdrop-filter: blur(3px);
+                            z-index: 2400;
+                        }
+                    }
+
                     /* CBT Objective (PG / Benar Salah / PG Kompleks) */
                     .cbt-pg-answer-container { margin-top: 20px; }
                     .cbt-pg-instruction { font-size: 1rem; font-weight: 700; color: #475569; margin-bottom: 16px; }
