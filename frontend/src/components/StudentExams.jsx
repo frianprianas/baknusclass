@@ -90,16 +90,38 @@ const StudentExams = () => {
         };
     }, [currentExam, showTokenOverlay, showFinishConfirm]);
 
+    const DEFAULT_PRACTICE_EVENT = {
+        id: 'event_latihan_cbt',
+        namaEvent: '🎯 Simulasi & Latihan CBT',
+        kodeEvent: 'SIMULASI_CBT',
+        statusAktif: true,
+        deskripsi: 'Event latihan mandiri tanpa batas waktu untuk mencoba sistem dan seluruh format soal'
+    };
+
     const fetchEvents = async () => {
         try {
             const resp = await axios.get('/api/exam/event', { headers });
-            setEvents(resp.data);
-            if (resp.data.length > 0) {
-                const active = resp.data.find(e => e.statusAktif) || resp.data[0];
+            const dbEvents = resp.data || [];
+            
+            // Check if DB already has a simulation/latihan event
+            const hasLatihan = dbEvents.some(e => 
+                (e.kodeEvent && e.kodeEvent.toUpperCase() === 'SIMULASI_CBT') ||
+                (e.namaEvent && e.namaEvent.toLowerCase().includes('latihan'))
+            );
+
+            const allEvents = hasLatihan ? dbEvents : [DEFAULT_PRACTICE_EVENT, ...dbEvents];
+            setEvents(allEvents);
+
+            if (allEvents.length > 0) {
+                // Select practice event or active event
+                const active = allEvents.find(e => e.statusAktif) || allEvents[0];
                 handleSelectEvent(active);
             }
         } catch (err) {
             console.error('Error fetching events:', err);
+            // Fallback so student can ALWAYS practice even if server or DB is booting
+            setEvents([DEFAULT_PRACTICE_EVENT]);
+            handleSelectEvent(DEFAULT_PRACTICE_EVENT);
         }
     };
 
@@ -107,6 +129,27 @@ const StudentExams = () => {
         setSelectedEvent(event);
         setLoading(true);
         setAiSaran(null);
+
+        // Instant mock exam for Practice Event so students can test immediately without teacher assignment
+        if (event.id === 'event_latihan_cbt' || (event.kodeEvent && event.kodeEvent.toUpperCase() === 'SIMULASI_CBT')) {
+            const practiceExamsList = [
+                {
+                    id: 'practice_default_simulasi',
+                    namaMapel: 'Simulasi Ujian CBT (Coba Semua Tipe Soal)',
+                    namaGuru: 'Sistem CBT BaknusClass',
+                    durasi: 0,
+                    waktuMulai: new Date().toISOString(),
+                    waktuSelesai: new Date(Date.now() + 864000000).toISOString(),
+                    isPractice: true,
+                    tampilkanNilai: true,
+                    nilaiAkhir: null
+                }
+            ];
+            setExams(practiceExamsList);
+            setLoading(false);
+            return;
+        }
+
         try {
             const resp = await axios.get(`/api/exam/ujian-mapel/siswa?eventId=${event.id}`, { headers });
             setExams(resp.data);
@@ -258,6 +301,10 @@ const StudentExams = () => {
     };
 
     const handleStartClick = (exam) => {
+        if (exam.isPractice || exam.id === 'practice_default_simulasi') {
+            handleStartPractice();
+            return;
+        }
         setTokenInput('');
         setShowTokenOverlay(exam);
     };
@@ -1303,6 +1350,29 @@ const StudentExams = () => {
                 <p>Silakan pilih jadwal ujian yang sedang berlangsung.</p>
             </div>
 
+            {/* Banner Ujian Latihan Default - Selalu Terlihat */}
+            <div className="practice-banner-card">
+                <div className="practice-banner-left">
+                    <div className="practice-icon-circle">
+                        <Sparkles size={28} />
+                    </div>
+                    <div className="practice-text-content">
+                        <div className="practice-tag">
+                            <Shield size={13} />
+                            <span>SIMULASI CBT RESMI & LATIHAN MANDIRI</span>
+                        </div>
+                        <h3 className="practice-title">Coba Ujian Latihan (Tanpa Batas Waktu)</h3>
+                        <p className="practice-desc">
+                            Coba pengerjaan <strong>4 Tipe Soal Lengkap</strong> (Pilihan Ganda Biasa, PG Kompleks, Benar / Salah, dan Essay dengan Whiteboard Corat-coret) tanpa batas waktu dan tanpa perlu token pengawas.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" className="practice-start-btn" onClick={handleStartPractice}>
+                    <Play size={18} />
+                    Mulai Coba Latihan
+                </button>
+            </div>
+
             <div className="events-bar mb-8">
                 {events.map(ev => (
                     <button
@@ -1355,29 +1425,6 @@ const StudentExams = () => {
                             </div>
                         </div>
                     )}
-                    {/* Banner Ujian Latihan Default */}
-                    <div className="practice-banner-card">
-                        <div className="practice-banner-left">
-                            <div className="practice-icon-circle">
-                                <Sparkles size={28} />
-                            </div>
-                            <div className="practice-text-content">
-                                <div className="practice-tag">
-                                    <Shield size={13} />
-                                    <span>SIMULASI CBT RESMI & LATIHAN MANDIRI</span>
-                                </div>
-                                <h3 className="practice-title">Coba Ujian Latihan (Tanpa Batas Waktu)</h3>
-                                <p className="practice-desc">
-                                    Coba pengerjaan <strong>4 Tipe Soal Lengkap</strong> (Pilihan Ganda Biasa, PG Kompleks, Benar / Salah, dan Essay dengan Whiteboard Corat-coret) tanpa batas waktu dan tanpa perlu token pengawas.
-                                </p>
-                            </div>
-                        </div>
-                        <button type="button" className="practice-start-btn" onClick={handleStartPractice}>
-                            <Play size={18} />
-                            Mulai Coba Latihan
-                        </button>
-                    </div>
-
                     <div className="exams-grid">
                         {exams.map(ex => (
                             <div key={ex.id} className="student-exam-card">

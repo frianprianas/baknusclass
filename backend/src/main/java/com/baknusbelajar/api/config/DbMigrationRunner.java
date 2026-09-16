@@ -97,6 +97,19 @@ public class DbMigrationRunner implements CommandLineRunner {
                 System.out.println("====== Mapel Deletion Skipped (Already Cleared) ======");
             }
 
+            
+            // Ensure default Latihan / Simulasi Event exists in tb_event_ujian
+            try {
+                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_event_ujian WHERE kode_event = 'SIMULASI_CBT'")) {
+                    if (rs.next() && rs.getInt(1) == 0) {
+                        stmt.executeUpdate("INSERT INTO tb_event_ujian (nama_event, kode_event, status_aktif, deskripsi, tanggal_dibuat) VALUES ('Simulasi & Latihan CBT', 'SIMULASI_CBT', 1, 'Event latihan mandiri tanpa batas waktu untuk mencoba sistem dan seluruh format soal CBT', CURRENT_TIMESTAMP)");
+                        System.out.println("Oracle Migration: Default Event LATIHAN created successfully in tb_event_ujian.");
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Oracle Migration: Check/Insert tb_event_ujian ignored: " + e.getMessage());
+            }
+
             System.out.println("====== Oracle DB Schema Migration Completed Successfully ======");
         } catch (Exception e) {
             System.err.println("Oracle Migration Fatal Error: " + e.getMessage());
