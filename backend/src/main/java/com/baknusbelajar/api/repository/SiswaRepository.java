@@ -11,10 +11,13 @@ import java.util.Optional;
 @Repository
 public interface SiswaRepository extends JpaRepository<Siswa, Long> {
     Optional<Siswa> findByNisn(String nisn);
-
     Optional<Siswa> findByUserId(Long userId);
-
     Optional<Siswa> findByUserUsername(String username);
+
+    Optional<Siswa> findFirstByNisnOrderByIdAsc(String nisn);
+    Optional<Siswa> findFirstByUserIdOrderByIdAsc(Long userId);
+    List<Siswa> findAllByNisn(String nisn);
+    List<Siswa> findAllByUserId(Long userId);
 
     List<Siswa> findByKelasId(Long kelasId);
 

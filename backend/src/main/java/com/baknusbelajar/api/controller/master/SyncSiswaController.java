@@ -500,7 +500,8 @@ public class SyncSiswaController {
 
     private Kelas getOrCreateKelas(String finalKelasStr) {
         String normalizedKelasStr = finalKelasStr.replaceAll("(?i)\\bRPL\\b", "PPLG").trim();
-        Kelas kelas = kelasRepository.findByNamaKelasIgnoreCase(normalizedKelasStr).orElse(null);
+        List<Kelas> existingList = kelasRepository.findAllByNamaKelasIgnoreCase(normalizedKelasStr);
+        Kelas kelas = existingList.isEmpty() ? null : existingList.get(0);
         if (kelas == null) {
             String tingkat = "X";
             if (normalizedKelasStr.contains(" ")) {
@@ -582,10 +583,12 @@ public class SyncSiswaController {
         // 2. Siswa belum terdaftar, cek apakah akun Users sudah ada
         Users existingUser = null;
         if (row.email != null && !row.email.isEmpty()) {
-            existingUser = userRepository.findByEmail(row.email).orElse(null);
+            List<Users> byEmail = userRepository.findAllByEmailIgnoreCase(row.email);
+            if (!byEmail.isEmpty()) existingUser = byEmail.get(0);
         }
         if (existingUser == null && row.username != null && !row.username.isEmpty()) {
-            existingUser = userRepository.findByUsername(row.username).orElse(null);
+            List<Users> byUname = userRepository.findAllByUsernameIgnoreCase(row.username);
+            if (!byUname.isEmpty()) existingUser = byUname.get(0);
         }
 
         if (existingUser != null) {
@@ -598,11 +601,12 @@ public class SyncSiswaController {
             existingUser = userRepository.save(existingUser);
 
             final Users finalU = existingUser;
-            Siswa s = siswaRepository.findByUserId(existingUser.getId()).orElseGet(() -> {
-                Siswa ns = new Siswa();
-                ns.setUser(finalU);
-                return ns;
-            });
+            List<Siswa> existingSiswaList = siswaRepository.findAllByUserId(existingUser.getId());
+            Siswa s = !existingSiswaList.isEmpty() ? existingSiswaList.get(0) : null;
+            if (s == null) {
+                s = new Siswa();
+                s.setUser(finalU);
+            }
             s.setKelas(kelas);
             s.setNamaLengkap((row.nama != null && !row.nama.isEmpty()) ? row.nama : finalU.getNamaLengkap());
             s.setNisn((row.nis != null && !row.nis.isEmpty()) ? row.nis : finalU.getUsername());
