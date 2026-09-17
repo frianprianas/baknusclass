@@ -50,8 +50,13 @@ public class SoalPGService {
         entity.setPilihanE(dto.getPilihanE() != null && !dto.getPilihanE().trim().isEmpty() ? dto.getPilihanE() : "-");
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
-        if (dto.getTipeSoal() != null) entity.setTipeSoal(dto.getTipeSoal());
-        entity.setTipeSoal(dto.getTipeSoal() != null ? dto.getTipeSoal() : "PG_BIASA");
+        String tipe = dto.getTipeSoal();
+        if (tipe == null || tipe.isEmpty() || "PG_BIASA".equals(tipe)) {
+            if ("Benar".equalsIgnoreCase(dto.getPilihanA()) && "Salah".equalsIgnoreCase(dto.getPilihanB())) {
+                tipe = "BENAR_SALAH";
+            }
+        }
+        entity.setTipeSoal(tipe != null ? tipe : "PG_BIASA");
 
         SoalPG saved = soalPGRepository.save(entity);
         String fullPertanyaan;
@@ -91,6 +96,13 @@ public class SoalPGService {
         entity.setPilihanE(dto.getPilihanE() != null && !dto.getPilihanE().trim().isEmpty() ? dto.getPilihanE() : "-");
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        String upTipe = dto.getTipeSoal();
+        if (upTipe == null || upTipe.isEmpty() || "PG_BIASA".equals(upTipe)) {
+            if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
+                upTipe = "BENAR_SALAH";
+            }
+        }
+        if (upTipe != null) entity.setTipeSoal(upTipe);
 
         SoalPG saved = soalPGRepository.save(entity);
         String fullPertanyaan;

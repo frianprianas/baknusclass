@@ -588,7 +588,8 @@ const ExamManagement = () => {
             } else {
                 const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
                 // Pastikan pilihan C, D, E tidak null/kosong agar tidak terkena constraint ORA-01400 pada Oracle
-                if (body.tipeSoal === 'BENAR_SALAH') {
+                if (body.tipeSoal === 'BENAR_SALAH' || (body.pilihanA === 'Benar' && body.pilihanB === 'Salah')) {
+                    body.tipeSoal = 'BENAR_SALAH';
                     body.pilihanA = body.pilihanA || 'Benar';
                     body.pilihanB = body.pilihanB || 'Salah';
                     body.pilihanC = body.pilihanC || '-';
@@ -656,6 +657,47 @@ const ExamManagement = () => {
         }
     };
 
+
+
+    const getQuestionMeta = (q) => {
+        const isBS = q.tipeSoal === 'BENAR_SALAH' || (
+            q.pilihanA && q.pilihanB &&
+            q.pilihanA.trim().toLowerCase() === 'benar' &&
+            q.pilihanB.trim().toLowerCase() === 'salah'
+        );
+        if (isBS) {
+            return {
+                typeKey: 'tf',
+                typeLabel: '⚖️ Soal Benar / Salah',
+                shortLabel: 'Benar / Salah',
+                badgeClass: 'badge-tf',
+                cardClass: 'pg-tf',
+                subLabel: 'Pernyataan Benar atau Salah',
+                kunciDesc: q.kunciJawaban === 'A' ? 'A (BENAR)' : (q.kunciJawaban === 'B' ? 'B (SALAH)' : q.kunciJawaban)
+            };
+        }
+        if (q.tipeSoal === 'PG_KOMPLEKS') {
+            const keys = (q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            return {
+                typeKey: 'complex',
+                typeLabel: `☑️ PG Kompleks (${keys.length || 2} Kunci Benar)`,
+                shortLabel: 'PG Kompleks',
+                badgeClass: 'badge-kompleks',
+                cardClass: 'pg-kompleks',
+                subLabel: 'Pilihan Jamak (Multi-select)',
+                kunciDesc: keys.join(', ') || q.kunciJawaban
+            };
+        }
+        return {
+            typeKey: 'single',
+            typeLabel: '🔘 Pilihan Ganda (1 Jawaban)',
+            shortLabel: 'Pilihan Ganda',
+            badgeClass: 'badge-single',
+            cardClass: 'pg-single',
+            subLabel: 'Pilihan Ganda Tunggal',
+            kunciDesc: q.kunciJawaban || 'A'
+        };
+    };
 
     if (viewingQuestions) {
         return (
@@ -992,93 +1034,155 @@ const ExamManagement = () => {
                                 ) : (
                                     <div className="questions-grid-v2">
                                         {/* PG Questions */}
-                                        {questionsPG.map((q, idx) => (
-                                            <div key={`pg - ${q.id} `} className={`q - card - v2 pg - type ${editingQuestion?.id === q.id ? 'is-editing' : ''} `}>
-                                                <div className="q-card-header">
-                                                    <div className="q-meta">
-                                                        <span className="q-number-v2">Soal {idx + 1}</span>
-                                                        <span className={`q-badge-pg ${q.tipeSoal === 'BENAR_SALAH' ? 'badge-tf' : q.tipeSoal === 'PG_KOMPLEKS' ? 'badge-kompleks' : 'badge-single'}`}>
-                                                        {q.tipeSoal === 'BENAR_SALAH'
-                                                            ? '⚖️ Benar / Salah (1 Pilihan)'
-                                                            : q.tipeSoal === 'PG_KOMPLEKS'
-                                                                ? `☑️ PG Kompleks (${(q.kunciJawaban || '').split(',').filter(Boolean).length} Kunci Benar)`
-                                                                : '🔘 PG (1 Jawaban Benar)'}
-                                                    </span>
-                                                    </div>
-                                                    <div className="q-actions-v2">
-                                                        <button className="q-btn-edit" onClick={() => handleEditSoal(q, 'pg')} title="Edit Soal">
-                                                            <Edit3 size={16} />
-                                                        </button>
-                                                        <button className="q-btn-delete" onClick={() => handleDeleteSoal(q.id, 'pg')} title="Hapus Soal">
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="q-card-body">
-                                                    <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
-                                                    <div className="q-options-v2">
-                                                        {(q.tipeSoal === 'BENAR_SALAH' ? ['A', 'B'] : ['A', 'B', 'C', 'D', 'E']).map(opt => {
-                                                            const optVal = q[`pilihan${opt} `];
-                                                            if (!optVal || (q.tipeSoal === 'BENAR_SALAH' && optVal === '-')) return null;
-                                                            return (
-                                                            <div key={opt} className={`opt-item-v2 ${((q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).includes(opt)) ? 'is-correct' : ''}`}>
-                                                                <div className="opt-marker">{opt}</div>
-                                                                <div className="opt-text">{q[`pilihan${opt} `]}</div>
-                                                                {((q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).includes(opt)) && (
-                                                                    <div className="correct-check"><CheckCircle2 size={14} /></div>
-                                                                )}
+                                        {questionsPG.map((q, idx) => {
+                                            const meta = getQuestionMeta(q);
+                                            const correctKeys = (q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+
+                                            return (
+                                                <div key={`pg-${q.id}`} className={`q-card-v2 ${meta.cardClass} ${editingQuestion?.id === q.id ? 'is-editing' : ''}`}>
+                                                    {/* Header Soal */}
+                                                    <div className="q-card-header">
+                                                        <div className="q-meta">
+                                                            <span className="q-number-pill">Soal #{idx + 1}</span>
+                                                            <span className={`q-badge-type ${meta.badgeClass}`}>
+                                                                {meta.typeLabel}
+                                                            </span>
+                                                            <span className="q-sub-label">{meta.subLabel}</span>
+                                                        </div>
+                                                        <div className="q-header-right">
+                                                            <span className="q-bobot-chip">
+                                                                <Clock size={13} /> {q.bobotNilai || 2} Poin
+                                                            </span>
+                                                            <div className="q-actions-v2">
+                                                                <button type="button" className="q-btn-edit" onClick={() => handleEditSoal(q, 'pg')} title="Edit Soal">
+                                                                    <Edit3 size={15} />
+                                                                    <span>Edit</span>
+                                                                </button>
+                                                                <button type="button" className="q-btn-delete" onClick={() => handleDeleteSoal(q.id, 'pg')} title="Hapus Soal">
+                                                                    <Trash2 size={15} />
+                                                                </button>
                                                             </div>
-                                                            );
-                                                        })}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Isi Pertanyaan */}
+                                                    <div className="q-card-body">
+                                                        <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
+
+                                                        {/* Preview Ramah untuk Benar / Salah */}
+                                                        {meta.typeKey === 'tf' ? (
+                                                            <div className="tf-preview-row">
+                                                                <div className={`tf-preview-box ${q.kunciJawaban === 'A' ? 'is-key' : ''}`}>
+                                                                    <div className="tf-p-badge">A</div>
+                                                                    <div className="tf-p-label">
+                                                                        <strong>BENAR</strong>
+                                                                        <span>Pernyataan ini sesuai</span>
+                                                                    </div>
+                                                                    {q.kunciJawaban === 'A' && (
+                                                                        <div className="tf-p-check">
+                                                                            <CheckCircle2 size={15} /> Kunci Benar
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className={`tf-preview-box ${q.kunciJawaban === 'B' ? 'is-key' : ''}`}>
+                                                                    <div className="tf-p-badge">B</div>
+                                                                    <div className="tf-p-label">
+                                                                        <strong>SALAH</strong>
+                                                                        <span>Pernyataan ini salah</span>
+                                                                    </div>
+                                                                    {q.kunciJawaban === 'B' && (
+                                                                        <div className="tf-p-check">
+                                                                            <CheckCircle2 size={15} /> Kunci Benar
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            /* Preview Ramah untuk Pilihan Ganda & Kompleks */
+                                                            <div className="q-options-v2">
+                                                                {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                                    const optVal = q[`pilihan${opt}`];
+                                                                    if (!optVal || optVal === '-') return null;
+                                                                    const isCorrect = correctKeys.includes(opt);
+
+                                                                    return (
+                                                                        <div key={opt} className={`opt-item-v2 ${isCorrect ? 'is-correct' : ''}`}>
+                                                                            <div className="opt-marker">{opt}</div>
+                                                                            <div className="opt-text">{optVal}</div>
+                                                                            {isCorrect && (
+                                                                                <div className="opt-key-pill">
+                                                                                    <CheckCircle2 size={13} /> Kunci Benar
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Footer Soal */}
+                                                    <div className="q-card-footer">
+                                                        <div className="q-footer-info">
+                                                            <span className="q-key-info">
+                                                                <strong>Kunci Jawaban:</strong> <span className="kunci-highlight">{meta.kunciDesc}</span>
+                                                            </span>
+                                                            {meta.typeKey === 'complex' && (
+                                                                <span className="q-multi-note">*Pilihan Jamak (${correctKeys.length} opsi benar)</span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="q-card-footer">
-                                                    <div className="bobot-tag">
-                                                        <Clock size={14} />
-                                                        <span>Bobot: <strong>{q.bobotNilai}</strong></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
 
                                         {/* Essay Questions */}
                                         {questions.map((q, idx) => (
-                                            <div key={`essay - ${q.id} `} className={`q - card - v2 essay - type ${editingQuestion?.id === q.id ? 'is-editing' : ''} `}>
+                                            <div key={`essay-${q.id}`} className={`q-card-v2 essay-type ${editingQuestion?.id === q.id ? 'is-editing' : ''}`}>
                                                 <div className="q-card-header">
                                                     <div className="q-meta">
-                                                        <span className="q-number-v2">Soal {questionsPG.length + idx + 1}</span>
-                                                        <span className="q-badge-essay">📝 Soal Essay / Uraian Terbuka</span>
+                                                        <span className="q-number-pill">Soal #{questionsPG.length + idx + 1}</span>
+                                                        <span className="q-badge-type essay">📝 Soal Essay / Uraian</span>
+                                                        <span className="q-sub-label">Jawaban Teks Bebas</span>
                                                     </div>
-                                                    <div className="q-actions-v2">
-                                                        <button
-                                                            className="q-btn-edit"
-                                                            onClick={() => openKartuSoalEdit(q, idx)}
-                                                            title="Edit via Kartu Soal (Word)"
-                                                            style={{ background: '#fef3c7', color: '#b45309', borderColor: '#fde68a' }}
-                                                        >
-                                                            <FileText size={16} />
-                                                        </button>
-                                                        <button className="q-btn-edit" onClick={() => handleEditSoal(q, 'essay')} title="Edit Soal">
-                                                            <Edit3 size={16} />
-                                                        </button>
-                                                        <button className="q-btn-delete" onClick={() => handleDeleteSoal(q.id, 'essay')} title="Hapus Soal">
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                    <div className="q-header-right">
+                                                        <span className="q-bobot-chip essay">
+                                                            <Clock size={13} /> {q.bobotNilai || 10} Poin
+                                                        </span>
+                                                        <div className="q-actions-v2">
+                                                            <button
+                                                                type="button"
+                                                                className="q-btn-kartu"
+                                                                onClick={() => openKartuSoalEdit(q, idx)}
+                                                                title="Edit via Kartu Soal (Word)"
+                                                            >
+                                                                <FileText size={15} />
+                                                                <span>Word</span>
+                                                            </button>
+                                                            <button type="button" className="q-btn-edit" onClick={() => handleEditSoal(q, 'essay')} title="Edit Soal">
+                                                                <Edit3 size={15} />
+                                                                <span>Edit</span>
+                                                            </button>
+                                                            <button type="button" className="q-btn-delete" onClick={() => handleDeleteSoal(q.id, 'essay')} title="Hapus Soal">
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="q-card-body">
                                                     <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
                                                     <div className="essay-rubric-v2">
                                                         <div className="rubric-header">
-                                                            <Info size={14} /> Pedoman Penskoran
+                                                            <Info size={14} /> Pedoman Penskoran / Kunci Jawaban
                                                         </div>
                                                         <div className="rubric-content" dangerouslySetInnerHTML={{ __html: q.kunciJawaban }}></div>
                                                     </div>
                                                 </div>
                                                 <div className="q-card-footer">
-                                                    <div className="bobot-tag">
-                                                        <Clock size={14} />
-                                                        <span>Bobot: <strong>{q.bobotNilai}</strong></span>
+                                                    <div className="q-footer-info">
+                                                        <span className="q-key-info">
+                                                            <strong>Format:</strong> Penilaian Manual Guru / Koreksi AI
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1353,6 +1457,381 @@ const ExamManagement = () => {
                     .q-card-footer { border-top: 2px dashed #f1f5f9; margin-top: 24px; padding-top: 16px; display: flex; justify-content: flex-end; }
                     .bobot-tag { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #64748b; font-weight: 700; padding: 8px 16px; background: #f8fafc; border-radius: 50px; border: 2px solid #f1f5f9; }
                     .bobot-tag strong { color: #0f172a; font-size: 1rem; font-weight: 900; }
+
+                    
+                    /* Ramah Visual: Kartu Daftar Soal Tersimpan */
+                    .q-card-v2 {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        border: 1.5px solid #e2e8f0;
+                        padding: 22px;
+                        transition: all 0.25s ease;
+                        position: relative;
+                        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+                    }
+                    .q-card-v2:hover {
+                        box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.08);
+                        transform: translateY(-2px);
+                    }
+                    .q-card-v2.pg-single {
+                        border-left: 6px solid #3b82f6;
+                    }
+                    .q-card-v2.pg-kompleks {
+                        border-left: 6px solid #8b5cf6;
+                    }
+                    .q-card-v2.pg-tf {
+                        border-left: 6px solid #f59e0b;
+                    }
+                    .q-card-v2.essay-type {
+                        border-left: 6px solid #10b981;
+                    }
+                    .q-card-v2.is-editing {
+                        border-color: #3b82f6;
+                        background: #eff6ff;
+                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+                    }
+
+                    .q-card-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 16px;
+                        flex-wrap: wrap;
+                        gap: 10px;
+                    }
+                    .q-meta {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        flex-wrap: wrap;
+                    }
+                    .q-number-pill {
+                        font-size: 0.8rem;
+                        font-weight: 900;
+                        background: #f1f5f9;
+                        color: #475569;
+                        padding: 5px 12px;
+                        border-radius: 10px;
+                        letter-spacing: 0.3px;
+                    }
+                    .q-badge-type {
+                        font-size: 0.82rem;
+                        font-weight: 800;
+                        padding: 5px 12px;
+                        border-radius: 10px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    .q-badge-type.badge-tf {
+                        background: #fffbeb;
+                        color: #b45309;
+                        border: 1px solid #fde68a;
+                    }
+                    .q-badge-type.badge-kompleks {
+                        background: #f5f3ff;
+                        color: #6d28d9;
+                        border: 1px solid #ddd6fe;
+                    }
+                    .q-badge-type.badge-single {
+                        background: #eff6ff;
+                        color: #1d4ed8;
+                        border: 1px solid #bfdbfe;
+                    }
+                    .q-badge-type.essay {
+                        background: #f0fdf4;
+                        color: #15803d;
+                        border: 1px solid #bbf7d0;
+                    }
+                    .q-sub-label {
+                        font-size: 0.76rem;
+                        color: #94a3b8;
+                        font-weight: 600;
+                    }
+                    .q-header-right {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+                    .q-bobot-chip {
+                        font-size: 0.82rem;
+                        font-weight: 800;
+                        color: #1e293b;
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        padding: 5px 12px;
+                        border-radius: 10px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                    }
+                    .q-bobot-chip.essay {
+                        background: #f0fdf4;
+                        color: #15803d;
+                        border-color: #bbf7d0;
+                    }
+                    .q-actions-v2 {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    .q-btn-edit {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 6px 12px;
+                        border-radius: 10px;
+                        font-size: 0.82rem;
+                        font-weight: 700;
+                        background: #eff6ff;
+                        color: #2563eb;
+                        border: 1px solid #bfdbfe;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .q-btn-edit:hover {
+                        background: #2563eb;
+                        color: #ffffff;
+                        border-color: #2563eb;
+                    }
+                    .q-btn-delete {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 10px;
+                        background: #fff1f2;
+                        color: #e11d48;
+                        border: 1px solid #fecdd3;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .q-btn-delete:hover {
+                        background: #e11d48;
+                        color: #ffffff;
+                        border-color: #e11d48;
+                    }
+                    .q-btn-kartu {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 6px 12px;
+                        border-radius: 10px;
+                        font-size: 0.82rem;
+                        font-weight: 700;
+                        background: #fef3c7;
+                        color: #b45309;
+                        border: 1px solid #fde68a;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .q-btn-kartu:hover {
+                        background: #f59e0b;
+                        color: #ffffff;
+                        border-color: #f59e0b;
+                    }
+
+                    /* Benar / Salah Preview */
+                    .tf-preview-row {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 12px;
+                        margin-top: 10px;
+                        margin-bottom: 12px;
+                    }
+                    .tf-preview-box {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 12px 16px;
+                        border-radius: 14px;
+                        background: #f8fafc;
+                        border: 1.5px solid #e2e8f0;
+                        transition: all 0.2s;
+                    }
+                    .tf-preview-box.is-key {
+                        background: #f0fdf4;
+                        border-color: #22c55e;
+                        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.12);
+                    }
+                    .tf-p-badge {
+                        width: 32px;
+                        height: 32px;
+                        min-width: 32px;
+                        border-radius: 8px;
+                        background: #ffffff;
+                        border: 2px solid #cbd5e1;
+                        font-weight: 900;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 0.9rem;
+                        color: #475569;
+                    }
+                    .tf-preview-box.is-key .tf-p-badge {
+                        background: #22c55e;
+                        border-color: #22c55e;
+                        color: #ffffff;
+                    }
+                    .tf-p-label strong {
+                        display: block;
+                        font-size: 0.92rem;
+                        color: #1e293b;
+                    }
+                    .tf-p-label span {
+                        font-size: 0.76rem;
+                        color: #64748b;
+                    }
+                    .tf-p-check {
+                        margin-left: auto;
+                        font-size: 0.78rem;
+                        font-weight: 800;
+                        color: #15803d;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        background: #dcfce7;
+                        padding: 4px 10px;
+                        border-radius: 8px;
+                        flex-shrink: 0;
+                    }
+
+                    /* Option Cards */
+                    .opt-key-pill {
+                        margin-left: auto;
+                        font-size: 0.74rem;
+                        font-weight: 800;
+                        color: #15803d;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        background: #dcfce7;
+                        padding: 3px 8px;
+                        border-radius: 6px;
+                        flex-shrink: 0;
+                    }
+                    .q-card-footer {
+                        border-top: 1px dashed #e2e8f0;
+                        margin-top: 16px;
+                        padding-top: 12px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        font-size: 0.85rem;
+                    }
+                    .q-footer-info {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        flex-wrap: wrap;
+                    }
+                    .q-key-info {
+                        color: #475569;
+                    }
+                    .kunci-highlight {
+                        background: #dbeafe;
+                        color: #1d4ed8;
+                        padding: 2px 10px;
+                        border-radius: 6px;
+                        font-weight: 900;
+                        margin-left: 4px;
+                    }
+                    .q-multi-note {
+                        font-size: 0.78rem;
+                        color: #6d28d9;
+                        font-weight: 700;
+                    }
+
+                    /* Dark Mode Overrides for Friendly Cards */
+                    body.dark-theme .q-card-v2,
+                    .dark .q-card-v2 {
+                        background: #1e293b;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .q-card-v2.is-editing,
+                    .dark .q-card-v2.is-editing {
+                        background: rgba(30, 58, 138, 0.25);
+                        border-color: #3b82f6;
+                    }
+                    body.dark-theme .q-number-pill,
+                    .dark .q-number-pill {
+                        background: #0f172a;
+                        color: #cbd5e1;
+                    }
+                    body.dark-theme .q-badge-type.badge-tf,
+                    .dark .q-badge-type.badge-tf {
+                        background: rgba(180, 83, 9, 0.2);
+                        color: #fde68a;
+                        border-color: #d97706;
+                    }
+                    body.dark-theme .q-badge-type.badge-kompleks,
+                    .dark .q-badge-type.badge-kompleks {
+                        background: rgba(109, 40, 217, 0.2);
+                        color: #c4b5fd;
+                        border-color: #7c3aed;
+                    }
+                    body.dark-theme .q-badge-type.badge-single,
+                    .dark .q-badge-type.badge-single {
+                        background: rgba(29, 78, 216, 0.2);
+                        color: #93c5fd;
+                        border-color: #2563eb;
+                    }
+                    body.dark-theme .q-badge-type.essay,
+                    .dark .q-badge-type.essay {
+                        background: rgba(21, 128, 61, 0.2);
+                        color: #86efac;
+                        border-color: #16a34a;
+                    }
+                    body.dark-theme .q-bobot-chip,
+                    .dark .q-bobot-chip {
+                        background: #0f172a;
+                        color: #cbd5e1;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .tf-preview-box,
+                    .dark .tf-preview-box {
+                        background: #0f172a;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .tf-preview-box.is-key,
+                    .dark .tf-preview-box.is-key {
+                        background: rgba(34, 197, 94, 0.15);
+                        border-color: #22c55e;
+                    }
+                    body.dark-theme .tf-p-badge,
+                    .dark .tf-p-badge {
+                        background: #1e293b;
+                        color: #cbd5e1;
+                        border-color: #475569;
+                    }
+                    body.dark-theme .tf-p-label strong,
+                    .dark .tf-p-label strong {
+                        color: #f1f5f9;
+                    }
+                    body.dark-theme .tf-p-label span,
+                    .dark .tf-p-label span {
+                        color: #94a3b8;
+                    }
+                    body.dark-theme .tf-p-check,
+                    .dark .tf-p-check {
+                        background: rgba(34, 197, 94, 0.2);
+                        color: #86efac;
+                    }
+                    body.dark-theme .opt-key-pill,
+                    .dark .opt-key-pill {
+                        background: rgba(34, 197, 94, 0.2);
+                        color: #86efac;
+                    }
+                    body.dark-theme .q-card-footer,
+                    .dark .q-card-footer {
+                        border-color: #334155;
+                    }
+                    body.dark-theme .kunci-highlight,
+                    .dark .kunci-highlight {
+                        background: rgba(30, 58, 138, 0.4);
+                        color: #93c5fd;
+                    }
 
                     /* Custom Scrollbar */
                     .questions-scroll-v2::-webkit-scrollbar { width: 8px; }
