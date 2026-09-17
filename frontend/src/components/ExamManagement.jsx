@@ -25,7 +25,11 @@ import {
     BookCheck,
     Power,
     PowerOff,
-    CloudUpload
+    CloudUpload,
+    Image as ImageIcon,
+    Eye,
+    ZoomIn,
+    X
 } from 'lucide-react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -51,15 +55,63 @@ const QuillEditor = ({ value, onChange, placeholder, isSimple }) => {
                         [{ 'list': 'ordered' }, { 'list': 'bullet' }],
                         ['link'],
                         ['clean']
-                    ] : [
-                        [{ 'header': [1, 2, false] }],
-                        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                        ['link', 'image', 'video'],
-                        ['clean']
-                    ]
+                    ] : {
+                        container: [
+                            [{ 'header': [1, 2, false] }],
+                            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                            ['link', 'image', 'video'],
+                            ['clean']
+                        ]
+                    }
                 }
             });
+
+            // Handle image upload compression inside Quill toolbar
+            if (!isSimple && quillRef.current.getModule('toolbar')) {
+                const toolbar = quillRef.current.getModule('toolbar');
+                toolbar.addHandler('image', () => {
+                    const input = document.createElement('input');
+                    input.setAttribute('type', 'file');
+                    input.setAttribute('accept', 'image/*');
+                    input.click();
+                    input.onchange = async () => {
+                        const file = input.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const img = new window.Image();
+                                img.onload = () => {
+                                    const canvas = document.createElement('canvas');
+                                    let width = img.width;
+                                    let height = img.height;
+                                    const maxDim = 1200;
+                                    if (width > maxDim || height > maxDim) {
+                                        if (width > height) {
+                                            height = Math.round((height * maxDim) / width);
+                                            width = maxDim;
+                                        } else {
+                                            width = Math.round((width * maxDim) / height);
+                                            height = maxDim;
+                                        }
+                                    }
+                                    canvas.width = width;
+                                    canvas.height = height;
+                                    const ctx = canvas.getContext('2d');
+                                    ctx.drawImage(img, 0, 0, width, height);
+                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                                    
+                                    const range = quillRef.current.getSelection(true);
+                                    quillRef.current.insertEmbed(range ? range.index : 0, 'image', compressedDataUrl);
+                                    quillRef.current.setSelection((range ? range.index : 0) + 1);
+                                };
+                                img.src = e.target.result;
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    };
+                });
+            }
 
             quillRef.current.on('text-change', () => {
                 isInternalChange.current = true;
@@ -152,6 +204,57 @@ const ExamManagement = () => {
     const fileInputRef = useRef(null);
     const [uploadingExam, setUploadingExam] = useState(null);
     const [savingQuestion, setSavingQuestion] = useState(false);
+    const [enlargedImage, setEnlargedImage] = useState(null);
+    const directImageInputRef = useRef(null);
+
+    const handleDirectImageUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new window.Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 1200;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                
+                const imageTag = `<p><img src="${compressedDataUrl}" alt="Gambar Soal" style="max-width:100%; border-radius:12px; margin: 10px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" /></p>`;
+                if (qType === 'essay') {
+                    setQuestionForm(prev => ({ ...prev, pertanyaan: (prev.pertanyaan || '') + imageTag }));
+                } else {
+                    setQuestionFormPG(prev => ({ ...prev, pertanyaan: (prev.pertanyaan || '') + imageTag }));
+                }
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
+
+    const handleRemoveImagesFromCurrent = () => {
+        if (!window.confirm('Hapus semua gambar dari isi pertanyaan saat ini?')) return;
+        const cleanHtml = (html) => html ? html.replace(/<img[^>]*>/gi, '') : '';
+        if (qType === 'essay') {
+            setQuestionForm(prev => ({ ...prev, pertanyaan: cleanHtml(prev.pertanyaan) }));
+        } else {
+            setQuestionFormPG(prev => ({ ...prev, pertanyaan: cleanHtml(prev.pertanyaan) }));
+        }
+    };
 
     // Kartu Soal States
     const [isKartuModalOpen, setIsKartuModalOpen] = useState(false);
@@ -823,7 +926,28 @@ const ExamManagement = () => {
                                     </div>
 
                                     <div className="form-group-v2">
-                                        <label>Isi Pertanyaan</label>
+                                        <div className="form-label-row">
+                                            <label style={{ margin: 0 }}>Isi Pertanyaan</label>
+                                            <div className="img-upload-actions">
+                                                <button
+                                                    type="button"
+                                                    className="btn-add-img-soal"
+                                                    onClick={() => directImageInputRef.current?.click()}
+                                                    title="Pilih gambar dari komputer/HP untuk disisipkan ke soal"
+                                                >
+                                                    <ImageIcon size={16} />
+                                                    <span>Sisipkan / Upload Gambar</span>
+                                                </button>
+                                                <input
+                                                    type="file"
+                                                    ref={directImageInputRef}
+                                                    accept="image/*"
+                                                    style={{ display: 'none' }}
+                                                    onChange={handleDirectImageUpload}
+                                                />
+                                            </div>
+                                        </div>
+
                                         <div className="editor-container-v2">
                                             <QuillEditor
                                                 key={qType === 'essay' ? 'essay-q' : 'pg-q'}
@@ -831,10 +955,49 @@ const ExamManagement = () => {
                                                 onChange={(content) => qType === 'essay'
                                                     ? setQuestionForm(prev => ({ ...prev, pertanyaan: content }))
                                                     : setQuestionFormPG(prev => ({ ...prev, pertanyaan: content }))}
-                                                placeholder="Ketik pertanyaan secara detail di sini..."
+                                                placeholder="Ketik pertanyaan secara detail di sini... Anda juga bisa menyisipkan gambar dengan tombol di atas atau toolbar editor."
                                                 isSimple={false}
                                             />
                                         </div>
+
+                                        {/* Preview Langsung Tampilan Soal dan Gambar Saat Soal Diisikan */}
+                                        {((qType === 'essay' ? questionForm.pertanyaan : questionFormPG.pertanyaan) || '').trim() && (
+                                            <div className="live-question-preview-container">
+                                                <div className="lqp-header">
+                                                    <div className="lqp-title">
+                                                        <Eye size={15} />
+                                                        <span>Preview Tampilan Soal (Yang Dilihat Guru & Siswa):</span>
+                                                        {((qType === 'essay' ? questionForm.pertanyaan : questionFormPG.pertanyaan) || '').includes('<img') && (
+                                                            <span className="lqp-img-badge">
+                                                                <ImageIcon size={13} /> Ada Gambar Terlampir
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {((qType === 'essay' ? questionForm.pertanyaan : questionFormPG.pertanyaan) || '').includes('<img') && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn-clear-img-preview"
+                                                            onClick={handleRemoveImagesFromCurrent}
+                                                            title="Hapus gambar dari pertanyaan"
+                                                        >
+                                                            <X size={13} /> Hapus Gambar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div
+                                                    className="lqp-body"
+                                                    onClick={(e) => {
+                                                        if (e.target.tagName === 'IMG') {
+                                                            setEnlargedImage(e.target.src);
+                                                        }
+                                                    }}
+                                                    dangerouslySetInnerHTML={{ __html: (qType === 'essay' ? questionForm.pertanyaan : questionFormPG.pertanyaan) || '' }}
+                                                />
+                                                <div className="lqp-tip">
+                                                    *Klik pada gambar untuk memperbesar tampilan (Zoom Lightbox).
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {qType === 'pg' && (
@@ -1048,6 +1211,11 @@ const ExamManagement = () => {
                                                                 {meta.typeLabel}
                                                             </span>
                                                             <span className="q-sub-label">{meta.subLabel}</span>
+                                                            {(q.pertanyaan || '').includes('<img') && (
+                                                                <span className="q-img-present-chip" title="Soal ini menyertakan gambar">
+                                                                    <ImageIcon size={12} /> Gambar
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="q-header-right">
                                                             <span className="q-bobot-chip">
@@ -1067,7 +1235,15 @@ const ExamManagement = () => {
 
                                                     {/* Isi Pertanyaan */}
                                                     <div className="q-card-body">
-                                                        <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
+                                                        <div
+                                                            className="q-text-v2"
+                                                            onClick={(e) => {
+                                                                if (e.target.tagName === 'IMG') {
+                                                                    setEnlargedImage(e.target.src);
+                                                                }
+                                                            }}
+                                                            dangerouslySetInnerHTML={{ __html: q.pertanyaan }}
+                                                        ></div>
 
                                                         {/* Preview Ramah untuk Benar / Salah */}
                                                         {meta.typeKey === 'tf' ? (
@@ -1170,7 +1346,15 @@ const ExamManagement = () => {
                                                     </div>
                                                 </div>
                                                 <div className="q-card-body">
-                                                    <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
+                                                    <div
+                                                        className="q-text-v2"
+                                                        onClick={(e) => {
+                                                            if (e.target.tagName === 'IMG') {
+                                                                setEnlargedImage(e.target.src);
+                                                            }
+                                                        }}
+                                                        dangerouslySetInnerHTML={{ __html: q.pertanyaan }}
+                                                    ></div>
                                                     <div className="essay-rubric-v2">
                                                         <div className="rubric-header">
                                                             <Info size={14} /> Pedoman Penskoran / Kunci Jawaban
@@ -1191,7 +1375,22 @@ const ExamManagement = () => {
                                 )}
                             </div>
                         </div>
+                    {enlargedImage && (
+                <div className="img-lightbox-backdrop" onClick={() => setEnlargedImage(null)}>
+                    <div className="img-lightbox-wrapper" onClick={(e) => e.stopPropagation()}>
+                        <div className="img-lightbox-header">
+                            <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Pratinjau Penuh Gambar Soal</span>
+                            <button type="button" className="img-lightbox-close" onClick={() => setEnlargedImage(null)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="img-lightbox-content">
+                            <img src={enlargedImage} alt="Perbesar Gambar Soal" />
+                        </div>
                     </div>
+                </div>
+            )}
+</div>
 
                     <style>{`
                     .exam-management { max-width: 1400px; margin: 0 auto; } 
@@ -1831,6 +2030,245 @@ const ExamManagement = () => {
                     .dark .kunci-highlight {
                         background: rgba(30, 58, 138, 0.4);
                         color: #93c5fd;
+                    }
+
+                    
+                    /* Image Upload & Live Preview Styles */
+                    .form-label-row {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 8px;
+                    }
+                    .btn-add-img-soal {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 6px 14px;
+                        border-radius: 10px;
+                        background: #ecfdf5;
+                        color: #059669;
+                        border: 1.5px solid #a7f3d0;
+                        font-size: 0.8rem;
+                        font-weight: 800;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .btn-add-img-soal:hover {
+                        background: #059669;
+                        color: #ffffff;
+                        border-color: #059669;
+                    }
+                    .live-question-preview-container {
+                        margin-top: 14px;
+                        border: 1.5px solid #cbd5e1;
+                        border-radius: 14px;
+                        background: #f8fafc;
+                        overflow: hidden;
+                        animation: fadeIn 0.25s ease;
+                    }
+                    .lqp-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 10px 14px;
+                        background: #f1f5f9;
+                        border-bottom: 1px solid #e2e8f0;
+                        font-size: 0.8rem;
+                        font-weight: 800;
+                        color: #334155;
+                    }
+                    .lqp-title {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        flex-wrap: wrap;
+                    }
+                    .lqp-img-badge {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 2px 8px;
+                        background: #dbeafe;
+                        color: #1e40af;
+                        border-radius: 6px;
+                        font-size: 0.72rem;
+                        font-weight: 800;
+                    }
+                    .btn-clear-img-preview {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        background: #fee2e2;
+                        color: #b91c1c;
+                        border: 1px solid #fca5a5;
+                        border-radius: 6px;
+                        padding: 3px 8px;
+                        font-size: 0.74rem;
+                        font-weight: 700;
+                        cursor: pointer;
+                    }
+                    .btn-clear-img-preview:hover {
+                        background: #b91c1c;
+                        color: #ffffff;
+                    }
+                    .lqp-body {
+                        padding: 14px 16px;
+                        font-size: 1rem;
+                        line-height: 1.6;
+                        color: #0f172a;
+                    }
+                    .lqp-body img {
+                        max-width: 100%;
+                        max-height: 350px;
+                        object-fit: contain;
+                        border-radius: 12px;
+                        border: 1.5px solid #cbd5e1;
+                        background: #ffffff;
+                        padding: 6px;
+                        display: block;
+                        margin: 10px 0;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+                        cursor: zoom-in;
+                        transition: transform 0.2s;
+                    }
+                    .lqp-body img:hover {
+                        transform: scale(1.01);
+                    }
+                    .lqp-tip {
+                        padding: 6px 14px 10px 14px;
+                        font-size: 0.74rem;
+                        color: #64748b;
+                        font-style: italic;
+                    }
+
+                    /* Saved Question Card Images */
+                    .q-text-v2 img {
+                        max-width: 100%;
+                        max-height: 360px;
+                        object-fit: contain;
+                        border-radius: 12px;
+                        margin: 12px 0;
+                        display: block;
+                        border: 1.5px solid #e2e8f0;
+                        background: #ffffff;
+                        padding: 6px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                        cursor: zoom-in;
+                        transition: transform 0.2s;
+                    }
+                    .q-text-v2 img:hover {
+                        transform: scale(1.01);
+                    }
+                    .q-img-present-chip {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        background: #ecfdf5;
+                        color: #047857;
+                        border: 1px solid #a7f3d0;
+                        padding: 3px 8px;
+                        border-radius: 8px;
+                        font-size: 0.72rem;
+                        font-weight: 800;
+                    }
+
+                    /* Lightbox Modal */
+                    .img-lightbox-backdrop {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(15, 23, 42, 0.85);
+                        z-index: 99999;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 24px;
+                        animation: fadeIn 0.2s ease;
+                    }
+                    .img-lightbox-wrapper {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        max-width: 90vw;
+                        max-height: 90vh;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                    }
+                    .img-lightbox-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 14px 20px;
+                        background: #f8fafc;
+                        border-bottom: 1px solid #e2e8f0;
+                    }
+                    .img-lightbox-close {
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #64748b;
+                        padding: 4px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 8px;
+                    }
+                    .img-lightbox-close:hover {
+                        background: #fee2e2;
+                        color: #b91c1c;
+                    }
+                    .img-lightbox-content {
+                        padding: 16px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: #0f172a;
+                        overflow: auto;
+                        max-height: calc(90vh - 60px);
+                    }
+                    .img-lightbox-content img {
+                        max-width: 100%;
+                        max-height: calc(90vh - 90px);
+                        object-fit: contain;
+                        border-radius: 8px;
+                    }
+
+                    /* Dark Mode Overrides for Image Previews */
+                    body.dark-theme .live-question-preview-container,
+                    .dark .live-question-preview-container {
+                        background: #0f172a;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .lqp-header,
+                    .dark .lqp-header {
+                        background: #1e293b;
+                        border-color: #334155;
+                        color: #cbd5e1;
+                    }
+                    body.dark-theme .lqp-body,
+                    .dark .lqp-body {
+                        color: #f1f5f9;
+                    }
+                    body.dark-theme .lqp-body img,
+                    .dark .lqp-body img,
+                    body.dark-theme .q-text-v2 img,
+                    .dark .q-text-v2 img {
+                        border-color: #334155;
+                        background: #1e293b;
+                    }
+                    body.dark-theme .img-lightbox-wrapper,
+                    .dark .img-lightbox-wrapper {
+                        background: #1e293b;
+                    }
+                    body.dark-theme .img-lightbox-header,
+                    .dark .img-lightbox-header {
+                        background: #0f172a;
+                        border-color: #334155;
+                        color: #f1f5f9;
                     }
 
                     /* Custom Scrollbar */

@@ -63,6 +63,7 @@ const StudentExams = () => {
     const [practiceResult, setPracticeResult] = useState(null);
     const [fontSizeScale, setFontSizeScale] = useState(1);
     const [showQuestionInfoModal, setShowQuestionInfoModal] = useState(false);
+    const [enlargedImg, setEnlargedImg] = useState(null);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
@@ -774,7 +775,15 @@ const StudentExams = () => {
                                         </div>
                                     </div>
 
-                                    <div className={`cbt-question-text ${fontClass}`} dangerouslySetInnerHTML={{ __html: q?.pertanyaan }}></div>
+                                    <div
+                                        className={`cbt-question-text ${fontClass}`}
+                                        onClick={(e) => {
+                                            if (e.target.tagName === 'IMG') {
+                                                setEnlargedImg(e.target.src);
+                                            }
+                                        }}
+                                        dangerouslySetInnerHTML={{ __html: q?.pertanyaan }}
+                                    ></div>
 
                                     <div className="cbt-answer-area">
                                         {q?.qType === 'pg' ? (
@@ -1094,7 +1103,32 @@ const StudentExams = () => {
                     </div>
                 )}
 
-                {showFinishConfirm && (
+                {/* Modal Zoom Gambar Soal untuk Siswa */}
+            {enlargedImg && (
+                <div
+                    className="img-lightbox-backdrop"
+                    onClick={() => setEnlargedImg(null)}
+                    style={{ zIndex: 99999 }}
+                >
+                    <div className="img-lightbox-wrapper" onClick={(e) => e.stopPropagation()}>
+                        <div className="img-lightbox-header">
+                            <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>Lihat Detail Gambar Soal</span>
+                            <button
+                                type="button"
+                                className="img-lightbox-close"
+                                onClick={() => setEnlargedImg(null)}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="img-lightbox-content">
+                            <img src={enlargedImg} alt="Detail Gambar Soal" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showFinishConfirm && (
                     <div className="modal-overlay">
                         <div className="modal-content token-modal" style={{ maxWidth: '500px', textAlign: 'center' }}>
                             <div className="shield-icon" style={{ color: '#ef4444', display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
@@ -1216,6 +1250,103 @@ const StudentExams = () => {
                         color: inherit;
                     }
                     
+                    /* CBT Question Image Styling */
+                    .cbt-question-text img {
+                        max-width: 100%;
+                        max-height: 420px;
+                        object-fit: contain;
+                        border-radius: 14px;
+                        margin: 16px auto;
+                        display: block;
+                        border: 1.5px solid #e2e8f0;
+                        background: #ffffff;
+                        padding: 6px;
+                        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+                        cursor: zoom-in;
+                        transition: transform 0.2s;
+                    }
+                    .cbt-question-text img:hover {
+                        transform: scale(1.01);
+                    }
+                    body.dark-theme .cbt-question-text img,
+                    .dark .cbt-question-text img {
+                        border-color: #334155;
+                        background: #1e293b;
+                    }
+
+                    /* Lightbox Modal */
+                    .img-lightbox-backdrop {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(15, 23, 42, 0.85);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 24px;
+                        animation: fadeIn 0.2s ease;
+                    }
+                    .img-lightbox-wrapper {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        max-width: 90vw;
+                        max-height: 90vh;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                    }
+                    .img-lightbox-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 14px 20px;
+                        background: #f8fafc;
+                        border-bottom: 1px solid #e2e8f0;
+                    }
+                    .img-lightbox-close {
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        color: #64748b;
+                        padding: 4px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 8px;
+                    }
+                    .img-lightbox-close:hover {
+                        background: #fee2e2;
+                        color: #b91c1c;
+                    }
+                    .img-lightbox-content {
+                        padding: 16px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: #0f172a;
+                        overflow: auto;
+                        max-height: calc(90vh - 60px);
+                    }
+                    .img-lightbox-content img {
+                        max-width: 100%;
+                        max-height: calc(90vh - 90px);
+                        object-fit: contain;
+                        border-radius: 8px;
+                    }
+                    body.dark-theme .img-lightbox-wrapper,
+                    .dark .img-lightbox-wrapper {
+                        background: #1e293b;
+                    }
+                    body.dark-theme .img-lightbox-header,
+                    .dark .img-lightbox-header {
+                        background: #0f172a;
+                        border-color: #334155;
+                        color: #f1f5f9;
+                    }
+
                     /* Practice Banner */
                     .practice-banner-card {
                         background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0284c7 100%);
