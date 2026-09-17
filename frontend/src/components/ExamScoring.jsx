@@ -505,7 +505,7 @@ const ExamScoring = () => {
                                     <tr key={item.siswaId}>
                                         <td style={{ fontWeight: 800, color: '#94a3b8' }}>{idx + 1}</td>
                                         <td style={{ fontWeight: 600 }}>{item.nisn}</td>
-                                        <td style={{ fontWeight: 800, color: '#1e293b' }}>{item.namaSiswa}</td>
+                                        <td className="praktek-std-name" style={{ fontWeight: 800 }}>{item.namaSiswa}</td>
                                         <td>
                                             <input
                                                 type="number"
@@ -1125,6 +1125,49 @@ const ExamScoring = () => {
                 .stat-praktek strong { font-size: 1.5rem; color: #1e293b; font-weight: 950; }
 
                 /* Dark mode support for AI Box & Grading Panel */
+                
+                /* Additional Dark Mode Overrides for Scoring */
+                [data-theme="dark"] .page-header h1 { color: #f8fafc; }
+                [data-theme="dark"] .page-header p { color: #94a3b8; }
+                [data-theme="dark"] .card-box { background: #1e293b; border-color: #334155; }
+                [data-theme="dark"] .custom-select { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                [data-theme="dark"] .custom-select:focus { background: #0f172a; }
+                [data-theme="dark"] .form-group label { color: #94a3b8; }
+                [data-theme="dark"] .exam-card { background: #1e293b; border-color: #334155; }
+                [data-theme="dark"] .exam-card:hover { border-color: #3b82f6; }
+                [data-theme="dark"] .exam-card h3 { color: #f8fafc; }
+                [data-theme="dark"] .exam-card p { color: #94a3b8; }
+                [data-theme="dark"] .tag-kelas { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+                [data-theme="dark"] .btn-back { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+                [data-theme="dark"] .btn-back:hover { background: #1e293b; color: #f8fafc; }
+                [data-theme="dark"] .ws-title h3 { color: #f8fafc; }
+                [data-theme="dark"] .student-list-card { background: #1e293b; border-color: #334155; }
+                [data-theme="dark"] .list-title { background: #0f172a; border-bottom-color: #334155; color: #f8fafc; }
+                [data-theme="dark"] .kelas-header { background: #0f172a; color: #94a3b8; }
+                [data-theme="dark"] .student-item { border-bottom-color: #334155; }
+                [data-theme="dark"] .student-item:hover { background: #0f172a; }
+                [data-theme="dark"] .student-item.active { background: #1e3a8a30; }
+                [data-theme="dark"] .std-name { color: #f8fafc; }
+                [data-theme="dark"] .std-score { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                [data-theme="dark"] .grading-card { background: #1e293b; border-color: #334155; }
+                [data-theme="dark"] .grading-head { border-bottom-color: #334155; }
+                [data-theme="dark"] .grading-head h2 { color: #f8fafc; }
+                [data-theme="dark"] .answer-item { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .q-question { color: #f8fafc; }
+                [data-theme="dark"] .std-answer-box { background: #1e293b; border-color: #475569; }
+                [data-theme="dark"] .key-answer-box { background: #451a0320; border-color: #78350f; }
+                [data-theme="dark"] .table-wrapper { border-color: #334155; }
+                [data-theme="dark"] .praktek-table th { background: #0f172a; color: #94a3b8; border-color: #334155; }
+                [data-theme="dark"] .praktek-table td { border-color: #334155; color: #cbd5e1; }
+                [data-theme="dark"] .praktek-std-name { color: #f8fafc; }
+                [data-theme="dark"] .score-input-praktek { background: #0f172a; border-color: #334155; color: #60a5fa; }
+                [data-theme="dark"] .header-stats-praktek { background: #1e293b; border-color: #334155; }
+                [data-theme="dark"] .stat-praktek strong { color: #f8fafc; }
+                [data-theme="dark"] .empty-state, [data-theme="dark"] .empty-grading { color: #94a3b8; }
+                [data-theme="dark"] .empty-grading h3 { color: #cbd5e1; }
+                [data-theme="dark"] .btn-praktek { background: #0f172a; border-color: #3b82f6; color: #60a5fa; }
+                [data-theme="dark"] .btn-praktek:hover { background: #1e3a8a30; }
+
                 [data-theme="dark"] .ai-box { background: #1e293b; border-color: #3b82f6; }
                 [data-theme="dark"] .ai-head { color: #60a5fa; }
                 [data-theme="dark"] .ai-score { background: #0f172a; border-color: #1e3a8a; color: #bae6fd; }

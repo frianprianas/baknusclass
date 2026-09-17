@@ -170,7 +170,7 @@ const SyncSiswa = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
-        <div className="upload-card" style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <div className="upload-card">
           <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Upload size={18} /> Upload CSV
           </h3>
@@ -189,7 +189,7 @@ const SyncSiswa = () => {
                 setStats({ success: 0, failed: 0 });
               }}
               disabled={status === 'uploading' || status === 'syncing'}
-              style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#fff', fontSize: '0.9rem' }}
+              className="styled-sync-select"
             >
               <option value="normal">Sinkronisasi Normal (Update Kelas Saja)</option>
               <option value="hard">Hard Sync (Impor Data & Akun Siswa Baru/Lama)</option>
@@ -215,7 +215,7 @@ const SyncSiswa = () => {
             accept=".csv" 
             onChange={handleFileChange}
             disabled={status === 'uploading' || status === 'syncing'}
-            style={{ width: '100%', padding: '10px', border: '1px dashed #cbd5e1', borderRadius: '8px', marginBottom: '16px' }}
+            className="file-input-sync"
           />
 
           {status === 'complete' && (
@@ -247,7 +247,7 @@ const SyncSiswa = () => {
           </button>
 
           <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px dashed #e2e8f0' }}>
-            <h4 style={{ marginBottom: '8px', fontSize: '0.95rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h4 className="sync-section-title" style={{ marginBottom: '8px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Zap size={16} color="#eab308" /> Fix Data Duplikat
             </h4>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '12px' }}>
@@ -312,6 +312,91 @@ const SyncSiswa = () => {
       </div>
       
       <style>{`
+        .upload-card {
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .styled-sync-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 0.9rem;
+            color: #1e293b;
+        }
+        .file-input-sync {
+            width: 100%;
+            padding: 10px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            background: #f8fafc;
+            color: #475569;
+        }
+        .sync-section-title {
+            color: #1e293b;
+        }
+        .btn-deep-sync {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: #fff;
+            color: #ef4444;
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .btn-deep-sync:hover {
+            background: #fef2f2;
+        }
+
+        /* Dark Mode Overrides */
+        [data-theme="dark"] .sync-siswa h1 { color: #f8fafc !important; }
+        [data-theme="dark"] .sync-siswa p { color: #94a3b8; }
+        [data-theme="dark"] .upload-card {
+            background: #1e293b;
+            border-color: #334155;
+            color: #f8fafc;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        [data-theme="dark"] .upload-card h3 {
+            color: #f8fafc;
+        }
+        [data-theme="dark"] .upload-card label {
+            color: #94a3b8 !important;
+        }
+        [data-theme="dark"] .styled-sync-select {
+            background: #0f172a;
+            border-color: #334155;
+            color: #f8fafc;
+        }
+        [data-theme="dark"] .file-input-sync {
+            background: #0f172a;
+            border-color: #334155;
+            color: #94a3b8;
+        }
+        [data-theme="dark"] .sync-section-title {
+            color: #f8fafc;
+        }
+        [data-theme="dark"] .btn-deep-sync {
+            background: #0f172a;
+            border-color: #ef4444;
+            color: #f87171;
+        }
+        [data-theme="dark"] .btn-deep-sync:hover {
+            background: #7f1d1d30;
+        }
+
         .spin {
           animation: spin 1s linear infinite;
         }

@@ -1048,6 +1048,203 @@ const MasterData = () => {
                 .peserta-table tr:hover td { background: #fbfcfe; }
                 .remove-peserta-btn { width: 28px; height: 28px; border-radius: 6px; background: #fee2e2; color: #ef4444; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
                 .remove-peserta-btn:hover { background: #ef4444; color: white; transform: scale(1.05); }
+
+                /* Dark Mode Overrides */
+                [data-theme="dark"] .page-header h1 { color: #f8fafc; }
+                [data-theme="dark"] .page-header p { color: #94a3b8; }
+                
+                [data-theme="dark"] .tab-navigation {
+                    background: #0f172a;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .tab-navigation button {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .tab-navigation button.active {
+                    background: #1e293b;
+                    color: #60a5fa;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                }
+                [data-theme="dark"] .tab-navigation button:hover:not(.active) {
+                    background: #1e293b;
+                    color: #f8fafc;
+                }
+
+                [data-theme="dark"] .table-card {
+                    background: #1e293b;
+                    border-color: #334155;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+                }
+                [data-theme="dark"] .table-actions {
+                    background: #1e293b;
+                    border-bottom-color: #334155;
+                }
+                [data-theme="dark"] .search-box input {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .search-box input:focus {
+                    background: #0f172a;
+                    border-color: #3b82f6;
+                }
+
+                [data-theme="dark"] .master-table th {
+                    background: #0f172a;
+                    color: #94a3b8;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .master-table td {
+                    border-bottom-color: #334155;
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .master-table td strong {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .master-table tr:hover td {
+                    background: #0f172a;
+                }
+
+                [data-theme="dark"] .code-badge {
+                    background: #1e3a8a30;
+                    color: #93c5fd;
+                    border: 1px solid #1d4ed8;
+                }
+
+                [data-theme="dark"] .guru-card {
+                    background: #1e293b;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .guru-card-header {
+                    background: #0f172a;
+                    border-bottom: 1px solid #334155;
+                }
+                [data-theme="dark"] .guru-info h4 {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .guru-info p {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .pengampu-chip {
+                    background: #0f172a;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .chip-mapel {
+                    color: #93c5fd;
+                }
+                [data-theme="dark"] .edit-pengampu-btn {
+                    background: #0f172a;
+                    color: #60a5fa;
+                }
+                [data-theme="dark"] .edit-pengampu-btn:hover {
+                    background: #3b82f6;
+                    color: white;
+                }
+
+                [data-theme="dark"] .modal-content {
+                    background: #1e293b;
+                    color: #f8fafc;
+                    border: 1px solid #334155;
+                }
+                [data-theme="dark"] .modal-header h3 {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .icon-close {
+                    background: #0f172a;
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .icon-close:hover {
+                    background: #7f1d1d;
+                    color: #fca5a5;
+                }
+                [data-theme="dark"] .form-group label {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .form-group input,
+                [data-theme="dark"] .form-group select {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .form-group input:focus,
+                [data-theme="dark"] .form-group select:focus {
+                    background: #0f172a;
+                    border-color: #3b82f6;
+                }
+
+                [data-theme="dark"] .mapel-assignment-list {
+                    background: #0f172a;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .mapel-block:not(.active):hover {
+                    background: #1e293b;
+                }
+                [data-theme="dark"] .mapel-block.active {
+                    background: #1e3a8a30;
+                    border-color: #2563eb;
+                }
+                [data-theme="dark"] .mapel-label {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .kelas-chip-check {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .kelas-chip-check:hover {
+                    border-color: #3b82f6;
+                    color: #60a5fa;
+                    background: #1e293b;
+                }
+                [data-theme="dark"] .kelas-chip-check.selected {
+                    background: #1e3a8a;
+                    border-color: #3b82f6;
+                    color: #bfdbfe;
+                }
+                [data-theme="dark"] .btn-secondary {
+                    background: #0f172a;
+                    color: #cbd5e1;
+                    border: 1px solid #334155;
+                }
+                [data-theme="dark"] .btn-secondary:hover {
+                    background: #334155;
+                    color: #f8fafc;
+                }
+
+                [data-theme="dark"] .import-kelas-bar {
+                    background: #0f172a;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .import-kelas-label {
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .import-kelas-select {
+                    background: #1e293b;
+                    border-color: #334155;
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .kelas-section {
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .kelas-section-header {
+                    background: #0f172a;
+                    border-bottom-color: #334155;
+                }
+                [data-theme="dark"] .kelas-section-title {
+                    color: #60a5fa;
+                }
+                [data-theme="dark"] .peserta-table th {
+                    background: #0f172a;
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .peserta-table td {
+                    border-bottom-color: #334155;
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .peserta-table tr:hover td {
+                    background: #1e293b;
+                }
+
             `}</style>
 
         </div>

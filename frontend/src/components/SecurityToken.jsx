@@ -270,7 +270,7 @@ const SecurityToken = () => {
                     <div className="modal-content monitor-modal">
                         <div className="modal-header">
                             <div>
-                                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>Pantau Peserta Ujian</h3>
+                                <h3 className="monitor-title" style={{ margin: 0, fontSize: '1.25rem' }}>Pantau Peserta Ujian</h3>
                                 <p style={{ fontSize: '0.9rem', color: '#64748b', margin: '4px 0 0 0' }}>{monitoringExamName}</p>
                             </div>
                             <button onClick={() => setIsMonitoringModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
@@ -288,7 +288,7 @@ const SecurityToken = () => {
                                         <div key={std.siswaId} className={`monitor-card ${std.isFinished ? 'finished' : std.isOnline ? 'online' : 'offline'}`}>
                                             <div className="monitor-status-dot" style={{ background: std.isFinished ? '#3b82f6' : std.isOnline ? '#10b981' : '#ef4444' }}></div>
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>{std.namaSiswa}</div>
+                                                <div className="monitor-std-name" style={{ fontWeight: 700, fontSize: '0.95rem' }}>{std.namaSiswa}</div>
                                                 <div style={{ fontSize: '0.8rem', color: '#64748b' }}>NIS: {std.nisn}</div>
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -356,6 +356,83 @@ const SecurityToken = () => {
 
                 .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+                /* Dark Mode Overrides */
+                [data-theme="dark"] .page-header h1 { color: #f8fafc; }
+                [data-theme="dark"] .page-header p { color: #94a3b8; }
+                [data-theme="dark"] .card {
+                    background: #1e293b;
+                    border-color: #334155;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+                }
+                [data-theme="dark"] .card-header {
+                    background: #0f172a;
+                    border-bottom-color: #334155;
+                }
+                [data-theme="dark"] .card-header h3 {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .styled-select {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .styled-select:focus {
+                    background: #0f172a;
+                    border-color: #3b82f6;
+                }
+                [data-theme="dark"] .token-table th {
+                    background: #0f172a;
+                    color: #94a3b8;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .token-table td {
+                    border-bottom-color: #334155;
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .mapel-name {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .time-info {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .token-display {
+                    background: #451a0330;
+                    border-color: #78350f40;
+                    color: #fbbf24;
+                }
+                [data-theme="dark"] .monitor-modal {
+                    background: #1e293b;
+                    color: #f8fafc;
+                    border: 1px solid #334155;
+                }
+                [data-theme="dark"] .monitor-modal .modal-header {
+                    background: #0f172a;
+                    border-bottom-color: #334155;
+                }
+                [data-theme="dark"] .monitor-title {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .monitor-card {
+                    background: #0f172a;
+                    border-color: #334155;
+                }
+                [data-theme="dark"] .monitor-card.online {
+                    background: #064e3b30;
+                    border-color: #059669;
+                }
+                [data-theme="dark"] .monitor-card.offline {
+                    background: #450a0a30;
+                    border-color: #b91c1c;
+                }
+                [data-theme="dark"] .monitor-card.finished {
+                    background: #1e3a8a30;
+                    border-color: #2563eb;
+                }
+                [data-theme="dark"] .monitor-std-name {
+                    color: #f8fafc;
+                }
+
             `}
             </style>
         </div>

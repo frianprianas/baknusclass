@@ -90,11 +90,38 @@ input {
 [data-theme="dark"] table th,
 [data-theme="dark"] table td,
 [data-theme="dark"] .exam-card,
+[data-theme="dark"] .table-card,
+[data-theme="dark"] .card-box,
 [data-theme="dark"] .dashboard-layout {
   background-color: #1e293b !important;
   border-color: #334155 !important;
   color: #f8fafc !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .empty-state {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .empty-state p,
+[data-theme="dark"] .empty-state h3,
+[data-theme="dark"] .empty-state span {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .selection-bar {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .event-selector,
+[data-theme="dark"] .custom-select,
+[data-theme="dark"] .styled-select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
 }
 
 [data-theme="dark"] .card-header h2,

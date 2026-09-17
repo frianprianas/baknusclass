@@ -1206,6 +1206,31 @@ const UserManagement = () => {
                     border-color: #3b82f6;
                 }
 
+                
+                [data-theme="dark"] .page-header h1 { color: #f8fafc; }
+                [data-theme="dark"] .page-header p { color: #94a3b8; }
+                [data-theme="dark"] .table-card { background: #1e293b; border-color: #334155; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); }
+                [data-theme="dark"] .table-actions { background: #1e293b; border-bottom-color: #334155; }
+                [data-theme="dark"] .search-box { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .search-box:focus-within { background: #0f172a; }
+                [data-theme="dark"] .search-box input { color: #f8fafc; }
+                [data-theme="dark"] .user-table th { background: #0f172a; color: #94a3b8; border-color: #334155; }
+                [data-theme="dark"] .user-table td { border-bottom-color: #334155; color: #cbd5e1; }
+                [data-theme="dark"] .user-table tr:hover td { background: #0f172a; }
+                [data-theme="dark"] .full-name { color: #f8fafc; }
+                [data-theme="dark"] .email { color: #cbd5e1; }
+                [data-theme="dark"] .info-tag { background: #0f172a; color: #94a3b8; border: 1px solid #334155; }
+                [data-theme="dark"] .modal-content { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+                [data-theme="dark"] .modal-header h3 { color: #f8fafc; }
+                [data-theme="dark"] .form-group label { color: #94a3b8; }
+                [data-theme="dark"] .form-group input, [data-theme="dark"] .form-group select { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                [data-theme="dark"] .mapel-assignment-list { background: #0f172a; border-color: #334155; }
+                [data-theme="dark"] .mapel-assignment-row:hover { background: #1e293b; }
+                [data-theme="dark"] .mapel-assignment-row.active { background: #1e3a8a30; border-color: #2563eb; }
+                [data-theme="dark"] .kelas-mini-select { background: #0f172a !important; color: #f8fafc !important; border-color: #3b82f6 !important; }
+                [data-theme="dark"] .btn-secondary { background: #0f172a; color: #cbd5e1; border: 1px solid #334155; }
+                [data-theme="dark"] .btn-secondary:hover { background: #334155; color: #f8fafc; }
+
                 [data-theme="dark"] .pagination-container {
                     background: #1e293b;
                     border-top-color: #334155;

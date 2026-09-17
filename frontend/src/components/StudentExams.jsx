@@ -1697,6 +1697,72 @@ const StudentExams = () => {
                 .transcript-score-value { color: #1e293b; }
 
                 /* Dark Mode for Transcript */
+                
+                [data-theme="dark"] .student-home .page-header h1 { color: #f8fafc; }
+                [data-theme="dark"] .student-home .page-header p { color: #94a3b8; }
+                [data-theme="dark"] .event-btn {
+                    background: #1e293b;
+                    border-color: #334155;
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .event-btn:hover {
+                    background: #334155;
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .event-btn.active {
+                    background: #1e3a8a;
+                    border-color: #3b82f6;
+                    color: #bfdbfe;
+                }
+                [data-theme="dark"] .student-exam-card {
+                    background: #1e293b;
+                    border-color: #334155;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+                }
+                [data-theme="dark"] .student-exam-card:hover {
+                    border-color: #3b82f6;
+                }
+                [data-theme="dark"] .student-exam-card h3 {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .teacher {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .subject-icon {
+                    background: #0f172a;
+                    color: #60a5fa;
+                }
+                [data-theme="dark"] .exam-times {
+                    background: #0f172a;
+                }
+                [data-theme="dark"] .time-item {
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .token-modal h2, [data-theme="dark"] .token-modal h3 {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .token-modal p {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .token-field {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .token-field:focus {
+                    background: #0f172a;
+                    border-color: #3b82f6;
+                }
+                [data-theme="dark"] .btn-cancel {
+                    background: #0f172a;
+                    border-color: #334155;
+                    color: #cbd5e1;
+                }
+                [data-theme="dark"] .btn-cancel:hover {
+                    background: #334155;
+                    color: #f8fafc;
+                }
+
                 [data-theme="dark"] .transcript-scroll-area { background: #0f172a !important; }
                 [data-theme="dark"] .transcript-nilai-box { background: #1e293b; border-color: #334155 !important; }
                 [data-theme="dark"] .transcript-detail-title { color: #e2e8f0 !important; border-bottom-color: #334155 !important; }

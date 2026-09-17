@@ -1191,25 +1191,23 @@ const ExamManagement = () => {
                     .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-                    .opt - item - v2.is - correct { background: #f0fdf4; border - color: #22c55e; color: #166534; font - weight: 800; }
-                    .opt - marker { width: 30px; height: 30px; min - width: 30px; border - radius: 8px; background: white; border: 2px solid #e2e8f0; display: flex; align - items: center; justify - content: center; font - size: 0.8rem; font - weight: 900; color: #64748b; }
-                    .opt - item - v2.is - correct.opt - marker { background: #22c55e; color: white; border - color: #22c55e; }
-                    .essay - rubric - v2 { background: #fffbeb; border - radius: 16px; padding: 20px; border - left: 6px solid #f59e0b; margin - top: 20px; }
-                    .rubric - header { display: flex; align - items: center; gap: 8px; font - size: 0.8rem; font - weight: 950; color: #b45309; text - transform: uppercase; margin - bottom: 12px; letter - spacing: 0.5px; }
-                    .rubric - content { font - size: 1rem; color: #78350f; line - height: 1.6; font - weight: 600; white - space: pre - wrap; }
-                    .q - card - footer { border - top: 2px dashed #f1f5f9; margin - top: 24px; padding - top: 16px; display: flex; justify - content: flex - end; }
-                    .bobot - tag { display: flex; align - items: center; gap: 8px; font - size: 0.9rem; color: #64748b; font - weight: 700; padding: 8px 16px; background: #f8fafc; border - radius: 50px; border: 2px solid #f1f5f9; }
-                    .bobot - tag strong { color: #0f172a; font - size: 1rem; font - weight: 900; }
-                    .empty - questions - v2 { text - align: center; padding: 60px 20px; background: white; border - radius: 24px; border: 2px dashed #e2e8f0; color: #94a3b8; }
-                    .empty - illustration { color: #e2e8f0; margin - bottom: 16px; }
-                    .empty - questions - v2 h3 { font - size: 1.3rem; color: #475569; margin - bottom: 8px; font - weight: 800; }
-                    .empty - questions - v2 p { font - size: 1rem; }
-                    .animate - fade -in { animation: fadeIn 0.4s cubic- bezier(0.4, 0, 0.2, 1) forwards; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                    .questions - scroll - v2:: -webkit - scrollbar { width: 8px; }
-                    .questions - scroll - v2:: -webkit - scrollbar - track { background: transparent; }
-                    .questions - scroll - v2:: -webkit - scrollbar - thumb { background: #e2e8f0; border - radius: 10px; }
-                    .questions - scroll - v2:: -webkit - scrollbar - thumb:hover { background: #cbd5e1; }
+                    .opt-item-v2.is-correct { background: #f0fdf4; border-color: #22c55e; color: #166534; font-weight: 800; }
+                    .opt-marker { width: 30px; height: 30px; min-width: 30px; border-radius: 8px; background: white; border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; color: #64748b; }
+                    .opt-item-v2.is-correct .opt-marker { background: #22c55e; color: white; border-color: #22c55e; }
+                    .essay-rubric-v2 { background: #fffbeb; border-radius: 16px; padding: 20px; border-left: 6px solid #f59e0b; margin-top: 20px; }
+                    .rubric-header { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 950; color: #b45309; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
+                    .rubric-content { font-size: 1rem; color: #78350f; line-height: 1.6; font-weight: 600; white-space: pre-wrap; }
+                    .q-card-footer { border-top: 2px dashed #f1f5f9; margin-top: 24px; padding-top: 16px; display: flex; justify-content: flex-end; }
+                    .bobot-tag { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #64748b; font-weight: 700; padding: 8px 16px; background: #f8fafc; border-radius: 50px; border: 2px solid #f1f5f9; }
+                    .bobot-tag strong { color: #0f172a; font-size: 1rem; font-weight: 900; }
+                    .empty-questions-v2 { text-align: center; padding: 60px 20px; background: white; border-radius: 24px; border: 2px dashed #e2e8f0; color: #94a3b8; }
+                    .empty-illustration { color: #e2e8f0; margin-bottom: 16px; }
+                    .empty-questions-v2 h3 { font-size: 1.3rem; color: #475569; margin-bottom: 8px; font-weight: 800; }
+                    .empty-questions-v2 p { font-size: 1rem; }
+                    .questions-scroll-v2::-webkit-scrollbar { width: 8px; }
+                    .questions-scroll-v2::-webkit-scrollbar-track { background: transparent; }
+                    .questions-scroll-v2::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+                    .questions-scroll-v2::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 
                     /* Modal Styles */
                     .modal-overlay { position: fixed; top: 70px; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: flex-start; z-index: 10000; padding: 20px; overflow-y: auto; }
@@ -1241,6 +1239,39 @@ const ExamManagement = () => {
                         box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
                     }
                     .btn-primary:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.3); }
+                    /* Dark Mode Overrides for Questions View */
+                    [data-theme="dark"] .card-v2 { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .title-v2, [data-theme="dark"] .form-header-v2 h3 { color: #f8fafc; }
+                    [data-theme="dark"] .back-btn-v2 { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+                    [data-theme="dark"] .back-btn-v2:hover { background: #1e293b; color: #3b82f6; border-color: #3b82f6; }
+                    [data-theme="dark"] .q-type-switcher-v2 { background: #0f172a; border: 1px solid #334155; }
+                    [data-theme="dark"] .q-type-btn-v2 { color: #94a3b8; }
+                    [data-theme="dark"] .q-type-btn-v2.active { background: #1e293b; color: #60a5fa; }
+                    [data-theme="dark"] .q-type-btn-v2.active .icon-circle { background: #3b82f6; color: white; }
+                    [data-theme="dark"] .q-type-btn-v2 .icon-circle { background: #0f172a; color: #94a3b8; }
+                    [data-theme="dark"] .form-group-v2 label { color: #94a3b8; }
+                    [data-theme="dark"] .editor-container-v2 { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .btn-type-toggle { background: #0f172a; border-color: #334155; color: #94a3b8; }
+                    [data-theme="dark"] .btn-type-toggle:hover { background: #1e293b; color: #f8fafc; }
+                    [data-theme="dark"] .btn-type-toggle.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
+                    [data-theme="dark"] .true-false-selection { background: #0f172a; border-color: #334155; }
+                    [data-theme="dark"] .tf-card { background: #1e293b; border-color: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .tf-badge { background: #0f172a; color: #cbd5e1; }
+                    [data-theme="dark"] .stat-item { background: #1e293b; border-color: #334155; border-bottom-color: #334155; }
+                    [data-theme="dark"] .stat-item .value { color: #f8fafc; }
+                    [data-theme="dark"] .guru-tag { background: #0f172a; color: #cbd5e1; }
+                    [data-theme="dark"] .q-card-v2 { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .opt-item-v2 { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+                    [data-theme="dark"] .opt-marker { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+                    [data-theme="dark"] .bobot-tag { background: #0f172a; border-color: #334155; color: #94a3b8; }
+                    [data-theme="dark"] .bobot-tag strong { color: #f8fafc; }
+                    [data-theme="dark"] .empty-questions-v2 { background: #1e293b; border-color: #334155; color: #94a3b8; }
+                    [data-theme="dark"] .empty-questions-v2 h3 { color: #f8fafc; }
+                    [data-theme="dark"] .modal-content { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+                    [data-theme="dark"] .modal-header h3 { color: #f8fafc; }
+                    [data-theme="dark"] .form-group input, [data-theme="dark"] .form-group select, [data-theme="dark"] .form-group textarea { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .btn-secondary { background: #0f172a; color: #cbd5e1; border: 1px solid #334155; }
+                    [data-theme="dark"] .btn-secondary:hover { background: #334155; color: #f8fafc; }
 `}</style>
 
                 </div>
@@ -1259,9 +1290,9 @@ const ExamManagement = () => {
                             overflow: 'hidden',
                             borderRadius: '24px',
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                            background: 'white'
+                            background: 'var(--bg-modal, #1e293b)'
                         }}>
-                            <div className="modal-header" style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #f1f5f9', padding: '20px 40px', zIndex: 20 }}>
+                            <div className="modal-header" style={{ flexShrink: 0, background: 'var(--bg-modal, #1e293b)', borderBottom: '1px solid #334155', padding: '20px 40px', zIndex: 20 }}>
                                 <div className="flex items-center gap-3">
                                     <div style={{ background: '#fef3c7', color: '#b45309', padding: '10px', borderRadius: '12px' }}>
                                         <FileText size={24} />
@@ -1501,7 +1532,7 @@ const ExamManagement = () => {
                 <div className="tabs-container">
                     {(userRole === 'ADMIN' || userRole === 'TU') && (
                         <button
-                            className={`nav - tab ${activeTab === 'events' ? 'active' : ''} `}
+                            className={`nav-tab ${activeTab === 'events' ? 'active' : ''}`}
                             onClick={() => setActiveTab('events')}
                         >
                             <Calendar size={18} />
@@ -1509,7 +1540,7 @@ const ExamManagement = () => {
                         </button>
                     )}
                     <button
-                        className={`nav - tab ${activeTab === 'exams' ? 'active' : ''} `}
+                        className={`nav-tab ${activeTab === 'exams' ? 'active' : ''}`}
                         onClick={() => setActiveTab('exams')}
                     >
                         <BookOpen size={18} />
@@ -1537,7 +1568,7 @@ const ExamManagement = () => {
                                                 {userRole === 'ADMIN' && (
                                                     <button
                                                         onClick={() => handleToggleEventStatus(event.id)}
-                                                        className={`icon - btn ${event.statusAktif ? 'deactivate' : 'activate'} `}
+                                                        className={`icon-btn ${event.statusAktif ? 'deactivate' : 'activate'}`}
                                                         title={event.statusAktif ? 'Nonaktifkan' : 'Aktifkan'}
                                                     >
                                                         {event.statusAktif ? <PowerOff size={16} /> : <Power size={16} />}
@@ -2259,6 +2290,69 @@ const ExamManagement = () => {
             [data-theme="dark"] .q-text,
             [data-theme="dark"] .total-weight {
                 color: #f8fafc;
+            }
+
+            
+            [data-theme="dark"] .empty-state {
+                background: #1e293b !important;
+                border-color: #334155 !important;
+                color: #94a3b8 !important;
+            }
+
+            [data-theme="dark"] .empty-state p {
+                color: #94a3b8 !important;
+            }
+
+            [data-theme="dark"] .selection-bar {
+                background: #1e293b !important;
+                border-color: #334155 !important;
+            }
+
+            [data-theme="dark"] .event-selector {
+                background: #0f172a !important;
+                border-color: #334155 !important;
+                color: #f8fafc !important;
+            }
+
+            [data-theme="dark"] .event-selector:focus {
+                background: #0f172a !important;
+            }
+
+            [data-theme="dark"] .table-card {
+                background: #1e293b !important;
+                border-color: #334155 !important;
+            }
+
+            [data-theme="dark"] .exam-table th {
+                background: #0f172a !important;
+                color: #94a3b8 !important;
+                border-color: #334155 !important;
+            }
+
+            [data-theme="dark"] .exam-table td {
+                border-color: #334155 !important;
+                color: #cbd5e1 !important;
+            }
+
+            [data-theme="dark"] .mapel-cell {
+                color: #f8fafc !important;
+            }
+
+            [data-theme="dark"] .time-cell {
+                background: #0f172a !important;
+                color: #94a3b8 !important;
+            }
+
+            [data-theme="dark"] .auto-generate-box {
+                background: #0f172a !important;
+                border-color: #334155 !important;
+                color: #94a3b8 !important;
+            }
+
+            [data-theme="dark"] .btn-refresh-token {
+                background: #1e293b !important;
+                border-color: #334155 !important;
+                color: #94a3b8 !important;
             }
 
             [data-theme="dark"] .tabs-container {
