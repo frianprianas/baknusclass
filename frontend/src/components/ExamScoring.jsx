@@ -67,18 +67,51 @@ const ExamScoring = () => {
         setSelectedStudent(null);
         setLoading(true);
         try {
-            // Fetch Questions
-            const qResp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
-            setQuestions(qResp.data);
-            const questionLength = qResp.data ? qResp.data.length : 0;
+            // Fetch Questions & Answers for both Essay and PG in parallel
+            const [qResp, pgResp, monitorResp, ansResp, pgAnsResp] = await Promise.all([
+                axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/ujian-mapel/${exam.id}/monitoring`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
+            ]);
 
-            // Fetch Monitoring Data (Ground Truth for who is Finished)
-            const monitorResp = await axios.get(`/api/exam/ujian-mapel/${exam.id}/monitoring`, { headers });
-            const monitorData = monitorResp.data;
+            const pgQuestions = (pgResp.data || []).map(q => {
+                let resolvedTipe = q.tipeSoal;
+                const isBS = resolvedTipe === 'BENAR_SALAH' || (
+                    q.pilihanA && q.pilihanB &&
+                    (q.pilihanA.trim().toLowerCase() === 'benar' || q.pilihanA.trim().toLowerCase() === 'true') &&
+                    (q.pilihanB.trim().toLowerCase() === 'salah' || q.pilihanB.trim().toLowerCase() === 'false') &&
+                    (!q.pilihanC || q.pilihanC === '-' || q.pilihanC.trim() === '')
+                );
+                const isKompleks = resolvedTipe === 'PG_KOMPLEKS' || (
+                    q.kunciJawaban && q.kunciJawaban.includes(',')
+                );
 
-            // Fetch Answers
-            const ansResp = await axios.get(`/api/exam/jawaban/ujian/${exam.id}`, { headers });
-            const allAnswers = ansResp.data;
+                if (isBS) resolvedTipe = 'BENAR_SALAH';
+                else if (isKompleks) resolvedTipe = 'PG_KOMPLEKS';
+                else if (!resolvedTipe) resolvedTipe = 'PG_BIASA';
+
+                return {
+                    ...q,
+                    qType: 'pg',
+                    tipeSoal: resolvedTipe,
+                    bobotNilai: q.bobotNilai || 2
+                };
+            });
+
+            const essayQuestions = (qResp.data || []).map(q => ({
+                ...q,
+                qType: 'essay',
+                bobotNilai: q.bobotNilai || 10
+            }));
+
+            const allQuestions = [...pgQuestions, ...essayQuestions];
+            setQuestions(allQuestions);
+
+            const monitorData = monitorResp.data || [];
+            const allEssayAnswers = ansResp.data || [];
+            const allPgAnswers = pgAnsResp.data || [];
 
             // Map monitoring data to student objects
             const studentMap = {};
@@ -89,49 +122,119 @@ const ExamScoring = () => {
                     nisn: m.nisn,
                     isOnline: m.isOnline,
                     isFinished: m.isFinished,
-                    namaKelas: 'Tanpa Kelas', // Will be updated if answers exist
-                    answers: []
+                    namaKelas: 'Tanpa Kelas',
+                    answers: [],
+                    pgAnswers: [],
+                    essayAnswers: []
                 };
             });
 
-            // Attach answers and metadata from answers
-            allAnswers.forEach(ans => {
-                if (!studentMap[ans.siswaId]) {
-                    // This case shouldn't happen if monitorData is complete for the class
-                    studentMap[ans.siswaId] = {
-                        siswaId: ans.siswaId,
-                        namaSiswa: ans.namaSiswa,
-                        nisn: ans.nisn,
+            // Attach PG answers
+            allPgAnswers.forEach(ans => {
+                const sId = ans.siswaId;
+                if (!studentMap[sId]) {
+                    studentMap[sId] = {
+                        siswaId: sId,
+                        namaSiswa: ans.namaSiswa || 'Siswa',
+                        nisn: ans.nisn || '-',
                         isOnline: false,
                         isFinished: ans.statusSelesaiUjian || false,
                         namaKelas: ans.namaKelas || 'Tanpa Kelas',
-                        answers: []
+                        answers: [],
+                        pgAnswers: [],
+                        essayAnswers: []
                     };
                 }
-                studentMap[ans.siswaId].answers.push(ans);
-                if (ans.namaKelas) studentMap[ans.siswaId].namaKelas = ans.namaKelas;
-                // If answer says it's finished, trust it too as backup
-                if (ans.statusSelesaiUjian) studentMap[ans.siswaId].isFinished = true;
+                const formattedAns = {
+                    ...ans,
+                    qType: 'pg',
+                    soalId: ans.soalPGId || ans.soalId,
+                    jawaban: ans.jawaban || ans.jawabanDipilih || '',
+                    skorFinalGuru: ans.skor !== null && ans.skor !== undefined ? ans.skor : 0,
+                    isGraded: true
+                };
+                studentMap[sId].answers.push(formattedAns);
+                studentMap[sId].pgAnswers.push(formattedAns);
+                if (ans.namaKelas) studentMap[sId].namaKelas = ans.namaKelas;
+                if (ans.statusSelesaiUjian) studentMap[sId].isFinished = true;
             });
+
+            // Attach Essay answers
+            allEssayAnswers.forEach(ans => {
+                const sId = ans.siswaId;
+                if (!studentMap[sId]) {
+                    studentMap[sId] = {
+                        siswaId: sId,
+                        namaSiswa: ans.namaSiswa || 'Siswa',
+                        nisn: ans.nisn || '-',
+                        isOnline: false,
+                        isFinished: ans.statusSelesaiUjian || false,
+                        namaKelas: ans.namaKelas || 'Tanpa Kelas',
+                        answers: [],
+                        pgAnswers: [],
+                        essayAnswers: []
+                    };
+                }
+                const isGraded = ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined;
+                const formattedAns = {
+                    ...ans,
+                    qType: 'essay',
+                    soalId: ans.soalId,
+                    isGraded: isGraded
+                };
+                studentMap[sId].answers.push(formattedAns);
+                studentMap[sId].essayAnswers.push(formattedAns);
+                if (ans.namaKelas) studentMap[sId].namaKelas = ans.namaKelas;
+                if (ans.statusSelesaiUjian) studentMap[sId].isFinished = true;
+            });
+
+            const totalMaxBobot = allQuestions.reduce((acc, q) => acc + (q.bobotNilai || 0), 0);
+            const totalPgBobot = pgQuestions.reduce((acc, q) => acc + (q.bobotNilai || 0), 0);
+            const totalEssayBobot = essayQuestions.reduce((acc, q) => acc + (q.bobotNilai || 0), 0);
 
             // Calculate metrics for list
             const grouped = Object.values(studentMap).map(std => {
                 let totalAi = 0;
                 let totalGuru = 0;
+                let totalPg = 0;
+                let totalEssay = 0;
                 let isFullyGraded = true;
                 let start = null;
                 let end = null;
 
-                if (std.answers.length === 0) isFullyGraded = false;
+                // Hitung nilai PG (otomatis)
+                pgQuestions.forEach(q => {
+                    const ans = std.pgAnswers.find(a => a.soalId === q.id);
+                    if (ans && ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined) {
+                        totalPg += ans.skorFinalGuru;
+                        totalGuru += ans.skorFinalGuru;
+                    }
+                });
 
-                std.answers.forEach(a => {
-                    if (a.skorAi) totalAi += a.skorAi;
-                    if (a.skorFinalGuru !== null && a.skorFinalGuru !== undefined) {
-                        totalGuru += a.skorFinalGuru;
-                    } else {
+                // Hitung nilai Essay
+                if (essayQuestions.length > 0) {
+                    essayQuestions.forEach(q => {
+                        const ans = std.essayAnswers.find(a => a.soalId === q.id);
+                        if (ans) {
+                            if (ans.skorAi) totalAi += ans.skorAi;
+                            if (ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined) {
+                                totalEssay += ans.skorFinalGuru;
+                                totalGuru += ans.skorFinalGuru;
+                            } else {
+                                isFullyGraded = false;
+                            }
+                        } else {
+                            isFullyGraded = false;
+                        }
+                    });
+                } else {
+                    // Jika ujian murni PG, dan siswa telah menyelesaikan ujian:
+                    if (!std.isFinished) {
                         isFullyGraded = false;
                     }
+                }
 
+                [...std.pgAnswers, ...std.essayAnswers].forEach(a => {
                     if (a.waktuMulaiUjian) {
                         const dStart = new Date(a.waktuMulaiUjian);
                         if (!start || dStart < start) start = dStart;
@@ -152,14 +255,38 @@ const ExamScoring = () => {
                     } else {
                         durasiStr = 'Selesai';
                     }
-                } else if (start) {
+                } else if (start || std.isOnline) {
                     durasiStr = 'Pengerjaan';
                 }
 
-                const nilaiAkhir = questionLength > 0 ? (totalGuru / questionLength).toFixed(1) : 0;
-                const nilaiAkhirAi = questionLength > 0 ? (totalAi / questionLength).toFixed(1) : 0;
+                // Skala nilai akhir 0 - 100
+                let nilaiAkhir = '0';
+                if (totalMaxBobot > 0) {
+                    nilaiAkhir = ((totalGuru / totalMaxBobot) * 100).toFixed(1);
+                    if (nilaiAkhir.endsWith('.0')) nilaiAkhir = nilaiAkhir.slice(0, -2);
+                }
 
-                return { ...std, totalAi, totalGuru, nilaiAkhir, nilaiAkhirAi, isFullyGraded, durasiStr };
+                let nilaiAkhirAi = '0';
+                if (totalMaxBobot > 0) {
+                    const estimatedAi = totalPg + totalAi;
+                    nilaiAkhirAi = ((estimatedAi / totalMaxBobot) * 100).toFixed(1);
+                    if (nilaiAkhirAi.endsWith('.0')) nilaiAkhirAi = nilaiAkhirAi.slice(0, -2);
+                }
+
+                return {
+                    ...std,
+                    totalAi,
+                    totalGuru,
+                    totalPg,
+                    totalEssay,
+                    totalMaxBobot,
+                    totalPgBobot,
+                    totalEssayBobot,
+                    nilaiAkhir,
+                    nilaiAkhirAi,
+                    isFullyGraded,
+                    durasiStr
+                };
             });
 
             setStudentsData(grouped);
@@ -178,7 +305,7 @@ const ExamScoring = () => {
     const triggerAllAiScoring = async () => {
         if (!selectedStudent || isProcessingAll) return;
 
-        const answersToProcess = selectedStudent.answers.filter(a => a.skorAi === null || a.skorAi === undefined);
+        const answersToProcess = selectedStudent.answers.filter(a => a.qType === 'essay' && (a.skorAi === null || a.skorAi === undefined));
         if (answersToProcess.length === 0) {
             alert('Semua jawaban sudah memiliki analisis AI.');
             return;
@@ -199,50 +326,83 @@ const ExamScoring = () => {
         }
     };
 
-    const handleSaveScore = async (answerId, newScore) => {
+    const handleSaveScore = async (answerId, newScore, qType = 'essay') => {
         setSavingId(answerId);
         try {
-            const payload = new FormData();
-            payload.append('skorGuru', newScore);
+            const parsedScore = parseFloat(newScore) || 0;
+            if (qType === 'pg') {
+                await axios.put(`/api/exam/jawaban-pg/${answerId}/nilai?skor=${parsedScore}`, {}, { headers });
+            } else {
+                const payload = new FormData();
+                payload.append('skorGuru', parsedScore);
+                await axios.put(`/api/exam/jawaban/${answerId}/nilai`, payload, {
+                    headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+                });
+            }
 
-            const resp = await axios.put(`/api/exam/jawaban/${answerId}/nilai`, payload, {
-                headers: { ...headers, 'Content-Type': 'multipart/form-data' }
-            });
+            const totalMaxBobot = questions.reduce((acc, q) => acc + (q.bobotNilai || 0), 0);
 
-            // Update local state
+            // Update local state for selectedStudent
             setSelectedStudent(prev => {
                 if (!prev) return prev;
-                const newAnswers = prev.answers.map(a => a.id === answerId ? { ...a, skorFinalGuru: parseFloat(newScore) } : a);
+                const newAnswers = prev.answers.map(a => a.id === answerId ? { ...a, skorFinalGuru: parsedScore, skor: parsedScore, isGraded: true } : a);
                 let tguru = 0;
                 let full = true;
-                newAnswers.forEach(a => {
-                    if (a.skorFinalGuru !== null && a.skorFinalGuru !== undefined) tguru += a.skorFinalGuru;
-                    else full = false;
+                questions.forEach(q => {
+                    const ans = newAnswers.find(a => a.soalId === q.id);
+                    if (ans && ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined) {
+                        tguru += ans.skorFinalGuru;
+                    } else {
+                        full = false;
+                    }
                 });
-                const nAkhir = questions.length > 0 ? (tguru / questions.length).toFixed(1) : 0;
+                let nAkhir = totalMaxBobot > 0 ? ((tguru / totalMaxBobot) * 100).toFixed(1) : '0';
+                if (nAkhir.endsWith('.0')) nAkhir = nAkhir.slice(0, -2);
                 return { ...prev, answers: newAnswers, totalGuru: tguru, nilaiAkhir: nAkhir, isFullyGraded: full };
             });
 
-            // Also update the main studentsData array
+            // Update global studentsData
             setStudentsData(prev => prev.map(std => {
                 if (std.siswaId === selectedStudent.siswaId) {
-                    const newAnswers = std.answers.map(a => a.id === answerId ? { ...a, skorFinalGuru: parseFloat(newScore) } : a);
+                    const newAnswers = std.answers.map(a => a.id === answerId ? { ...a, skorFinalGuru: parsedScore, skor: parsedScore, isGraded: true } : a);
                     let tguru = 0;
                     let full = true;
-                    newAnswers.forEach(a => {
-                        if (a.skorFinalGuru !== null && a.skorFinalGuru !== undefined) tguru += a.skorFinalGuru;
-                        else full = false;
+                    questions.forEach(q => {
+                        const ans = newAnswers.find(a => a.soalId === q.id);
+                        if (ans && ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined) {
+                            tguru += ans.skorFinalGuru;
+                        } else {
+                            full = false;
+                        }
                     });
-                    const nAkhir = questions.length > 0 ? (tguru / questions.length).toFixed(1) : 0;
+                    let nAkhir = totalMaxBobot > 0 ? ((tguru / totalMaxBobot) * 100).toFixed(1) : '0';
+                    if (nAkhir.endsWith('.0')) nAkhir = nAkhir.slice(0, -2);
                     return { ...std, answers: newAnswers, totalGuru: tguru, nilaiAkhir: nAkhir, isFullyGraded: full };
                 }
                 return std;
             }));
 
         } catch (err) {
+            console.error('Save score error:', err);
             alert('Gagal menyimpan nilai');
         } finally {
             setSavingId(null);
+        }
+    };
+
+    const handleRecalculatePG = async () => {
+        if (!selectedExam) return;
+        if (!window.confirm('Hitung ulang otomatis seluruh skor jawaban PG untuk ujian ini?')) return;
+        setLoading(true);
+        try {
+            await axios.post(`/api/exam/jawaban-pg/ujian/${selectedExam.id}/recalculate`, {}, { headers });
+            alert('Skor PG berhasil dihitung ulang!');
+            await handleSelectExam(selectedExam);
+        } catch (err) {
+            console.error('Recalculate error:', err);
+            alert('Gagal menghitung ulang skor PG.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -697,11 +857,13 @@ const ExamScoring = () => {
                                                         {std.isFullyGraded ? (
                                                             <span className="badge-graded"><CheckCircle2 size={14} /> Sudah Dinilai</span>
                                                         ) : (
-                                                            <span className="badge-pending">Belum Dinilai</span>
+                                                            <span className="badge-pending">{std.isFinished ? 'Koreksi Essay' : 'Sedang Mengerjakan'}</span>
                                                         )}
-                                                        <div className="std-score">M: {std.totalGuru} | AI: {std.totalAi}</div>
+                                                        <div className="std-score" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
+                                                            Skor: <strong>{std.totalGuru}</strong> / {std.totalMaxBobot || 100}
+                                                        </div>
                                                         <div className="std-final-score" style={{ fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
-                                                            Saran Nilai Akhir: <span style={{ color: '#3b82f6' }}>{std.nilaiAkhir}</span>
+                                                            Nilai Akhir: <span style={{ color: '#16a34a', fontSize: '1.05rem' }}>{std.nilaiAkhir}</span>
                                                         </div>
                                                     </div>
                                                     <div className="std-time" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
@@ -750,9 +912,9 @@ const ExamScoring = () => {
                                                 </span>
                                             </div>
                                             <div className="total-score-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '150px' }}>
-                                                <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>Saran Nilai Akhir:</span>
-                                                <strong style={{ fontSize: '1.25rem' }}>{selectedStudent.nilaiAkhir}</strong>
-                                                <span style={{ fontSize: '0.65rem', marginBottom: '6px' }}>Total Skor: {selectedStudent.totalGuru} / {questions.reduce((a, b) => a + b.bobotNilai, 0)}</span>
+                                                <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>Nilai Akhir Siswa:</span>
+                                                <strong style={{ fontSize: '1.4rem', color: '#15803d' }}>{selectedStudent.nilaiAkhir}</strong>
+                                                <span style={{ fontSize: '0.7rem', marginBottom: '6px' }}>Total Skor: {selectedStudent.totalGuru} / {questions.reduce((a, b) => a + (b.bobotNilai || 0), 0)}</span>
                                                 {selectedStudent.isFullyGraded && (
                                                     <button
                                                         onClick={() => {
@@ -774,11 +936,157 @@ const ExamScoring = () => {
                                     <div className="answers-list">
                                         {questions.map((q, idx) => {
                                             const ans = selectedStudent.answers.find(a => a.soalId === q.id);
+                                            const isPG = q.qType === 'pg';
+
+                                            if (isPG) {
+                                                const studentChoice = ans?.jawaban || ans?.jawabanDipilih || '';
+                                                const keyAnswer = q.kunciJawaban || '';
+                                                const earnedScore = ans?.skorFinalGuru !== null && ans?.skorFinalGuru !== undefined ? ans.skorFinalGuru : (ans?.skor || 0);
+
+                                                // Check choices matching
+                                                const studentChoicesList = studentChoice.split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+                                                const keyChoicesList = keyAnswer.split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+
+                                                const isBS = q.tipeSoal === 'BENAR_SALAH';
+                                                const isKompleks = q.tipeSoal === 'PG_KOMPLEKS';
+
+                                                const options = isBS ? [
+                                                    { key: 'A', text: q.pilihanA || 'Benar' },
+                                                    { key: 'B', text: q.pilihanB || 'Salah' }
+                                                ] : [
+                                                    { key: 'A', text: q.pilihanA },
+                                                    { key: 'B', text: q.pilihanB },
+                                                    { key: 'C', text: q.pilihanC },
+                                                    { key: 'D', text: q.pilihanD },
+                                                    { key: 'E', text: q.pilihanE }
+                                                ].filter(opt => opt.text && opt.text.trim() !== '' && opt.text !== '-');
+
+                                                return (
+                                                    <div key={q.id} className="answer-item" style={{ borderLeft: '4px solid #3b82f6' }}>
+                                                        <div className="q-banner" style={{ background: '#eff6ff' }}>
+                                                            <span className="q-num" style={{ color: '#1d4ed8' }}>
+                                                                Soal #{idx + 1} &bull; {isBS ? 'Benar / Salah' : isKompleks ? 'Pilihan Ganda Lebih dari 1' : 'Pilihan Ganda'}
+                                                            </span>
+                                                            <span className="q-bobot" style={{ background: '#dbeafe', color: '#1e40af' }}>Bobot: {q.bobotNilai || 2} Poin</span>
+                                                        </div>
+
+                                                        <div className="q-question" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
+
+                                                        {/* Option preview list */}
+                                                        <div className="pg-options-preview" style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0' }}>
+                                                            {options.map(opt => {
+                                                                const isChosen = studentChoicesList.includes(opt.key) || studentChoicesList.includes(opt.text.toUpperCase());
+                                                                const isKey = keyChoicesList.includes(opt.key) || keyChoicesList.includes(opt.text.toUpperCase());
+
+                                                                let borderCol = '#e2e8f0';
+                                                                let bgCol = '#ffffff';
+                                                                if (isChosen && isKey) {
+                                                                    borderCol = '#22c55e';
+                                                                    bgCol = '#f0fdf4';
+                                                                } else if (isChosen && !isKey) {
+                                                                    borderCol = '#ef4444';
+                                                                    bgCol = '#fef2f2';
+                                                                } else if (isKey) {
+                                                                    borderCol = '#16a34a';
+                                                                    bgCol = '#f0fdf4';
+                                                                }
+
+                                                                return (
+                                                                    <div
+                                                                        key={opt.key}
+                                                                        style={{
+                                                                            padding: '10px 14px',
+                                                                            borderRadius: '10px',
+                                                                            border: `2px solid ${borderCol}`,
+                                                                            background: bgCol,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'space-between',
+                                                                            fontSize: '0.9rem'
+                                                                        }}
+                                                                    >
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                            <strong style={{ minWidth: '24px', color: '#334155' }}>{opt.key}.</strong>
+                                                                            <span dangerouslySetInnerHTML={{ __html: opt.text }}></span>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', gap: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                                                            {isKey && (
+                                                                                <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px' }}>
+                                                                                    Kunci Jawaban
+                                                                                </span>
+                                                                            )}
+                                                                            {isChosen && (
+                                                                                <span style={{ background: isKey ? '#bbf7d0' : '#fee2e2', color: isKey ? '#166534' : '#991b1b', padding: '2px 8px', borderRadius: '6px' }}>
+                                                                                    Pilihan Siswa
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        {/* Summary evaluation box */}
+                                                        <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                                                    Jawaban Siswa: <strong style={{ color: '#0f172a' }}>{studentChoice || '(Kosong / Tidak Dijawab)'}</strong>
+                                                                    {' '}&bull;{' '}
+                                                                    Kunci Jawaban: <strong style={{ color: '#16a34a' }}>{keyAnswer}</strong>
+                                                                </div>
+                                                                <div style={{ marginTop: '4px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    {earnedScore >= (q.bobotNilai || 2) ? (
+                                                                        <span style={{ color: '#16a34a', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <CheckCircle2 size={14} /> Nilai Penuh (Otomatis)
+                                                                        </span>
+                                                                    ) : earnedScore > 0 ? (
+                                                                        <span style={{ color: '#d97706', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <AlertCircle size={14} /> Nilai Sebagian (Otomatis)
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span style={{ color: '#dc2626', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <X size={14} /> Jawaban Salah (Otomatis)
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }}>Skor:</label>
+                                                                <input
+                                                                    type="number"
+                                                                    max={q.bobotNilai || 2}
+                                                                    min="0"
+                                                                    step="0.5"
+                                                                    defaultValue={earnedScore}
+                                                                    id={`score-${ans ? ans.id : 'pg-' + q.id}`}
+                                                                    style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 'bold', textAlign: 'center' }}
+                                                                />
+                                                                {ans && (
+                                                                    <button
+                                                                        className="btn-save-score"
+                                                                        disabled={savingId === ans.id}
+                                                                        onClick={() => {
+                                                                            const val = document.getElementById(`score-${ans.id}`).value;
+                                                                            if (val !== '') handleSaveScore(ans.id, val, 'pg');
+                                                                        }}
+                                                                        style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                                                                    >
+                                                                        {savingId === ans.id ? '...' : <><Save size={14} /> Ubah</>}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Render Essay Question
                                             return (
                                                 <div key={q.id} className="answer-item">
                                                     <div className="q-banner">
-                                                        <span className="q-num">Soal #{idx + 1}</span>
-                                                        <span className="q-bobot">Bobot Maks: {q.bobotNilai}</span>
+                                                        <span className="q-num">Soal #{idx + 1} &bull; Soal Essay</span>
+                                                        <span className="q-bobot">Bobot Maks: {q.bobotNilai || 10}</span>
                                                     </div>
 
                                                     <div className="q-question" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
@@ -839,7 +1147,7 @@ const ExamScoring = () => {
                                                                 <div className="score-input-group">
                                                                     <input
                                                                         type="number"
-                                                                        max={q.bobotNilai} min="0"
+                                                                        max={q.bobotNilai || 10} min="0"
                                                                         defaultValue={ans.skorFinalGuru ?? ''}
                                                                         id={`score-${ans.id}`}
                                                                     />
@@ -848,7 +1156,7 @@ const ExamScoring = () => {
                                                                         disabled={savingId === ans.id}
                                                                         onClick={() => {
                                                                             const val = document.getElementById(`score-${ans.id}`).value;
-                                                                            if (val !== '') handleSaveScore(ans.id, val);
+                                                                            if (val !== '') handleSaveScore(ans.id, val, 'essay');
                                                                         }}
                                                                     >
                                                                         {savingId === ans.id ? 'Menyimpan...' : <><Save size={16} /> Simpan</>}

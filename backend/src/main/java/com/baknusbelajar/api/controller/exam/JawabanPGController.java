@@ -35,4 +35,17 @@ public class JawabanPGController {
     public ResponseEntity<JawabanPGDTO> submitJawaban(@RequestBody JawabanPGDTO dto) {
         return ResponseEntity.ok(jawabanPGService.submitJawaban(dto));
     }
+
+    @PutMapping("/{id}/nilai")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    public ResponseEntity<JawabanPGDTO> updateNilai(@PathVariable Long id, @RequestParam Double skor) {
+        return ResponseEntity.ok(jawabanPGService.updateSkor(id, skor));
+    }
+
+    @PostMapping("/ujian/{ujianId}/recalculate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GURU')")
+    public ResponseEntity<String> recalculate(@PathVariable Long ujianId) {
+        jawabanPGService.recalculateAllScoresForUjian(ujianId);
+        return ResponseEntity.ok("Rekalkulasi nilai PG berhasil.");
+    }
 }

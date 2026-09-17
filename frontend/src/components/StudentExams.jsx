@@ -344,33 +344,57 @@ const StudentExams = () => {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            // Fetch questions
-            const qResp = await axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers });
-            const qs = qResp.data;
+            // Fetch questions & answers for both PG and Essay
+            const [qResp, pgResp, aResp, pgAResp] = await Promise.all([
+                axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban-pg/siswa/${user.profileId}/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
+            ]);
 
-            // Fetch answers
-            const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
-            const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
+            const pgQs = (pgResp.data || []).map(q => ({ ...q, qType: 'pg' }));
+            const essayQs = (qResp.data || []).map(q => ({ ...q, qType: 'essay' }));
+            const qs = [...pgQs, ...essayQs];
+
+            const userEssayAnswers = (aResp.data || []).filter(a => essayQs.some(q => q.id === a.soalId));
+            const userPgAnswers = pgAResp.data || [];
 
             const compiledList = qs.map((q, i) => {
-                const ans = userAnswers.find(a => a.soalId === q.id) || {};
-                return {
-                    no: i + 1,
-                    pertanyaan: q.pertanyaan,
-                    bobot: q.bobotNilai,
-                    jawabanSiswa: ans.teksJawaban || 'Tidak ada jawaban',
-                    skorGuru: ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined ? ans.skorFinalGuru : null,
-                    saranAi: ans.alasanAi || 'Tidak ada catatan'
-                };
+                if (q.qType === 'pg') {
+                    const ans = userPgAnswers.find(a => (a.soalId === q.id || a.soalPGId === q.id)) || {};
+                    return {
+                        no: i + 1,
+                        qType: 'pg',
+                        tipeSoal: q.tipeSoal,
+                        pertanyaan: q.pertanyaan,
+                        bobot: q.bobotNilai || 2,
+                        jawabanSiswa: ans.jawaban || ans.jawabanDipilih || 'Tidak ada jawaban',
+                        skorGuru: ans.skor !== null && ans.skor !== undefined ? ans.skor : 0,
+                        saranAi: ans.isCorrect ? 'Benar (Otomatis)' : 'Salah (Otomatis)'
+                    };
+                } else {
+                    const ans = userEssayAnswers.find(a => a.soalId === q.id) || {};
+                    return {
+                        no: i + 1,
+                        qType: 'essay',
+                        pertanyaan: q.pertanyaan,
+                        bobot: q.bobotNilai || 10,
+                        jawabanSiswa: ans.teksJawaban || 'Tidak ada jawaban',
+                        skorGuru: ans.skorFinalGuru !== null && ans.skorFinalGuru !== undefined ? ans.skorFinalGuru : null,
+                        saranAi: ans.alasanAi || 'Tidak ada catatan'
+                    };
+                }
             });
 
             let totalSkor = 0;
+            let totalBobot = 0;
             let fullyGraded = true;
             compiledList.forEach(item => {
+                totalBobot += (item.bobot || 1);
                 if (item.skorGuru !== null) totalSkor += item.skorGuru;
                 else fullyGraded = false;
             });
-            const finalScore = qs.length > 0 ? (totalSkor / qs.length).toFixed(1) : 0;
+            const finalScore = totalBobot > 0 ? ((totalSkor / totalBobot) * 100).toFixed(1) : 0;
 
             setTranscriptData({ exam, compiledList, finalScore, fullyGraded });
             setShowTranscript(true);
@@ -535,7 +559,9 @@ const StudentExams = () => {
             const headers = { Authorization: `Bearer ${token}` };
             const payload = {
                 soalId,
+                soalPGId: soalId,
                 siswaId: user.profileId,
+                jawaban: selectedOption || '',
                 jawabanDipilih: selectedOption || '',
                 raguRagu: isRagu
             };

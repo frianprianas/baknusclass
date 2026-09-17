@@ -55,6 +55,13 @@ public class EventUjianController {
         }
     }
 
+    @PutMapping("/{id}/proktors")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'CO_ADMIN', 'GURU')")
+    public ResponseEntity<com.baknusbelajar.api.dto.exam.EventUjianDTO> updateProktors(
+            @PathVariable Long id, @RequestBody java.util.List<Long> proktorIds) {
+        return ResponseEntity.ok(eventUjianService.updateProktors(id, proktorIds));
+    }
+
     @PutMapping("/{id}/toggle-status")
     @PreAuthorize("hasAnyRole('ADMIN', 'CO_ADMIN')")
     public ResponseEntity<com.baknusbelajar.api.dto.exam.EventUjianDTO> toggleStatus(@PathVariable Long id) {

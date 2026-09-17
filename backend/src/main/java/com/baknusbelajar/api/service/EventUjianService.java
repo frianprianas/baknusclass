@@ -138,6 +138,19 @@ public class EventUjianService {
         eventUjianRepository.deleteById(id);
     }
 
+        @org.springframework.transaction.annotation.Transactional
+    public com.baknusbelajar.api.dto.exam.EventUjianDTO updateProktors(Long id, java.util.List<Long> proktorIds) {
+        EventUjian entity = eventUjianRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Event Ujian not found"));
+        if (proktorIds != null && !proktorIds.isEmpty()) {
+            java.util.List<com.baknusbelajar.api.entity.Guru> proktors = guruRepository.findAllById(proktorIds);
+            entity.setProktors(new java.util.HashSet<>(proktors));
+        } else {
+            entity.getProktors().clear();
+        }
+        return mapToDTO(eventUjianRepository.save(entity));
+    }
+
     public com.baknusbelajar.api.dto.exam.EventUjianDTO toggleEventStatus(Long id) {
         EventUjian entity = eventUjianRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Event Ujian not found"));

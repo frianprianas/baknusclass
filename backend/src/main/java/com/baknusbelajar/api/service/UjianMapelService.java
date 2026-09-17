@@ -38,6 +38,9 @@ public class UjianMapelService {
     private final JawabanSiswaService jawabanSiswaService;
     private final com.baknusbelajar.api.repository.SoalEssayRepository soalEssayRepository;
     private final com.baknusbelajar.api.repository.JawabanSiswaRepository jawabanSiswaRepository;
+    private final JawabanPGService jawabanPGService;
+    private final com.baknusbelajar.api.repository.SoalPGRepository soalPGRepository;
+    private final com.baknusbelajar.api.repository.JawabanPGRepository jawabanPGRepository;
 
     public List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO> getExamMonitoring(Long ujianId,
             java.util.Set<String> onlineStudents) {
@@ -48,36 +51,71 @@ public class UjianMapelService {
             return java.util.Collections.emptyList();
         }
 
-        List<com.baknusbelajar.api.entity.GuruMapel> guruMapels = guruMapelRepository.findByGuruId(ujian.getGuru().getId())
-                .stream()
-                .filter(gm -> gm.getMapel().getId().equals(ujian.getMapel().getId()))
-                .collect(Collectors.toList());
-
         List<com.baknusbelajar.api.entity.Siswa> siswaList = new java.util.ArrayList<>();
-        for (com.baknusbelajar.api.entity.GuruMapel gm : guruMapels) {
-            siswaList.addAll(siswaRepository.findByKelasId(gm.getKelas().getId()));
+        if (ujian.getKelasList() != null && !ujian.getKelasList().isEmpty()) {
+            for (com.baknusbelajar.api.entity.Kelas k : ujian.getKelasList()) {
+                siswaList.addAll(siswaRepository.findByKelasId(k.getId()));
+            }
+        } else if (ujian.getGuru() != null) {
+            List<com.baknusbelajar.api.entity.GuruMapel> guruMapels = guruMapelRepository.findByGuruId(ujian.getGuru().getId())
+                    .stream()
+                    .filter(gm -> gm.getMapel().getId().equals(ujian.getMapel().getId()))
+                    .collect(Collectors.toList());
+
+            for (com.baknusbelajar.api.entity.GuruMapel gm : guruMapels) {
+                siswaList.addAll(siswaRepository.findByKelasId(gm.getKelas().getId()));
+            }
         }
 
-        return siswaList.stream().map(siswa -> {
+        Map<Long, com.baknusbelajar.api.entity.Siswa> uniqueSiswa = siswaList.stream()
+                .collect(Collectors.toMap(com.baknusbelajar.api.entity.Siswa::getId, s -> s, (s1, s2) -> s1));
+
+        return uniqueSiswa.values().stream().map(siswa -> {
             com.baknusbelajar.api.dto.exam.ExamMonitoringDTO dto = new com.baknusbelajar.api.dto.exam.ExamMonitoringDTO();
             dto.setSiswaId(siswa.getId());
             dto.setNisn(siswa.getNisn());
             dto.setNamaSiswa(siswa.getNamaLengkap());
+            dto.setUjianId(ujianId);
+            dto.setNamaMapel(ujian.getMapel().getNamaMapel());
+            if (siswa.getKelas() != null) {
+                dto.setKelasId(siswa.getKelas().getId());
+                dto.setNamaKelas(siswa.getKelas().getNamaKelas());
+            } else {
+                dto.setNamaKelas("Tanpa Kelas");
+            }
 
             // Periksa online status
-            boolean isOnline = onlineStudents.stream().anyMatch(os -> os.startsWith(siswa.getNisn() + ":"));
+            boolean isOnline = onlineStudents != null && onlineStudents.stream().anyMatch(os -> os.startsWith(siswa.getNisn() + ":"));
             dto.setIsOnline(isOnline);
 
-            // Periksa finished status
-            boolean isFinished = siswaUjianStatusRepository.findBySiswaIdAndUjianMapelId(siswa.getId(), ujianId)
-                    .map(status -> status.getStatusSelesai())
-                    .orElse(false);
+            // Periksa status pengerjaan & waktu
+            var statusOpt = siswaUjianStatusRepository.findBySiswaIdAndUjianMapelId(siswa.getId(), ujianId);
+            boolean isFinished = statusOpt.map(status -> Boolean.TRUE.equals(status.getStatusSelesai())).orElse(false);
             dto.setIsFinished(isFinished);
 
-            return dto;
-        }).collect(Collectors.toList());
-    }
+            if (statusOpt.isPresent()) {
+                var status = statusOpt.get();
+                dto.setWaktuMulai(status.getWaktuMulaiSiswa());
+                dto.setWaktuSelesai(status.getWaktuSelesai());
+                if (status.getWaktuMulaiSiswa() != null && !isFinished && ujian.getDurasi() != null) {
+                    long elapsed = java.time.Duration.between(status.getWaktuMulaiSiswa(), java.time.LocalDateTime.now()).getSeconds();
+                    long remaining = (ujian.getDurasi() * 60) - elapsed;
+                    dto.setSisaWaktuDetik(Math.max(0, remaining));
+                }
+            }
 
+            if (isFinished) {
+                dto.setStatusText("SELESAI");
+            } else if (dto.getWaktuMulai() != null || isOnline) {
+                dto.setStatusText("SEDANG_MENGERJAKAN");
+            } else {
+                dto.setStatusText("BELUM_MULAI");
+            }
+
+            return dto;
+        }).sorted(java.util.Comparator.comparing(com.baknusbelajar.api.dto.exam.ExamMonitoringDTO::getNamaSiswa))
+          .collect(Collectors.toList());
+    }
     public List<UjianMapelDTO> getUjianByEvent(Long eventId) {
         return ujianMapelRepository.findByEventUjianId(eventId).stream()
                 .map(e -> mapToDTO(e, true))

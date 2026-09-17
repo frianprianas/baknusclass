@@ -145,6 +145,19 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.getExamMonitoring(id, onlineStudents));
     }
 
+    @GetMapping("/event/{eventId}/monitoring")
+    @PreAuthorize("hasAnyRole('TU', 'GURU', 'ADMIN')")
+    public ResponseEntity<List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO>> getEventMonitoring(
+            @PathVariable Long eventId) {
+        List<UjianMapelDTO> exams = ujianMapelService.getUjianByEvent(eventId);
+        List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO> all = new java.util.ArrayList<>();
+        for (UjianMapelDTO ex : exams) {
+            java.util.Set<String> onlineStudents = examStatusService.getActiveStudents(ex.getId(), null);
+            all.addAll(ujianMapelService.getExamMonitoring(ex.getId(), onlineStudents));
+        }
+        return ResponseEntity.ok(all);
+    }
+
     @PostMapping("/{id}/reset-peserta")
     @PreAuthorize("hasAnyRole('TU', 'GURU', 'ADMIN')")
     public ResponseEntity<Void> resetPeserta(@PathVariable Long id, @RequestParam String nisn) {
