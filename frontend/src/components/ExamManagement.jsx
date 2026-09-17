@@ -690,6 +690,21 @@ const ExamManagement = () => {
                 }
             } else {
                 const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
+                // Auto-detect PG_KOMPLEKS if multiple keys or complex text
+                const kj = (body.kunciJawaban || '').trim();
+                const pert = (body.pertanyaan || '').toLowerCase();
+                const isMultiKey = kj.includes(',') || kj.includes(';') || kj.length > 1;
+                const hasComplexHint = pert.includes('lebih dari') || pert.includes('kompleks') ||
+                        pert.includes('pilih 2') || pert.includes('pilihan 2') || pert.includes('pilihlah 2') ||
+                        pert.includes('pilih 3') || pert.includes('pilihlah 3') ||
+                        pert.includes('pilih dua') || pert.includes('pilihlah dua') ||
+                        pert.includes('pilih tiga') || pert.includes('pilihlah tiga') ||
+                        pert.includes('jawaban benar lebih') || pert.includes('bisa lebih') ||
+                        pert.includes('centang') || pert.includes('checkbox') || pert.includes('multi');
+
+                if (body.tipeSoal !== 'BENAR_SALAH' && (isMultiKey || hasComplexHint)) {
+                    body.tipeSoal = 'PG_KOMPLEKS';
+                }
                 // Pastikan pilihan C, D, E tidak null/kosong agar tidak terkena constraint ORA-01400 pada Oracle
                 if (body.tipeSoal === 'BENAR_SALAH' || (body.pilihanA === 'Benar' && body.pilihanB === 'Salah')) {
                     body.tipeSoal = 'BENAR_SALAH';

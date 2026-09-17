@@ -1057,8 +1057,8 @@ const ExamScoring = () => {
 
                                                 // Check choices matching
                                                 const stripHtml = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
-                                                const studentChoicesList = studentChoice.split(/[,;\s]+/).map(s => stripHtml(s).toUpperCase()).filter(Boolean);
-                                                const keyChoicesList = keyAnswer.split(/[,;\s]+/).map(s => stripHtml(s).toUpperCase()).filter(Boolean);
+                                                const studentChoicesList = studentChoice.split(/[,;]+/).map(s => stripHtml(s).trim().toUpperCase()).filter(Boolean);
+                                                const keyChoicesList = keyAnswer.split(/[,;]+/).map(s => stripHtml(s).trim().toUpperCase()).filter(Boolean);
 
                                                 const isBS = q.tipeSoal === 'BENAR_SALAH' || (
                                                     q.pilihanA && q.pilihanB &&
@@ -1500,7 +1500,7 @@ const ExamScoring = () => {
                 .q-num { background: #3b82f6; color: white; padding: 4px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
                 .q-bobot { font-weight: 800; color: #64748b; font-size: 0.9rem; }
                 
-                .q-question { font-size: 1.15rem; color: #0f172a; font-weight: 600; line-height: 1.6; margin-bottom: 24px; }
+                .q-question { font-size: 1.35rem; color: #0f172a; font-weight: 600; line-height: 1.75; margin-bottom: 24px; background: #f8fafc; border-left: 5px solid #3b82f6; padding: 18px 24px; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
                 
                 .std-answer-box { background: #f8fafc; border: 3px solid #64748b; border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
                 .key-answer-box { background: #fffbeb; border: 2px solid #fde68a; border-radius: 16px; padding: 20px; margin-bottom: 24px; }
@@ -1590,7 +1590,7 @@ const ExamScoring = () => {
                 [data-theme="dark"] .grading-head { border-bottom-color: #334155; }
                 [data-theme="dark"] .grading-head h2 { color: #f8fafc; }
                 [data-theme="dark"] .answer-item { background: #0f172a; border-color: #334155; }
-                [data-theme="dark"] .q-question { color: #f8fafc; }
+                [data-theme="dark"] .q-question { background: #1e293b; color: #f8fafc; border-left-color: #60a5fa; }
                 [data-theme="dark"] .std-answer-box { background: #1e293b; border-color: #475569; }
                 [data-theme="dark"] .key-answer-box { background: #451a0320; border-color: #78350f; }
                 [data-theme="dark"] .table-wrapper { border-color: #334155; }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import {
     BookOpen,
@@ -51,6 +51,7 @@ const StudentExams = () => {
     const [currentExam, setCurrentExam] = useState(null);
     const [questions, setQuestions] = useState([]);
     const [answers, setAnswers] = useState({}); // { soalId: text }
+    const answersRef = useRef({});
     const [raguState, setRaguState] = useState({}); // { soalId: boolean }
     const [currentIndex, setCurrentIndex] = useState(0);
     const [timer, setTimer] = useState(0); // seconds remaining
@@ -456,13 +457,25 @@ const StudentExams = () => {
                     (q.pilihanB.trim().toLowerCase() === 'salah' || q.pilihanB.trim().toLowerCase() === 'false') &&
                     (!q.pilihanC || q.pilihanC === '-' || q.pilihanC.trim() === '')
                 );
-                const hasComplexTextHint = pertHtml.includes('lebih dari 1') || 
-                                          pertHtml.includes('lebih dari satu') || 
+                const hasComplexTextHint = pertHtml.includes('lebih dari') || 
                                           pertHtml.includes('kompleks') || 
                                           pertHtml.includes('pilih 2') ||
+                                          pertHtml.includes('pilihan 2') ||
                                           pertHtml.includes('pilihlah 2') ||
+                                          pertHtml.includes('pilih 3') ||
+                                          pertHtml.includes('pilihan 3') ||
+                                          pertHtml.includes('pilihlah 3') ||
+                                          pertHtml.includes('pilih dua') ||
                                           pertHtml.includes('pilihlah dua') ||
-                                          pertHtml.includes('jawaban benar lebih');
+                                          pertHtml.includes('pilih tiga') ||
+                                          pertHtml.includes('pilihlah tiga') ||
+                                          pertHtml.includes('jawaban benar lebih') ||
+                                          pertHtml.includes('bisa lebih') ||
+                                          pertHtml.includes('dapat lebih') ||
+                                          pertHtml.includes('centang') ||
+                                          pertHtml.includes('kotak centang') ||
+                                          pertHtml.includes('checkbox') ||
+                                          pertHtml.includes('multi');
 
                 const isKompleks = !isBS && (
                     resolvedTipe.includes('KOMPLEKS') ||
@@ -523,6 +536,7 @@ const StudentExams = () => {
                 existingRagu[sId] = ans.raguRagu;
             });
 
+            answersRef.current = { ...initialAnswers, ...existingAnswers };
             setAnswers(prev => ({ ...prev, ...existingAnswers }));
             setRaguState(prev => ({ ...prev, ...existingRagu }));
             setWhiteboards(prev => ({ ...prev, ...existingWhiteboards }));
@@ -564,22 +578,21 @@ const StudentExams = () => {
     const [isSaving, setIsSaving] = useState(false);
 
     const handleToggleComplexOption = (soalId, opt) => {
-        setAnswers(prevAnswers => {
-            const currentStr = prevAnswers[soalId] || '';
-            const currentKeys = currentStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-            let newKeys;
-            if (currentKeys.includes(opt)) {
-                newKeys = currentKeys.filter(k => k !== opt);
-            } else {
-                newKeys = [...currentKeys, opt].sort();
-            }
-            const val = newKeys.join(',');
-            saveAnswerPG(soalId, val, raguState[soalId]);
-            return {
-                ...prevAnswers,
-                [soalId]: val
-            };
-        });
+        const currentStr = answersRef.current[soalId] !== undefined ? answersRef.current[soalId] : (answers[soalId] || '');
+        const currentKeys = currentStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        let newKeys;
+        if (currentKeys.includes(opt)) {
+            newKeys = currentKeys.filter(k => k !== opt);
+        } else {
+            newKeys = [...currentKeys, opt].sort();
+        }
+        const val = newKeys.join(',');
+        answersRef.current[soalId] = val;
+        setAnswers(prev => ({
+            ...prev,
+            [soalId]: val
+        }));
+        saveAnswerPG(soalId, val, raguState[soalId]);
     };
 
     const saveAnswerPG = async (soalId, selectedOption, isRagu = false) => {
@@ -634,16 +647,16 @@ const StudentExams = () => {
 
     const handleNext = () => {
         const q = questions[currentIndex];
-        if (q) {
-            saveCurrentAnswer(q.id, answers[q.id], raguState[q.id], whiteboards[q.id]);
+        if (q && q.qType === 'essay') {
+            saveAnswer(q.id, answersRef.current[q.id] || answers[q.id], raguState[q.id], whiteboards[q.id]);
         }
         setCurrentIndex(prev => prev + 1);
     };
 
     const handlePrev = () => {
         const q = questions[currentIndex];
-        if (q) {
-            saveCurrentAnswer(q.id, answers[q.id], raguState[q.id], whiteboards[q.id]);
+        if (q && q.qType === 'essay') {
+            saveAnswer(q.id, answersRef.current[q.id] || answers[q.id], raguState[q.id], whiteboards[q.id]);
         }
         setCurrentIndex(prev => prev - 1);
     };
@@ -671,7 +684,7 @@ const StudentExams = () => {
             const pgQuestionsToSave = questions.filter(q => q.qType === 'pg');
             if (pgQuestionsToSave.length > 0) {
                 await Promise.all(pgQuestionsToSave.map(q => {
-                    const ansVal = answers[q.id];
+                    const ansVal = answersRef.current[q.id] !== undefined ? answersRef.current[q.id] : answers[q.id];
                     if (ansVal !== undefined && ansVal !== null && ansVal !== '') {
                         return saveAnswerPG(q.id, ansVal, raguState[q.id]);
                     }
@@ -897,7 +910,8 @@ const StudentExams = () => {
                                                                 className={`tf-decision-card card-true ${(answers[q.id] === 'A' || answers[q.id] === 'Benar') ? 'selected-true' : ''}`}
                                                                 onClick={() => {
                                                                     const val = 'A';
-                                                                    setAnswers({ ...answers, [q.id]: val });
+                                                                    answersRef.current[q.id] = val;
+                                                                    setAnswers(prev => ({ ...prev, [q.id]: val }));
                                                                     saveAnswerPG(q.id, val, raguState[q.id]);
                                                                 }}
                                                             >
@@ -923,7 +937,8 @@ const StudentExams = () => {
                                                                 className={`tf-decision-card card-false ${(answers[q.id] === 'B' || answers[q.id] === 'Salah') ? 'selected-false' : ''}`}
                                                                 onClick={() => {
                                                                     const val = 'B';
-                                                                    setAnswers({ ...answers, [q.id]: val });
+                                                                    answersRef.current[q.id] = val;
+                                                                    setAnswers(prev => ({ ...prev, [q.id]: val }));
                                                                     saveAnswerPG(q.id, val, raguState[q.id]);
                                                                 }}
                                                             >
@@ -1016,7 +1031,8 @@ const StudentExams = () => {
                                                                         key={opt}
                                                                         className={`cbt-opt-row single-row ${isSelected ? 'selected' : ''}`}
                                                                         onClick={() => {
-                                                                            setAnswers({ ...answers, [q.id]: opt });
+                                                                            answersRef.current[q.id] = opt;
+                                                                            setAnswers(prev => ({ ...prev, [q.id]: opt }));
                                                                             saveAnswerPG(q.id, opt, raguState[q.id]);
                                                                         }}
                                                                     >
@@ -2040,14 +2056,21 @@ const StudentExams = () => {
                     
                     /* Multimedia (Images, Arabic RTL, Japanese CJK) */
                     .cbt-question-text {
-                        color: #1e293b;
-                        line-height: 1.8;
-                        margin-bottom: 32px;
-                        font-weight: 500;
-                        font-size: 1.15rem;
+                        color: #0f172a;
+                        line-height: 1.85;
+                        margin-bottom: 28px;
+                        font-weight: 600;
+                        font-size: 1.35rem;
                         unicode-bidi: plaintext;
                         word-break: break-word;
+                        background: #f8fafc;
+                        border-left: 5px solid #2563eb;
+                        border-radius: 12px;
+                        padding: 22px 26px;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
                     }
+                    .cbt-question-text.text-lg { font-size: 1.55rem; }
+                    .cbt-question-text.text-xl { font-size: 1.75rem; }
                     .cbt-question-text img {
                         max-width: 100%;
                         height: auto;
@@ -2183,7 +2206,7 @@ const StudentExams = () => {
                     [data-theme="dark"] .cbt-answer-area textarea:focus { border-color: #3b82f6; }
                     [data-theme="dark"] .nav-btn { background: #0f172a; color: #94a3b8; border-color: #334155; }
                     [data-theme="dark"] .icon-circle { background: #1e293b; }
-                    [data-theme="dark"] .cbt-question-text { color: #f8fafc; }
+                    [data-theme="dark"] .cbt-question-text { background: #1e293b; color: #f8fafc; border-left-color: #3b82f6; }
                     [data-theme="dark"] .cbt-font-controls span { color: #94a3b8; }
                     [data-theme="dark"] .cbt-font-controls span:hover { background: #334155; color: #3b82f6; }
                     [data-theme="dark"] .active-font { background: #334155 !important; border-color: #475569; color: #3b82f6 !important; }

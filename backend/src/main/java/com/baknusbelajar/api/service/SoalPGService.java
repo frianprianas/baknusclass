@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,12 +22,40 @@ public class SoalPGService {
     private final UjianMapelRepository ujianMapelRepository;
     private final KartuSoalService kartuSoalService;
 
-    @Cacheable(value = "soalPGCache", key = "#ujianId + '-' + #includeKunci")
+    @Transactional
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
-        return soalPGRepository.findByUjianMapelId(ujianId).stream().map(s -> {
+        List<SoalPG> soalList = soalPGRepository.findByUjianMapelId(ujianId);
+        return soalList.stream().map(s -> {
+            // Auto-detect and synchronize PG_KOMPLEKS or BENAR_SALAH directly into DB entity
+            String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
+            String pert = s.getPertanyaan() != null ? s.getPertanyaan().toLowerCase() : "";
+            boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
+            boolean hasComplexHint = pert.contains("lebih dari") || pert.contains("kompleks") ||
+                    pert.contains("pilih 2") || pert.contains("pilihan 2") || pert.contains("pilihlah 2") ||
+                    pert.contains("pilih 3") || pert.contains("pilihan 3") || pert.contains("pilihlah 3") ||
+                    pert.contains("pilih dua") || pert.contains("pilihlah dua") ||
+                    pert.contains("pilih tiga") || pert.contains("pilihlah tiga") ||
+                    pert.contains("jawaban benar lebih") || pert.contains("bisa lebih") ||
+                    pert.contains("dapat lebih") || pert.contains("centang") ||
+                    pert.contains("checkbox") || pert.contains("multi");
+
+            if (isMultiKey || hasComplexHint) {
+                if (!"PG_KOMPLEKS".equalsIgnoreCase(s.getTipeSoal())) {
+                    s.setTipeSoal("PG_KOMPLEKS");
+                    soalPGRepository.save(s);
+                }
+            } else if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
+                       ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB()))) {
+                if (!"BENAR_SALAH".equalsIgnoreCase(s.getTipeSoal())) {
+                    s.setTipeSoal("BENAR_SALAH");
+                    soalPGRepository.save(s);
+                }
+            }
+
             SoalPGDTO dto = mapToDTO(s);
-            if (!includeKunci)
+            if (!includeKunci) {
                 dto.setKunciJawaban(null);
+            }
             return dto;
         }).collect(Collectors.toList());
     }
@@ -143,15 +172,22 @@ public class SoalPGService {
         String tipe = s.getTipeSoal();
         String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
         String pert = s.getPertanyaan() != null ? s.getPertanyaan().toLowerCase() : "";
-        boolean hasComplexHint = pert.contains("lebih dari 1") || pert.contains("lebih dari satu") ||
-                pert.contains("kompleks") || pert.contains("pilih 2") || pert.contains("pilihlah dua");
+        boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
+        boolean hasComplexHint = pert.contains("lebih dari") || pert.contains("kompleks") ||
+                pert.contains("pilih 2") || pert.contains("pilihan 2") || pert.contains("pilihlah 2") ||
+                pert.contains("pilih 3") || pert.contains("pilihan 3") || pert.contains("pilihlah 3") ||
+                pert.contains("pilih dua") || pert.contains("pilihlah dua") ||
+                pert.contains("pilih tiga") || pert.contains("pilihlah tiga") ||
+                pert.contains("jawaban benar lebih") || pert.contains("bisa lebih") ||
+                pert.contains("dapat lebih") || pert.contains("centang") ||
+                pert.contains("checkbox") || pert.contains("multi");
 
         if (tipe == null || tipe.trim().isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
             if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
                 ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB())) &&
                 (s.getPilihanC() == null || "-".equals(s.getPilihanC().trim()) || s.getPilihanC().trim().isEmpty())) {
                 tipe = "BENAR_SALAH";
-            } else if (kj.contains(",") || kj.contains(";") || kj.length() > 1 || hasComplexHint) {
+            } else if (isMultiKey || hasComplexHint) {
                 tipe = "PG_KOMPLEKS";
             } else {
                 tipe = "PG_BIASA";
