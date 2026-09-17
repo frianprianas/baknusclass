@@ -126,9 +126,17 @@ public class UjianMapelService {
         var siswa = siswaRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Siswa record not found"));
 
-        java.util.Map<Long, com.baknusbelajar.api.entity.UjianMapel> distinctMap = new java.util.LinkedHashMap<>();
+        java.util.Map<String, com.baknusbelajar.api.entity.UjianMapel> distinctMap = new java.util.LinkedHashMap<>();
+        java.util.Set<Long> seenIds = new java.util.HashSet<>();
         for (com.baknusbelajar.api.entity.UjianMapel e : ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId())) {
-            distinctMap.putIfAbsent(e.getId(), e);
+            if (e == null || e.getId() == null || seenIds.contains(e.getId())) continue;
+            String sig = (e.getMapel() != null ? e.getMapel().getId() : "m") + "_" +
+                         (e.getGuru() != null ? e.getGuru().getId() : "g") + "_" +
+                         (e.getWaktuMulai() != null ? e.getWaktuMulai().toString() : e.getId().toString());
+            if (!distinctMap.containsKey(sig)) {
+                seenIds.add(e.getId());
+                distinctMap.put(sig, e);
+            }
         }
 
         return distinctMap.values().stream()

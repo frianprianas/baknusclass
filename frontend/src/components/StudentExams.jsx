@@ -160,12 +160,16 @@ const StudentExams = () => {
             const resp = await axios.get(`/api/exam/ujian-mapel/siswa?eventId=${event.id}`, { headers });
             let rawList = resp.data || [];
 
-            // Ensure 100% unique exams by ID (prevent duplicate cards)
+            // Ensure 100% unique exams (prevent duplicate cards by ID or by Subject + Teacher + StartTime)
             const uniqueExams = [];
             const seenIds = new Set();
+            const seenSignatures = new Set();
             for (const ex of rawList) {
-                if (ex && ex.id && !seenIds.has(ex.id)) {
+                if (!ex || !ex.id) continue;
+                const sig = (ex.namaMapel || '') + '___' + (ex.namaGuru || '') + '___' + (ex.waktuMulai || '');
+                if (!seenIds.has(ex.id) && !seenSignatures.has(sig)) {
                     seenIds.add(ex.id);
+                    seenSignatures.add(sig);
                     uniqueExams.push(ex);
                 }
             }
