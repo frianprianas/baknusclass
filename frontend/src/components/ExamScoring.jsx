@@ -552,7 +552,7 @@ const ExamScoring = () => {
             if (selectedStudent?.siswaId === student.siswaId) {
                 setSelectedStudent(null);
             }
-            fetchExamData();
+            if (selectedExam) { handleSelectExam(selectedExam); }
         } catch (err) {
             console.error('Failed to reset exam for student', err);
             alert('Gagal mereset ujian siswa: ' + (err.response?.data?.message || err.message));
@@ -571,7 +571,7 @@ const ExamScoring = () => {
             await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/reset-all`, {}, { headers });
             alert('Berhasil! Seluruh peserta ujian telah direset dan dapat mengulang ujian.');
             setSelectedStudent(null);
-            fetchExamData();
+            if (selectedExam) { handleSelectExam(selectedExam); }
         } catch (err) {
             console.error('Failed to reset all students', err);
             alert('Gagal mereset semua ujian: ' + (err.response?.data?.message || err.message));
