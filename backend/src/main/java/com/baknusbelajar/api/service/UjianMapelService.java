@@ -126,8 +126,12 @@ public class UjianMapelService {
         var siswa = siswaRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Siswa record not found"));
 
-        return ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId())
-                .stream()
+        java.util.Map<Long, com.baknusbelajar.api.entity.UjianMapel> distinctMap = new java.util.LinkedHashMap<>();
+        for (com.baknusbelajar.api.entity.UjianMapel e : ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId())) {
+            distinctMap.putIfAbsent(e.getId(), e);
+        }
+
+        return distinctMap.values().stream()
                 .map(e -> {
                     UjianMapelDTO dto = mapToDTO(e, false);
                     boolean isFinished = siswaUjianStatusRepository

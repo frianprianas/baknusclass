@@ -158,14 +158,24 @@ const StudentExams = () => {
 
         try {
             const resp = await axios.get(`/api/exam/ujian-mapel/siswa?eventId=${event.id}`, { headers });
-            let examList = resp.data || [];
+            let rawList = resp.data || [];
+
+            // Ensure 100% unique exams by ID (prevent duplicate cards)
+            const uniqueExams = [];
+            const seenIds = new Set();
+            for (const ex of rawList) {
+                if (ex && ex.id && !seenIds.has(ex.id)) {
+                    seenIds.add(ex.id);
+                    uniqueExams.push(ex);
+                }
+            }
+            let examList = uniqueExams;
 
             // If it's a Latihan / Simulasi event:
-            // Display real teacher exams + provide default CBT simulation sandbox if empty or alongside
             if (isLatihanEvent) {
                 if (examList.length === 0) {
                     examList = [defaultSimulasiExam];
-                } else {
+                } else if (!seenIds.has(defaultSimulasiExam.id)) {
                     examList = [...examList, defaultSimulasiExam];
                 }
             }
