@@ -31,7 +31,7 @@ public class JawabanPGController {
     }
 
     @PostMapping("/submit")
-    @PreAuthorize("hasRole('SISWA')")
+    @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'GURU', 'TU')")
     public ResponseEntity<JawabanPGDTO> submitJawaban(@RequestBody JawabanPGDTO dto) {
         return ResponseEntity.ok(jawabanPGService.submitJawaban(dto));
     }

@@ -944,8 +944,9 @@ const ExamScoring = () => {
                                                 const earnedScore = ans?.skorFinalGuru !== null && ans?.skorFinalGuru !== undefined ? ans.skorFinalGuru : (ans?.skor || 0);
 
                                                 // Check choices matching
-                                                const studentChoicesList = studentChoice.split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
-                                                const keyChoicesList = keyAnswer.split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+                                                const stripHtml = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
+                                                const studentChoicesList = studentChoice.split(/[,;\s]+/).map(s => stripHtml(s).toUpperCase()).filter(Boolean);
+                                                const keyChoicesList = keyAnswer.split(/[,;\s]+/).map(s => stripHtml(s).toUpperCase()).filter(Boolean);
 
                                                 const isBS = q.tipeSoal === 'BENAR_SALAH';
                                                 const isKompleks = q.tipeSoal === 'PG_KOMPLEKS';
@@ -975,8 +976,15 @@ const ExamScoring = () => {
                                                         {/* Option preview list */}
                                                         <div className="pg-options-preview" style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0' }}>
                                                             {options.map(opt => {
-                                                                const isChosen = studentChoicesList.includes(opt.key) || studentChoicesList.includes(opt.text.toUpperCase());
-                                                                const isKey = keyChoicesList.includes(opt.key) || keyChoicesList.includes(opt.text.toUpperCase());
+                                                                const cleanOptText = stripHtml(opt.text).toUpperCase();
+                                                                const isChosen = studentChoicesList.includes(opt.key) || 
+                                                                    (cleanOptText && studentChoicesList.includes(cleanOptText)) ||
+                                                                    (isBS && ((opt.key === 'A' && (studentChoice.toUpperCase() === 'BENAR' || studentChoice.toUpperCase() === 'TRUE' || studentChoice === '1')) ||
+                                                                              (opt.key === 'B' && (studentChoice.toUpperCase() === 'SALAH' || studentChoice.toUpperCase() === 'FALSE' || studentChoice === '0'))));
+                                                                const isKey = keyChoicesList.includes(opt.key) || 
+                                                                    (cleanOptText && keyChoicesList.includes(cleanOptText)) ||
+                                                                    (isBS && ((opt.key === 'A' && (keyAnswer.toUpperCase() === 'BENAR' || keyAnswer.toUpperCase() === 'TRUE' || keyAnswer === '1')) ||
+                                                                              (opt.key === 'B' && (keyAnswer.toUpperCase() === 'SALAH' || keyAnswer.toUpperCase() === 'FALSE' || keyAnswer === '0'))));
 
                                                                 let borderCol = '#e2e8f0';
                                                                 let bgCol = '#ffffff';

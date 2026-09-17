@@ -370,7 +370,7 @@ const StudentExams = () => {
                         bobot: q.bobotNilai || 2,
                         jawabanSiswa: ans.jawaban || ans.jawabanDipilih || 'Tidak ada jawaban',
                         skorGuru: ans.skor !== null && ans.skor !== undefined ? ans.skor : 0,
-                        saranAi: ans.isCorrect ? 'Benar (Otomatis)' : 'Salah (Otomatis)'
+                        saranAi: (ans.isCorrect || (ans.skor && ans.skor >= (q.bobotNilai || 2))) ? 'Benar (Otomatis)' : ((ans.skor && ans.skor > 0) ? `Benar Sebagian (${ans.skor} Poin)` : 'Salah (Otomatis)')
                     };
                 } else {
                     const ans = userEssayAnswers.find(a => a.soalId === q.id) || {};

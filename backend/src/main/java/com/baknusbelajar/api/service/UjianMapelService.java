@@ -190,6 +190,13 @@ public class UjianMapelService {
         status.setWaktuSelesai(java.time.LocalDateTime.now());
         siswaUjianStatusRepository.save(status);
 
+        // Auto-scoring PG:
+        try {
+            jawabanPGService.evaluateAndEnsureScoresForUjianAndSiswa(ujianId, siswa.getId());
+        } catch (Exception ex) {
+            log.error("Error auto-scoring PG for ujian: {}, siswa: {}", ujianId, siswa.getId(), ex);
+        }
+
         // Trigger automatic AI scoring if enabled
         jawabanSiswaService.processAiScoringForUjianAndSiswa(ujianId, siswa.getId());
     }

@@ -164,34 +164,105 @@ public class JawabanPGService {
         }
     }
 
+        private String cleanHtml(String text) {
+        if (text == null) return "";
+        return text.replaceAll("<[^>]*>", "").replace("&nbsp;", " ").trim();
+    }
+
+    private Boolean resolveTrueFalse(String val) {
+        if (val == null) return null;
+        String v = cleanHtml(val).trim().toUpperCase();
+        if (v.equals("A") || v.equals("BENAR") || v.equals("TRUE") || v.equals("1") || v.equals("YA") || v.equals("YES")) {
+            return true;
+        }
+        if (v.equals("B") || v.equals("SALAH") || v.equals("FALSE") || v.equals("0") || v.equals("TIDAK") || v.equals("NO")) {
+            return false;
+        }
+        return null;
+    }
+
+    private String normalizeOptionLetter(SoalPG soal, String input) {
+        if (input == null) return "";
+        String clean = cleanHtml(input).trim().toUpperCase();
+        if (clean.isEmpty()) return "";
+
+        // Direct letter match: "A", "B", "C", "D", "E"
+        if (clean.matches("^[A-E]$")) {
+            return clean;
+        }
+
+        // Match "A.", "A)", "(A)"
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\(?([A-E])[\\.\\)]?").matcher(clean);
+        if (m.find()) {
+            return m.group(1);
+        }
+
+        // Match against option texts
+        String textA = cleanHtml(soal.getPilihanA()).toUpperCase();
+        String textB = cleanHtml(soal.getPilihanB()).toUpperCase();
+        String textC = cleanHtml(soal.getPilihanC()).toUpperCase();
+        String textD = cleanHtml(soal.getPilihanD()).toUpperCase();
+        String textE = cleanHtml(soal.getPilihanE()).toUpperCase();
+
+        if (!textA.isEmpty() && (clean.equals(textA) || textA.equals(clean))) return "A";
+        if (!textB.isEmpty() && (clean.equals(textB) || textB.equals(clean))) return "B";
+        if (!textC.isEmpty() && (clean.equals(textC) || textC.equals(clean))) return "C";
+        if (!textD.isEmpty() && (clean.equals(textD) || textD.equals(clean))) return "D";
+        if (!textE.isEmpty() && (clean.equals(textE) || textE.equals(clean))) return "E";
+
+        return clean;
+    }
+
     public ScoringResult calculateScore(SoalPG soal, String jawabanSiswa) {
         if (jawabanSiswa == null || jawabanSiswa.trim().isEmpty()) {
             return new ScoringResult(0.0, false);
         }
 
-        String kunci = soal.getKunciJawaban() != null ? soal.getKunciJawaban().trim().toUpperCase() : "";
-        String jawaban = jawabanSiswa.trim().toUpperCase();
+        String rawKunci = soal.getKunciJawaban() != null ? soal.getKunciJawaban().trim() : "";
+        String rawJawaban = jawabanSiswa.trim();
         double bobot = soal.getBobotNilai() != null ? soal.getBobotNilai() : 1.0;
+
         String tipe = soal.getTipeSoal();
-        if (tipe == null || tipe.trim().isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
-            if (kunci.contains(",")) {
-                tipe = "PG_KOMPLEKS";
-            } else if ("Benar".equalsIgnoreCase(soal.getPilihanA()) && "Salah".equalsIgnoreCase(soal.getPilihanB())) {
-                tipe = "BENAR_SALAH";
+        String cleanPilA = cleanHtml(soal.getPilihanA()).toLowerCase();
+        String cleanPilB = cleanHtml(soal.getPilihanB()).toLowerCase();
+
+        boolean looksLikeBS = "BENAR_SALAH".equalsIgnoreCase(tipe) ||
+                ((cleanPilA.equals("benar") || cleanPilA.equals("true")) &&
+                 (cleanPilB.equals("salah") || cleanPilB.equals("false")));
+
+        boolean looksLikeKompleks = "PG_KOMPLEKS".equalsIgnoreCase(tipe) ||
+                (!looksLikeBS && (rawKunci.contains(",") || rawJawaban.contains(",")));
+
+        if (looksLikeBS) {
+            Boolean studentTF = resolveTrueFalse(rawJawaban);
+            Boolean keyTF = resolveTrueFalse(rawKunci);
+
+            boolean match = false;
+            if (studentTF != null && keyTF != null) {
+                match = studentTF.equals(keyTF);
             } else {
-                tipe = "PG_BIASA";
+                String normS = normalizeOptionLetter(soal, rawJawaban);
+                String normK = normalizeOptionLetter(soal, rawKunci);
+                match = normS.equalsIgnoreCase(normK);
             }
+            log.info("Scoring BENAR_SALAH [Soal {}]: Siswa='{}' ({}), Kunci='{}' ({}) -> Match={}",
+                    soal.getId(), rawJawaban, studentTF, rawKunci, keyTF, match);
+            return new ScoringResult(match ? bobot : 0.0, match);
         }
 
-        if ("PG_KOMPLEKS".equalsIgnoreCase(tipe)) {
-            // Split keys and answers into sets (e.g. "A,C" -> {"A", "C"})
-            Set<String> setKunci = Arrays.stream(kunci.split("[,;\\s]+"))
+        if (looksLikeKompleks) {
+            // Split keys and answers into sets, normalizing to option letters (A, B, C, D, E)
+            Set<String> setKunci = Arrays.stream(rawKunci.split("[,;\\s]+"))
                     .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(s -> normalizeOptionLetter(soal, s))
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toSet());
 
-            Set<String> setJawaban = Arrays.stream(jawaban.split("[,;\\s]+"))
+            Set<String> setJawaban = Arrays.stream(rawJawaban.split("[,;\\s]+"))
                     .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(s -> normalizeOptionLetter(soal, s))
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toSet());
 
@@ -199,33 +270,33 @@ public class JawabanPGService {
                 return new ScoringResult(0.0, false);
             }
 
-            // Hitung jawaban benar yang dipilih
             long correctSelected = setJawaban.stream().filter(setKunci::contains).count();
             long wrongSelected = setJawaban.stream().filter(j -> !setKunci.contains(j)).count();
 
             if (correctSelected == setKunci.size() && wrongSelected == 0) {
-                // Semua tepat 100%
+                log.info("Scoring PG_KOMPLEKS [Soal {}]: Full Match (Bobot {})", soal.getId(), bobot);
                 return new ScoringResult(bobot, true);
             } else if (correctSelected > 0 && wrongSelected == 0) {
-                // Skor proporsional jika benar sebagian tanpa jawaban salah
                 double partial = (double) correctSelected / setKunci.size() * bobot;
-                return new ScoringResult(Math.round(partial * 100.0) / 100.0, false);
+                double rounded = Math.round(partial * 100.0) / 100.0;
+                log.info("Scoring PG_KOMPLEKS [Soal {}]: Partial Match ({}/{}) -> {}", soal.getId(), correctSelected, setKunci.size(), rounded);
+                return new ScoringResult(rounded, false);
             } else {
+                log.info("Scoring PG_KOMPLEKS [Soal {}]: Wrong answer selected (Wrong={})", soal.getId(), wrongSelected);
                 return new ScoringResult(0.0, false);
             }
-        } else {
-            // PG_BIASA & BENAR_SALAH
-            boolean match = jawaban.equalsIgnoreCase(kunci);
-            if (!match && "BENAR_SALAH".equalsIgnoreCase(tipe)) {
-                boolean studentIsBenar = "A".equalsIgnoreCase(jawaban) || "BENAR".equalsIgnoreCase(jawaban) || "TRUE".equalsIgnoreCase(jawaban) || "1".equals(jawaban);
-                boolean studentIsSalah = "B".equalsIgnoreCase(jawaban) || "SALAH".equalsIgnoreCase(jawaban) || "FALSE".equalsIgnoreCase(jawaban) || "0".equals(jawaban);
-                boolean keyIsBenar = "A".equalsIgnoreCase(kunci) || "BENAR".equalsIgnoreCase(kunci) || "TRUE".equalsIgnoreCase(kunci) || "1".equals(kunci);
-                boolean keyIsSalah = "B".equalsIgnoreCase(kunci) || "SALAH".equalsIgnoreCase(kunci) || "FALSE".equalsIgnoreCase(kunci) || "0".equals(kunci);
-
-                match = (studentIsBenar && keyIsBenar) || (studentIsSalah && keyIsSalah);
-            }
-            return new ScoringResult(match ? bobot : 0.0, match);
         }
+
+        // PG_BIASA
+        String normS = normalizeOptionLetter(soal, rawJawaban);
+        String normK = normalizeOptionLetter(soal, rawKunci);
+        boolean match = normS.equalsIgnoreCase(normK) ||
+                        cleanHtml(rawJawaban).equalsIgnoreCase(cleanHtml(rawKunci));
+
+        log.info("Scoring PG_BIASA [Soal {}]: Siswa='{}' (Norm: {}), Kunci='{}' (Norm: {}) -> Match={}",
+                soal.getId(), rawJawaban, normS, rawKunci, normK, match);
+
+        return new ScoringResult(match ? bobot : 0.0, match);
     }
 
     private JawabanPGDTO mapToDTO(JawabanPG j) {
