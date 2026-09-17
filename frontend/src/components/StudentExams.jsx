@@ -62,6 +62,7 @@ const StudentExams = () => {
     const [showPracticeResult, setShowPracticeResult] = useState(false);
     const [practiceResult, setPracticeResult] = useState(null);
     const [fontSizeScale, setFontSizeScale] = useState(1);
+    const [showQuestionInfoModal, setShowQuestionInfoModal] = useState(false);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
@@ -696,8 +697,8 @@ const StudentExams = () => {
                                                 : 'badge-essay'
                                         }`}>
                                             {q?.qType === 'pg'
-                                                ? (q.tipeSoal === 'BENAR_SALAH' ? '⚖️ Benar / Salah' : q.tipeSoal === 'PG_KOMPLEKS' ? '☑️ PG Kompleks' : '🔘 Pilihan Ganda')
-                                                : '📝 Essay'}
+                                                ? (q.tipeSoal === 'BENAR_SALAH' ? '⚖️ Benar / Salah (1 Opsi)' : q.tipeSoal === 'PG_KOMPLEKS' ? '☑️ PG Kompleks (Multi Jawaban Benar)' : '🔘 Pilihan Ganda (1 Jawaban Benar)')
+                                                : '📝 Soal Essay / Uraian'}
                                         </span>
                                     </div>
                                     <div className="cbt-font-controls">
@@ -709,7 +710,7 @@ const StudentExams = () => {
                                 </div>
 
                                 <div className="cbt-topbar-center">
-                                    <button className="cbt-info-btn">INFORMASI SOAL</button>
+                                    <button type="button" className="cbt-info-btn" onClick={() => setShowQuestionInfoModal(true)}>INFORMASI SOAL</button>
                                 </div>
 
                                 <div className="cbt-topbar-right">
@@ -733,6 +734,46 @@ const StudentExams = () => {
 
                             <div className="cbt-content-area">
                                 <div className="cbt-question-box">
+                                    {/* Banner Keterangan Format & Petunjuk Soal untuk Siswa */}
+                                    <div className={`cbt-soal-instruction-banner ${
+                                        q?.qType === 'pg'
+                                            ? (q.tipeSoal === 'BENAR_SALAH' ? 'banner-tf' : q.tipeSoal === 'PG_KOMPLEKS' ? 'banner-kompleks' : 'banner-pg')
+                                            : 'banner-essay'
+                                    }`}>
+                                        <div className="csi-icon">
+                                            {q?.qType === 'pg' ? (
+                                                q.tipeSoal === 'BENAR_SALAH' ? '⚖️' :
+                                                q.tipeSoal === 'PG_KOMPLEKS' ? '☑️' : '🔘'
+                                            ) : '📝'}
+                                        </div>
+                                        <div className="csi-content">
+                                            <div className="csi-title">
+                                                {q?.qType === 'pg' ? (
+                                                    q.tipeSoal === 'BENAR_SALAH'
+                                                        ? 'Soal Pernyataan: Benar atau Salah'
+                                                        : q.tipeSoal === 'PG_KOMPLEKS'
+                                                            ? 'Soal Pilihan Ganda Kompleks (Bisa 2 atau Lebih Jawaban Benar)'
+                                                            : 'Soal Pilihan Ganda (1 Jawaban Benar)'
+                                                ) : 'Soal Essay / Uraian Terbuka'}
+                                            </div>
+                                            <div className="csi-desc">
+                                                {q?.qType === 'pg' ? (
+                                                    q.tipeSoal === 'BENAR_SALAH'
+                                                        ? 'Tentukan apakah pernyataan pada soal ini Benar atau Salah. Pilih salah satu tombol di bawah.'
+                                                        : q.tipeSoal === 'PG_KOMPLEKS'
+                                                            ? 'Soal ini memiliki lebih dari 1 pilihan jawaban yang benar (misal: 2 pilihan benar atau lebih). Centang semua pilihan yang kamu anggap benar!'
+                                                            : 'Pilihlah salah satu jawaban yang paling tepat dari pilihan A sampai E di bawah.'
+                                                ) : 'Tuliskan uraian atau penjelasan lengkap jawaban Anda pada kolom jawaban di bawah ini.'}
+                                            </div>
+                                        </div>
+                                        <div className="csi-chip">
+                                            {q?.qType === 'pg' ? (
+                                                q.tipeSoal === 'BENAR_SALAH' ? '1 Opsi Benar/Salah' :
+                                                q.tipeSoal === 'PG_KOMPLEKS' ? 'Bisa >1 Jawaban' : 'Pilih 1 Jawaban'
+                                            ) : 'Teks Terbuka'}
+                                        </div>
+                                    </div>
+
                                     <div className={`cbt-question-text ${fontClass}`} dangerouslySetInnerHTML={{ __html: q?.pertanyaan }}></div>
 
                                     <div className="cbt-answer-area">
@@ -978,6 +1019,81 @@ const StudentExams = () => {
                     </div>
                 )}
 
+                {/* Modal Informasi Detail Soal */}
+                {showQuestionInfoModal && q && (
+                    <div className="modal-overlay" style={{ zIndex: 9999 }}>
+                        <div className="modal-content" style={{ maxWidth: '520px', borderRadius: '20px', padding: '28px', background: 'var(--card-bg, #ffffff)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ background: '#eff6ff', color: '#2563eb', padding: '10px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <BookOpen size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Informasi Soal #{currentIndex + 1}</h3>
+                                        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{currentExam?.namaMapel}</span>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowQuestionInfoModal(false)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                                >
+                                    <X size={22} />
+                                </button>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+                                <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Tipe / Format Soal</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
+                                        {q.qType === 'pg'
+                                            ? (q.tipeSoal === 'BENAR_SALAH'
+                                                ? '⚖️ Pernyataan Benar atau Salah (1 Pilihan)'
+                                                : q.tipeSoal === 'PG_KOMPLEKS'
+                                                    ? '☑️ Pilihan Ganda Kompleks (Bisa >1 Jawaban Benar)'
+                                                    : '🔘 Pilihan Ganda Biasa (1 Jawaban Benar)')
+                                            : '📝 Soal Essay / Uraian Terbuka'}
+                                    </div>
+                                </div>
+
+                                <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Petunjuk Pengerjaan</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
+                                        {q.qType === 'pg'
+                                            ? (q.tipeSoal === 'BENAR_SALAH'
+                                                ? 'Baca pernyataan pada soal dengan cermat, lalu pilih tombol BENAR jika pernyataan sesuai, atau SALAH jika pernyataan tidak sesuai.'
+                                                : q.tipeSoal === 'PG_KOMPLEKS'
+                                                    ? 'Klik pada opsi jawaban (A sampai E) untuk memilih. Soal ini memiliki lebih dari 1 pilihan benar (misalnya 2 atau 3 opsi benar). Anda dapat memilih beberapa opsi sekaligus.'
+                                                    : 'Klik salah satu opsi (A sampai E) yang Anda anggap paling tepat. Hanya 1 pilihan yang dapat dipilih.')
+                                            : 'Ketik uraian atau penjelasan lengkap jawaban Anda pada area teks. Anda juga dapat menggunakan papan gambar/coretan (Whiteboard) jika diperlukan rumus/diagram.'}
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div style={{ background: '#f0fdf4', padding: '12px 14px', borderRadius: '14px', border: '1.5px solid #bbf7d0' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 800 }}>BOBOT SOAL</div>
+                                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#15803d' }}>{q.bobotNilai || 2} Poin</div>
+                                    </div>
+                                    <div style={{ background: (answers[q.id] && String(answers[q.id]).trim() !== '') ? '#eff6ff' : '#fff1f2', padding: '12px 14px', borderRadius: '14px', border: (answers[q.id] && String(answers[q.id]).trim() !== '') ? '1.5px solid #bfdbfe' : '1.5px solid #fecaca' }}>
+                                        <div style={{ fontSize: '0.75rem', color: (answers[q.id] && String(answers[q.id]).trim() !== '') ? '#1e40af' : '#991b1b', fontWeight: 800 }}>STATUS JAWABAN</div>
+                                        <div style={{ fontSize: '1rem', fontWeight: 900, color: (answers[q.id] && String(answers[q.id]).trim() !== '') ? '#1d4ed8' : '#b91c1c' }}>
+                                            {(answers[q.id] && String(answers[q.id]).trim() !== '') ? '✅ Sudah Terisi' : '⚠️ Belum Diisi'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowQuestionInfoModal(false)}
+                                style={{ width: '100%', padding: '12px', borderRadius: '14px', background: '#2563eb', color: '#fff', border: 'none', fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem' }}
+                            >
+                                Kembali Kerjakan Soal
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {showFinishConfirm && (
                     <div className="modal-overlay">
                         <div className="modal-content token-modal" style={{ maxWidth: '500px', textAlign: 'center' }}>
@@ -1009,6 +1125,96 @@ const StudentExams = () => {
 
                 <style>{`
                     
+                    
+                    /* Instruction Banner di Atas Soal untuk Siswa */
+                    .cbt-soal-instruction-banner {
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        padding: 12px 18px;
+                        border-radius: 14px;
+                        margin-bottom: 20px;
+                        border: 1.5px solid transparent;
+                        animation: fadeIn 0.25s ease;
+                    }
+                    .cbt-soal-instruction-banner.banner-pg {
+                        background: #eff6ff;
+                        border-color: #bfdbfe;
+                        color: #1e40af;
+                    }
+                    .cbt-soal-instruction-banner.banner-kompleks {
+                        background: #f5f3ff;
+                        border-color: #ddd6fe;
+                        color: #5b21b6;
+                    }
+                    .cbt-soal-instruction-banner.banner-tf {
+                        background: #fffbeb;
+                        border-color: #fde68a;
+                        color: #92400e;
+                    }
+                    .cbt-soal-instruction-banner.banner-essay {
+                        background: #f0fdf4;
+                        border-color: #bbf7d0;
+                        color: #166534;
+                    }
+                    .csi-icon {
+                        font-size: 1.6rem;
+                        line-height: 1;
+                        flex-shrink: 0;
+                    }
+                    .csi-content {
+                        flex: 1;
+                    }
+                    .csi-title {
+                        font-weight: 800;
+                        font-size: 0.95rem;
+                        margin-bottom: 2px;
+                    }
+                    .csi-desc {
+                        font-size: 0.83rem;
+                        line-height: 1.4;
+                        opacity: 0.9;
+                    }
+                    .csi-chip {
+                        padding: 4px 12px;
+                        border-radius: 9999px;
+                        font-size: 0.75rem;
+                        font-weight: 800;
+                        background: rgba(255, 255, 255, 0.85);
+                        white-space: nowrap;
+                        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+                        flex-shrink: 0;
+                    }
+                    /* Dark Mode overrides */
+                    body.dark-theme .cbt-soal-instruction-banner.banner-pg,
+                    .dark .cbt-soal-instruction-banner.banner-pg {
+                        background: rgba(30, 58, 138, 0.35);
+                        border-color: #1d4ed8;
+                        color: #93c5fd;
+                    }
+                    body.dark-theme .cbt-soal-instruction-banner.banner-kompleks,
+                    .dark .cbt-soal-instruction-banner.banner-kompleks {
+                        background: rgba(88, 28, 135, 0.35);
+                        border-color: #7c3aed;
+                        color: #c4b5fd;
+                    }
+                    body.dark-theme .cbt-soal-instruction-banner.banner-tf,
+                    .dark .cbt-soal-instruction-banner.banner-tf {
+                        background: rgba(120, 53, 15, 0.35);
+                        border-color: #d97706;
+                        color: #fde68a;
+                    }
+                    body.dark-theme .cbt-soal-instruction-banner.banner-essay,
+                    .dark .cbt-soal-instruction-banner.banner-essay {
+                        background: rgba(20, 83, 45, 0.35);
+                        border-color: #16a34a;
+                        color: #86efac;
+                    }
+                    body.dark-theme .csi-chip,
+                    .dark .csi-chip {
+                        background: rgba(15, 23, 42, 0.85);
+                        color: inherit;
+                    }
                     
                     /* Practice Banner */
                     .practice-banner-card {

@@ -742,6 +742,32 @@ const ExamManagement = () => {
                                 </div>
 
                                 <form onSubmit={handleSaveQuestion} className="space-y-6">
+                                    {/* Indikator & Penjelasan Format Soal Saat Dibuat/Diedit */}
+                                    <div className={`format-guide-banner ${qType === 'essay' ? 'banner-essay' : (questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'banner-tf' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'banner-kompleks' : 'banner-pg')}`}>
+                                        <div className="fgb-icon">
+                                            {qType === 'essay' ? '📝' : questionFormPG.tipeSoal === 'BENAR_SALAH' ? '⚖️' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '☑️' : '🔘'}
+                                        </div>
+                                        <div className="fgb-content">
+                                            <div className="fgb-title">
+                                                {qType === 'essay' && 'Soal Essay / Uraian (Jawaban Terbuka)'}
+                                                {qType === 'pg' && (questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Soal Pernyataan Benar / Salah (1 Pilihan Tepat)' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Soal Pilihan Ganda Kompleks (Bisa 2 atau Lebih Jawaban Benar)' : 'Soal Pilihan Ganda Biasa (1 Jawaban Benar)')}
+                                            </div>
+                                            <div className="fgb-desc">
+                                                {qType === 'essay' && 'Siswa akan menjawab dengan mengetikkan penjelasan/uraian secara mandiri. Penilaian dapat diperiksa manual oleh guru atau otomatis dibantu AI.'}
+                                                {qType === 'pg' && (
+                                                    questionFormPG.tipeSoal === 'BENAR_SALAH'
+                                                        ? 'Siswa diminta menentukan apakah pernyataan bernilai BENAR atau SALAH (pilih satu opsi).'
+                                                        : questionFormPG.tipeSoal === 'PG_KOMPLEKS'
+                                                            ? 'Soal memiliki lebih dari 1 kunci jawaban benar (misal: A & C, atau 2-3 jawaban). Klik tombol opsi (A-E) untuk menandai kunci-kunci yang benar!'
+                                                            : 'Soal hanya memiliki 1 kunci jawaban benar (Single Choice). Siswa hanya dapat memilih 1 opsi jawaban tepat.'
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="fgb-badge-pill">
+                                            {qType === 'essay' ? 'Tipe Essay' : questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Tipe Benar / Salah' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Multi Jawaban Benar' : '1 Jawaban Benar'}
+                                        </div>
+                                    </div>
+
                                     <div className="form-group-v2">
                                         <label>Isi Pertanyaan</label>
                                         <div className="editor-container-v2">
@@ -959,8 +985,12 @@ const ExamManagement = () => {
                                                 <div className="q-card-header">
                                                     <div className="q-meta">
                                                         <span className="q-number-v2">Soal {idx + 1}</span>
-                                                        <span className="q-badge-pg">
-                                                        {q.tipeSoal === 'BENAR_SALAH' ? 'Benar / Salah' : q.tipeSoal === 'PG_KOMPLEKS' ? 'PG Kompleks' : 'Pilihan Ganda'}
+                                                        <span className={`q-badge-pg ${q.tipeSoal === 'BENAR_SALAH' ? 'badge-tf' : q.tipeSoal === 'PG_KOMPLEKS' ? 'badge-kompleks' : 'badge-single'}`}>
+                                                        {q.tipeSoal === 'BENAR_SALAH'
+                                                            ? '⚖️ Benar / Salah (1 Pilihan)'
+                                                            : q.tipeSoal === 'PG_KOMPLEKS'
+                                                                ? `☑️ PG Kompleks (${(q.kunciJawaban || '').split(',').filter(Boolean).length} Kunci Benar)`
+                                                                : '🔘 PG (1 Jawaban Benar)'}
                                                     </span>
                                                     </div>
                                                     <div className="q-actions-v2">
@@ -1001,7 +1031,7 @@ const ExamManagement = () => {
                                                 <div className="q-card-header">
                                                     <div className="q-meta">
                                                         <span className="q-number-v2">Soal {questionsPG.length + idx + 1}</span>
-                                                        <span className="q-badge-essay">Essay</span>
+                                                        <span className="q-badge-essay">📝 Soal Essay / Uraian Terbuka</span>
                                                     </div>
                                                     <div className="q-actions-v2">
                                                         <button
@@ -1045,6 +1075,128 @@ const ExamManagement = () => {
 
                     <style>{`
                     .exam-management { max-width: 1400px; margin: 0 auto; } 
+                    /* Format Guide Banner Saat Buat Soal */
+                    .format-guide-banner {
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        padding: 14px 18px;
+                        border-radius: 14px;
+                        margin-bottom: 20px;
+                        border: 1.5px solid transparent;
+                        animation: fadeIn 0.3s ease;
+                    }
+                    .format-guide-banner.banner-pg {
+                        background: #eff6ff;
+                        border-color: #bfdbfe;
+                        color: #1e40af;
+                    }
+                    .format-guide-banner.banner-kompleks {
+                        background: #f5f3ff;
+                        border-color: #ddd6fe;
+                        color: #5b21b6;
+                    }
+                    .format-guide-banner.banner-tf {
+                        background: #fffbeb;
+                        border-color: #fde68a;
+                        color: #92400e;
+                    }
+                    .format-guide-banner.banner-essay {
+                        background: #f0fdf4;
+                        border-color: #bbf7d0;
+                        color: #166534;
+                    }
+                    .fgb-icon {
+                        font-size: 1.5rem;
+                        line-height: 1;
+                    }
+                    .fgb-content {
+                        flex: 1;
+                    }
+                    .fgb-title {
+                        font-weight: 800;
+                        font-size: 0.95rem;
+                        margin-bottom: 3px;
+                    }
+                    .fgb-desc {
+                        font-size: 0.82rem;
+                        line-height: 1.4;
+                        opacity: 0.9;
+                        margin: 0;
+                    }
+                    .fgb-badge-pill {
+                        padding: 5px 12px;
+                        border-radius: 9999px;
+                        font-size: 0.75rem;
+                        font-weight: 800;
+                        background: rgba(255, 255, 255, 0.8);
+                        white-space: nowrap;
+                        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                    }
+                    /* Dark Mode overrides for format guide */
+                    body.dark-theme .format-guide-banner.banner-pg,
+                    .dark .format-guide-banner.banner-pg {
+                        background: rgba(30, 58, 138, 0.3);
+                        border-color: #1d4ed8;
+                        color: #93c5fd;
+                    }
+                    body.dark-theme .format-guide-banner.banner-kompleks,
+                    .dark .format-guide-banner.banner-kompleks {
+                        background: rgba(88, 28, 135, 0.3);
+                        border-color: #7c3aed;
+                        color: #c4b5fd;
+                    }
+                    body.dark-theme .format-guide-banner.banner-tf,
+                    .dark .format-guide-banner.banner-tf {
+                        background: rgba(120, 53, 15, 0.3);
+                        border-color: #d97706;
+                        color: #fde68a;
+                    }
+                    body.dark-theme .format-guide-banner.banner-essay,
+                    .dark .format-guide-banner.banner-essay {
+                        background: rgba(20, 83, 45, 0.3);
+                        border-color: #16a34a;
+                        color: #86efac;
+                    }
+                    body.dark-theme .fgb-badge-pill,
+                    .dark .fgb-badge-pill {
+                        background: rgba(15, 23, 42, 0.8);
+                        color: inherit;
+                    }
+                    .q-badge-pg.badge-kompleks {
+                        background: #f5f3ff;
+                        color: #6d28d9;
+                        border: 1px solid #ddd6fe;
+                    }
+                    .q-badge-pg.badge-tf {
+                        background: #fffbeb;
+                        color: #b45309;
+                        border: 1px solid #fde68a;
+                    }
+                    .q-badge-pg.badge-single {
+                        background: #eff6ff;
+                        color: #1d4ed8;
+                        border: 1px solid #bfdbfe;
+                    }
+                    body.dark-theme .q-badge-pg.badge-kompleks,
+                    .dark .q-badge-pg.badge-kompleks {
+                        background: rgba(109, 40, 217, 0.2);
+                        color: #c4b5fd;
+                        border-color: #7c3aed;
+                    }
+                    body.dark-theme .q-badge-pg.badge-tf,
+                    .dark .q-badge-pg.badge-tf {
+                        background: rgba(180, 83, 9, 0.2);
+                        color: #fde68a;
+                        border-color: #d97706;
+                    }
+                    body.dark-theme .q-badge-pg.badge-single,
+                    .dark .q-badge-pg.badge-single {
+                        background: rgba(29, 78, 216, 0.2);
+                        color: #93c5fd;
+                        border-color: #2563eb;
+                    }
+                    
                     /* Tipe Soal Sub-Toggle & True-False UI */
                     .btn-type-toggle { padding: 8px 14px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
                     .btn-type-toggle:hover { background: #f1f5f9; color: #1e293b; }
