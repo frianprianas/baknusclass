@@ -21,6 +21,7 @@ public class SoalPGService {
     private final SoalPGRepository soalPGRepository;
     private final UjianMapelRepository ujianMapelRepository;
     private final KartuSoalService kartuSoalService;
+    private final JawabanPGService jawabanPGService;
 
     @Transactional
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
@@ -116,6 +117,28 @@ public class SoalPGService {
     }
 
     @CacheEvict(value = "soalPGCache", allEntries = true)
+    @Transactional
+    public SoalPGDTO updateKunciJawaban(Long id, String newKunci) {
+        SoalPG entity = soalPGRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Soal not found with ID: " + id));
+
+        String kj = newKunci != null ? newKunci.trim() : "";
+        entity.setKunciJawaban(kj);
+
+        boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
+        if (isMultiKey) {
+            entity.setTipeSoal("PG_KOMPLEKS");
+        } else if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
+            entity.setTipeSoal("BENAR_SALAH");
+        } else {
+            entity.setTipeSoal("PG_BIASA");
+        }
+
+        SoalPG saved = soalPGRepository.save(entity);
+        jawabanPGService.reevaluateAllJawabanForSoal(saved);
+        return mapToDTO(saved);
+    }
+
     public SoalPGDTO updateSoal(Long id, SoalPGDTO dto) {
         SoalPG entity = soalPGRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Soal not found"));

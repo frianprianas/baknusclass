@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface JawabanPGRepository extends JpaRepository<JawabanPG, Long> {
     Optional<JawabanPG> findBySiswaIdAndSoalPGId(Long siswaId, Long soalPGId);
+    List<JawabanPG> findBySoalPGId(Long soalPGId);
     List<JawabanPG> findBySiswaId(Long siswaId);
     List<JawabanPG> findBySoalPG_UjianMapel_Id(Long ujianMapelId);
     List<JawabanPG> findBySiswaIdAndSoalPG_UjianMapel_Id(Long siswaId, Long ujianMapelId);

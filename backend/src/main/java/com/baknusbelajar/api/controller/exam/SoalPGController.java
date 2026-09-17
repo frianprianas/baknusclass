@@ -40,6 +40,13 @@ public class SoalPGController {
         return ResponseEntity.ok(soalPGService.updateSoal(id, dto));
     }
 
+    @PutMapping("/{id}/kunci")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<SoalPGDTO> updateKunci(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        String kunci = body.get("kunciJawaban");
+        return ResponseEntity.ok(soalPGService.updateKunciJawaban(id, kunci));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

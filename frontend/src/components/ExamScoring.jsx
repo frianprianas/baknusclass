@@ -538,6 +538,35 @@ const ExamScoring = () => {
     };
 
     
+    const [editingKunciId, setEditingKunciId] = useState(null);
+    const [tempKunciMap, setTempKunciMap] = useState({});
+    const [isSavingKunci, setIsSavingKunci] = useState(false);
+
+    const handleSaveUpdatedKunci = async (soalId) => {
+        const keys = tempKunciMap[soalId] || [];
+        if (keys.length === 0) {
+            alert('Pilih minimal satu kunci jawaban!');
+            return;
+        }
+        const newKunciStr = keys.join(',');
+        setIsSavingKunci(true);
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.put(`/api/exam/soal-pg/${soalId}/kunci`, { kunciJawaban: newKunciStr }, { headers });
+            alert(`Berhasil! Kunci jawaban untuk Soal ini diperbarui menjadi "${newKunciStr}". Nilai seluruh siswa telah dihitung ulang otomatis!`);
+            setEditingKunciId(null);
+            if (selectedExam) {
+                handleSelectExam(selectedExam);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Gagal memperbarui kunci jawaban: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsSavingKunci(false);
+        }
+    };
+
     const handleResetStudentExam = async (targetStudent = null) => {
         const student = targetStudent || selectedStudent;
         if (!student || !selectedExam) return;
@@ -1158,11 +1187,97 @@ const ExamScoring = () => {
                                                         {/* Summary evaluation box */}
                                                         <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                                                             <div>
-                                                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                                                    Jawaban Siswa: <strong style={{ color: '#0f172a' }}>{studentChoice || '(Kosong / Tidak Dijawab)'}</strong>
-                                                                    {' '}&bull;{' '}
-                                                                    Kunci Jawaban: <strong style={{ color: '#16a34a' }}>{keyAnswer}</strong>
+                                                                <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                                                    <span>Jawaban Siswa: <strong style={{ color: '#0f172a' }}>{studentChoice || '(Kosong / Tidak Dijawab)'}</strong></span>
+                                                                    <span>&bull;</span>
+                                                                    <span>Kunci Jawaban: <strong style={{ color: '#16a34a' }}>{keyAnswer}</strong></span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setEditingKunciId(editingKunciId === q.id ? null : q.id);
+                                                                            setTempKunciMap(prev => ({
+                                                                                ...prev,
+                                                                                [q.id]: (q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+                                                                            }));
+                                                                        }}
+                                                                        style={{
+                                                                            background: '#e0e7ff',
+                                                                            color: '#4338ca',
+                                                                            border: '1px solid #c7d2fe',
+                                                                            padding: '3px 8px',
+                                                                            borderRadius: '6px',
+                                                                            fontSize: '0.75rem',
+                                                                            fontWeight: 800,
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                        title="Koreksi kunci jawaban jika kunci pada soal ini salah atau kurang lengkap"
+                                                                    >
+                                                                        ✏️ Koreksi Kunci Jawaban
+                                                                    </button>
                                                                 </div>
+                                                                {editingKunciId === q.id && (
+                                                                    <div style={{ marginTop: '10px', padding: '10px 14px', background: '#eff6ff', borderRadius: '8px', border: '1.5px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e40af' }}>Pilih Kunci:</span>
+                                                                        {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                                            const curList = tempKunciMap[q.id] || [];
+                                                                            const isChecked = curList.includes(opt);
+                                                                            return (
+                                                                                <button
+                                                                                    key={opt}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        const nextList = isChecked ? curList.filter(k => k !== opt) : [...curList, opt].sort();
+                                                                                        setTempKunciMap({ ...tempKunciMap, [q.id]: nextList });
+                                                                                    }}
+                                                                                    style={{
+                                                                                        padding: '4px 10px',
+                                                                                        borderRadius: '6px',
+                                                                                        border: isChecked ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                                                                        background: isChecked ? '#2563eb' : '#fff',
+                                                                                        color: isChecked ? '#fff' : '#334155',
+                                                                                        fontWeight: 800,
+                                                                                        fontSize: '0.8rem',
+                                                                                        cursor: 'pointer'
+                                                                                    }}
+                                                                                >
+                                                                                    {isChecked ? '✓ ' : ''}{opt}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleSaveUpdatedKunci(q.id)}
+                                                                            disabled={isSavingKunci}
+                                                                            style={{
+                                                                                background: '#16a34a',
+                                                                                color: '#fff',
+                                                                                border: 'none',
+                                                                                padding: '5px 12px',
+                                                                                borderRadius: '6px',
+                                                                                fontWeight: 800,
+                                                                                fontSize: '0.78rem',
+                                                                                cursor: 'pointer'
+                                                                            }}
+                                                                        >
+                                                                            {isSavingKunci ? 'Menyimpan...' : 'Simpan & Hitung Ulang'}
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setEditingKunciId(null)}
+                                                                            style={{
+                                                                                background: '#f1f5f9',
+                                                                                color: '#475569',
+                                                                                border: '1px solid #cbd5e1',
+                                                                                padding: '5px 10px',
+                                                                                borderRadius: '6px',
+                                                                                fontSize: '0.78rem',
+                                                                                cursor: 'pointer'
+                                                                            }}
+                                                                        >
+                                                                            Batal
+                                                                        </button>
+                                                                    </div>
+                                                                )}
                                                                 <div style={{ marginTop: '4px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                     {earnedScore >= (q.bobotNilai || 2) ? (
                                                                         <span style={{ color: '#16a34a', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>

@@ -225,6 +225,18 @@ public class JawabanPGService {
         return clean;
     }
 
+    @Transactional
+    public void reevaluateAllJawabanForSoal(SoalPG soal) {
+        List<JawabanPG> list = jawabanPGRepository.findBySoalPGId(soal.getId());
+        for (JawabanPG j : list) {
+            ScoringResult res = calculateScore(soal, j.getJawaban());
+            j.setSkor(res.skor);
+            j.setIsCorrect(res.isCorrect);
+            jawabanPGRepository.save(j);
+        }
+        log.info("Re-evaluated {} student answers for Soal ID: {}", list.size(), soal.getId());
+    }
+
     public ScoringResult calculateScore(SoalPG soal, String jawabanSiswa) {
         if (jawabanSiswa == null || jawabanSiswa.trim().isEmpty()) {
             return new ScoringResult(0.0, false);

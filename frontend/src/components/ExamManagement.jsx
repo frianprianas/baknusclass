@@ -1088,34 +1088,52 @@ const ExamManagement = () => {
                                                             </span>
                                                         )}
                                                     </div>
+                                                    {/* Visual Indicator of Selected Keys */}
+                                                    <div style={{ padding: '10px 14px', background: '#eef2ff', borderRadius: '8px', border: '1.5px solid #c7d2fe', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                            <span style={{ fontSize: '0.85rem', color: '#312e81', fontWeight: 800 }}>Kunci Jawaban Terpilih:</span>
+                                                            {((questionFormPG.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)).map(k => (
+                                                                <span key={k} style={{ background: '#4338ca', color: '#fff', padding: '3px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '0.85rem' }}>
+                                                                    ✓ Opsi {k}
+                                                                </span>
+                                                            ))}
+                                                            {!(questionFormPG.kunciJawaban || '').trim() && (
+                                                                <span style={{ color: '#ef4444', fontSize: '0.8rem', fontStyle: 'italic' }}>Belum ada kunci dipilih</span>
+                                                            )}
+                                                        </div>
+                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px', background: (questionFormPG.kunciJawaban || '').includes(',') || (questionFormPG.kunciJawaban || '').trim().length > 1 ? '#dcfce7' : '#f1f5f9', color: (questionFormPG.kunciJawaban || '').includes(',') || (questionFormPG.kunciJawaban || '').trim().length > 1 ? '#15803d' : '#64748b' }}>
+                                                            {(questionFormPG.kunciJawaban || '').includes(',') || (questionFormPG.kunciJawaban || '').trim().length > 1 ? '✓ Mode PG Kompleks (Multi Kunci)' : 'Mode PG Biasa (1 Kunci)'}
+                                                        </span>
+                                                    </div>
+
                                                     <div className="space-y-3">
                                                         {['A', 'B', 'C', 'D', 'E'].map(opt => {
                                                             const selectedKeys = (questionFormPG.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-                                                            const isSelected = questionFormPG.tipeSoal === 'PG_KOMPLEKS'
-                                                                ? selectedKeys.includes(opt)
-                                                                : questionFormPG.kunciJawaban === opt;
+                                                            const isSelected = selectedKeys.includes(opt);
 
                                                             return (
                                                                 <div key={opt} className={`opt-input-v2 ${isSelected ? 'selected' : ''}`}>
                                                                     <button
                                                                         type="button"
-                                                                        className="opt-check"
+                                                                        className={`opt-check ${isSelected ? 'is-key-selected' : ''}`}
                                                                         onClick={() => {
-                                                                            if (questionFormPG.tipeSoal === 'PG_KOMPLEKS') {
-                                                                                let newKeys;
-                                                                                if (selectedKeys.includes(opt)) {
-                                                                                    newKeys = selectedKeys.filter(k => k !== opt);
-                                                                                } else {
-                                                                                    newKeys = [...selectedKeys, opt].sort();
-                                                                                }
-                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: newKeys.join(',') || 'A' });
+                                                                            let newKeys;
+                                                                            if (selectedKeys.includes(opt)) {
+                                                                                newKeys = selectedKeys.filter(k => k !== opt);
                                                                             } else {
-                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: opt });
+                                                                                newKeys = [...selectedKeys, opt].sort();
                                                                             }
+                                                                            const finalKunci = newKeys.join(',') || opt;
+                                                                            setQuestionFormPG({
+                                                                                ...questionFormPG,
+                                                                                kunciJawaban: finalKunci,
+                                                                                tipeSoal: newKeys.length > 1 ? 'PG_KOMPLEKS' : questionFormPG.tipeSoal
+                                                                            });
                                                                         }}
-                                                                        title={questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Klik untuk toggle kunci jawaban' : 'Jadikan sebagai kunci jawaban'}
+                                                                        style={isSelected ? { background: '#4338ca', color: '#fff', borderColor: '#3730a3' } : {}}
+                                                                        title={isSelected ? 'Kunci terpilih (klik untuk batalkan)' : 'Klik untuk jadikan sebagai kunci jawaban'}
                                                                     >
-                                                                        {opt}
+                                                                        {isSelected ? `✓ ${opt}` : opt}
                                                                     </button>
                                                                     <input
                                                                         type="text"
