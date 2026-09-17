@@ -576,14 +576,14 @@ const ExamManagement = () => {
         const headers = { Authorization: `Bearer ${token}` };
         try {
             if (qType === 'essay') {
-                const body = { ...questionForm, ujianMapelId: viewingQuestions.id };
+                const body = { ...questionForm, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
                 if (editingQuestion) {
                     await axios.put(`/api/exam/soal-essay/${editingQuestion.id}`, body, { headers });
                 } else {
                     await axios.post('/api/exam/soal-essay', body, { headers });
                 }
             } else {
-                const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id };
+                const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
                 if (editingQuestion) {
                     await axios.put(`/api/exam/soal-pg/${editingQuestion.id}`, body, { headers });
                 } else {

@@ -30,8 +30,12 @@ public class SoalEssayService {
 
     @CacheEvict(value = "soalEssayCache", allEntries = true)
     public SoalEssayDTO createSoal(SoalEssayDTO dto) {
-        UjianMapel ujian = ujianMapelRepository.findById(dto.getUjianMapelId())
-                .orElseThrow(() -> new RuntimeException("UjianMapel not found"));
+        Long uId = dto.getUjianMapelId() != null ? dto.getUjianMapelId() : dto.getUjianId();
+        if (uId == null) {
+            throw new IllegalArgumentException("ID Ujian tidak boleh kosong (ujianMapelId / ujianId wajib ada)");
+        }
+        UjianMapel ujian = ujianMapelRepository.findById(uId)
+                .orElseThrow(() -> new RuntimeException("UjianMapel tidak ditemukan dengan ID: " + uId));
 
         SoalEssay entity = new SoalEssay();
         entity.setUjianMapel(ujian);
@@ -40,8 +44,12 @@ public class SoalEssayService {
         entity.setBobotNilai(dto.getBobotNilai());
 
         SoalEssay saved = soalEssayRepository.save(entity);
-        kartuSoalService.generateAndUploadAutoKartuSoal(ujian, dto.getPertanyaan(), dto.getKunciJawaban(),
-                dto.getBobotNilai(), "Essay");
+        try {
+            kartuSoalService.generateAndUploadAutoKartuSoal(ujian, dto.getPertanyaan(), dto.getKunciJawaban(),
+                    dto.getBobotNilai(), "Essay");
+        } catch (Exception e) {
+            // Do not fail DB save if drive upload has an issue
+        }
         return mapToDTO(saved, true);
     }
 

@@ -33,8 +33,12 @@ public class SoalPGService {
 
     @CacheEvict(value = "soalPGCache", allEntries = true)
     public SoalPGDTO createSoal(SoalPGDTO dto) {
-        UjianMapel ujian = ujianMapelRepository.findById(dto.getUjianId())
-                .orElseThrow(() -> new RuntimeException("Ujian not found"));
+        Long uId = dto.getUjianId() != null ? dto.getUjianId() : dto.getUjianMapelId();
+        if (uId == null) {
+            throw new IllegalArgumentException("ID Ujian tidak boleh kosong (ujianId / ujianMapelId wajib ada)");
+        }
+        UjianMapel ujian = ujianMapelRepository.findById(uId)
+                .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan dengan ID: " + uId));
 
         SoalPG entity = new SoalPG();
         entity.setUjianMapel(ujian);
@@ -46,14 +50,19 @@ public class SoalPGService {
         entity.setPilihanE(dto.getPilihanE());
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        if (dto.getTipeSoal() != null) entity.setTipeSoal(dto.getTipeSoal());
         entity.setTipeSoal(dto.getTipeSoal() != null ? dto.getTipeSoal() : "PG_BIASA");
 
         SoalPG saved = soalPGRepository.save(entity);
         String fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
                 dto.getPertanyaan(), dto.getPilihanA(), dto.getPilihanB(), dto.getPilihanC(), dto.getPilihanD(),
                 dto.getPilihanE() != null ? dto.getPilihanE() : "-");
-        kartuSoalService.generateAndUploadAutoKartuSoal(ujian, fullPertanyaan, dto.getKunciJawaban(),
-                dto.getBobotNilai(), "PG");
+        try {
+            kartuSoalService.generateAndUploadAutoKartuSoal(ujian, fullPertanyaan, dto.getKunciJawaban(),
+                    dto.getBobotNilai(), "PG");
+        } catch (Exception e) {
+            // Do not fail DB save if drive upload has an issue
+        }
 
         return mapToDTO(saved);
     }

@@ -143,9 +143,9 @@ public class KartuSoalService {
             subRun.setText(request.getJudul());
 
             // Info Section
-            addInfoRow(document, "Mata Pelajaran", ujian.getMapel().getNamaMapel());
-            addInfoRow(document, "Guru Pengampu", ujian.getGuru().getNamaLengkap());
-            addInfoRow(document, "Event", ujian.getEventUjian().getNamaEvent());
+            addInfoRow(document, "Mata Pelajaran", ujian.getMapel() != null ? ujian.getMapel().getNamaMapel() : "-");
+            addInfoRow(document, "Guru Pengampu", ujian.getGuru() != null ? ujian.getGuru().getNamaLengkap() : "-");
+            addInfoRow(document, "Event", ujian.getEventUjian() != null ? ujian.getEventUjian().getNamaEvent() : "-");
             if (request.getBobotNilai() != null) {
                 addInfoRow(document, "Bobot Nilai", String.valueOf(request.getBobotNilai()));
             }
