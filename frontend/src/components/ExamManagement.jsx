@@ -405,8 +405,12 @@ const ExamManagement = () => {
         const startDate = new Date(startIso);
         const endDate = new Date(startDate.getTime() + (Number(examForm.durasi) || 0) * 60 * 1000);
 
+        let sanitizedToken = (examForm.token || '').trim().toUpperCase();
+        if (sanitizedToken.length > 20) sanitizedToken = sanitizedToken.substring(0, 20);
+
         const payload = {
             ...examForm,
+            token: sanitizedToken,
             waktuMulai: startDate.toISOString(),
             mapelId: Number(examForm.mapelId),
             guruId: Number(examForm.guruId),
@@ -1638,7 +1642,7 @@ const ExamManagement = () => {
                                             waktuMulai: isLatihan ? new Date().toISOString().substring(0, 16) : '',
                                             waktuSelesai: '',
                                             durasi: isLatihan ? 0 : 90,
-                                            token: isLatihan ? 'LATIHAN' : '',
+                                            token: isLatihan ? 'LATIH' : '',
                                             kelasIds: []
                                         });
                                         setIsModalOpen(true);
@@ -2003,7 +2007,8 @@ const ExamManagement = () => {
                                                     value={examForm.token || ''} 
                                                     onChange={(e) => setExamForm({ ...examForm, token: e.target.value.toUpperCase() })} 
                                                     style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '1.2rem', fontWeight: 800, color: '#2563eb', letterSpacing: '2px', width: '100%' }}
-                                                    placeholder="Input manual / kosongkan utk auto"
+                                                    placeholder="Maks 20 karakter / kosongkan"
+                                                    maxLength={20}
                                                 />
                                             </div>
                                             <button 

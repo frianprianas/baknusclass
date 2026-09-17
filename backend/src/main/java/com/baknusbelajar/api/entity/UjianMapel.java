@@ -51,7 +51,7 @@ public class UjianMapel {
     @Column(name = "durasi")
     private Integer durasi; // in minutes
 
-    @Column(length = 6)
+    @Column(length = 20)
     private String token;
 
     @Column(name = "tampilkan_nilai")
