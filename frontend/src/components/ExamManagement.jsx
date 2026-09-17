@@ -587,6 +587,18 @@ const ExamManagement = () => {
                 }
             } else {
                 const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
+                // Pastikan pilihan C, D, E tidak null/kosong agar tidak terkena constraint ORA-01400 pada Oracle
+                if (body.tipeSoal === 'BENAR_SALAH') {
+                    body.pilihanA = body.pilihanA || 'Benar';
+                    body.pilihanB = body.pilihanB || 'Salah';
+                    body.pilihanC = body.pilihanC || '-';
+                    body.pilihanD = body.pilihanD || '-';
+                    body.pilihanE = body.pilihanE || '-';
+                } else {
+                    body.pilihanC = body.pilihanC || '-';
+                    body.pilihanD = body.pilihanD || '-';
+                    body.pilihanE = body.pilihanE || '-';
+                }
                 if (isEditing) {
                     await axios.put(`/api/exam/soal-pg/${editingQuestion.id}`, body, { headers });
                 } else {
@@ -1005,7 +1017,10 @@ const ExamManagement = () => {
                                                 <div className="q-card-body">
                                                     <div className="q-text-v2" dangerouslySetInnerHTML={{ __html: q.pertanyaan }}></div>
                                                     <div className="q-options-v2">
-                                                        {['A', 'B', 'C', 'D', 'E'].map(opt => q[`pilihan${opt} `] && (
+                                                        {(q.tipeSoal === 'BENAR_SALAH' ? ['A', 'B'] : ['A', 'B', 'C', 'D', 'E']).map(opt => {
+                                                            const optVal = q[`pilihan${opt} `];
+                                                            if (!optVal || (q.tipeSoal === 'BENAR_SALAH' && optVal === '-')) return null;
+                                                            return (
                                                             <div key={opt} className={`opt-item-v2 ${((q.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).includes(opt)) ? 'is-correct' : ''}`}>
                                                                 <div className="opt-marker">{opt}</div>
                                                                 <div className="opt-text">{q[`pilihan${opt} `]}</div>
@@ -1013,7 +1028,8 @@ const ExamManagement = () => {
                                                                     <div className="correct-check"><CheckCircle2 size={14} /></div>
                                                                 )}
                                                             </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                                 <div className="q-card-footer">

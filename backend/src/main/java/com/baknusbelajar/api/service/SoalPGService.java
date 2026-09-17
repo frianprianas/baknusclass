@@ -43,20 +43,26 @@ public class SoalPGService {
         SoalPG entity = new SoalPG();
         entity.setUjianMapel(ujian);
         entity.setPertanyaan(dto.getPertanyaan());
-        entity.setPilihanA(dto.getPilihanA());
-        entity.setPilihanB(dto.getPilihanB());
-        entity.setPilihanC(dto.getPilihanC());
-        entity.setPilihanD(dto.getPilihanD());
-        entity.setPilihanE(dto.getPilihanE());
+        entity.setPilihanA(dto.getPilihanA() != null && !dto.getPilihanA().trim().isEmpty() ? dto.getPilihanA() : "Benar");
+        entity.setPilihanB(dto.getPilihanB() != null && !dto.getPilihanB().trim().isEmpty() ? dto.getPilihanB() : "Salah");
+        entity.setPilihanC(dto.getPilihanC() != null && !dto.getPilihanC().trim().isEmpty() ? dto.getPilihanC() : "-");
+        entity.setPilihanD(dto.getPilihanD() != null && !dto.getPilihanD().trim().isEmpty() ? dto.getPilihanD() : "-");
+        entity.setPilihanE(dto.getPilihanE() != null && !dto.getPilihanE().trim().isEmpty() ? dto.getPilihanE() : "-");
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
         if (dto.getTipeSoal() != null) entity.setTipeSoal(dto.getTipeSoal());
         entity.setTipeSoal(dto.getTipeSoal() != null ? dto.getTipeSoal() : "PG_BIASA");
 
         SoalPG saved = soalPGRepository.save(entity);
-        String fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
-                dto.getPertanyaan(), dto.getPilihanA(), dto.getPilihanB(), dto.getPilihanC(), dto.getPilihanD(),
-                dto.getPilihanE() != null ? dto.getPilihanE() : "-");
+        String fullPertanyaan;
+        if ("BENAR_SALAH".equalsIgnoreCase(entity.getTipeSoal())) {
+            fullPertanyaan = String.format("%s<br>A. %s<br>B. %s (Format Pernyataan Benar/Salah)",
+                    dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB());
+        } else {
+            fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
+                    dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(), entity.getPilihanC(), entity.getPilihanD(),
+                    entity.getPilihanE() != null ? entity.getPilihanE() : "-");
+        }
         try {
             kartuSoalService.generateAndUploadAutoKartuSoal(ujian, fullPertanyaan, dto.getKunciJawaban(),
                     dto.getBobotNilai(), "PG");
@@ -78,18 +84,24 @@ public class SoalPGService {
                 .orElseThrow(() -> new RuntimeException("Soal not found"));
 
         entity.setPertanyaan(dto.getPertanyaan());
-        entity.setPilihanA(dto.getPilihanA());
-        entity.setPilihanB(dto.getPilihanB());
-        entity.setPilihanC(dto.getPilihanC());
-        entity.setPilihanD(dto.getPilihanD());
-        entity.setPilihanE(dto.getPilihanE());
+        entity.setPilihanA(dto.getPilihanA() != null && !dto.getPilihanA().trim().isEmpty() ? dto.getPilihanA() : "Benar");
+        entity.setPilihanB(dto.getPilihanB() != null && !dto.getPilihanB().trim().isEmpty() ? dto.getPilihanB() : "Salah");
+        entity.setPilihanC(dto.getPilihanC() != null && !dto.getPilihanC().trim().isEmpty() ? dto.getPilihanC() : "-");
+        entity.setPilihanD(dto.getPilihanD() != null && !dto.getPilihanD().trim().isEmpty() ? dto.getPilihanD() : "-");
+        entity.setPilihanE(dto.getPilihanE() != null && !dto.getPilihanE().trim().isEmpty() ? dto.getPilihanE() : "-");
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
 
         SoalPG saved = soalPGRepository.save(entity);
-        String fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
-                dto.getPertanyaan(), dto.getPilihanA(), dto.getPilihanB(), dto.getPilihanC(), dto.getPilihanD(),
-                dto.getPilihanE() != null ? dto.getPilihanE() : "-");
+        String fullPertanyaan;
+        if ("BENAR_SALAH".equalsIgnoreCase(entity.getTipeSoal())) {
+            fullPertanyaan = String.format("%s<br>A. %s<br>B. %s (Format Pernyataan Benar/Salah)",
+                    dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB());
+        } else {
+            fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
+                    dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(), entity.getPilihanC(), entity.getPilihanD(),
+                    entity.getPilihanE() != null ? entity.getPilihanE() : "-");
+        }
         kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), fullPertanyaan, dto.getKunciJawaban(),
                 dto.getBobotNilai(), "PG_Update");
 
