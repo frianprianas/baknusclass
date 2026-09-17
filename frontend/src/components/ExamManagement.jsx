@@ -151,6 +151,7 @@ const ExamManagement = () => {
     const [editingQuestion, setEditingQuestion] = useState(null);
     const fileInputRef = useRef(null);
     const [uploadingExam, setUploadingExam] = useState(null);
+    const [savingQuestion, setSavingQuestion] = useState(false);
 
     // Kartu Soal States
     const [isKartuModalOpen, setIsKartuModalOpen] = useState(false);
@@ -574,28 +575,33 @@ const ExamManagement = () => {
         e.preventDefault();
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
+        setSavingQuestion(true);
         try {
+            const isEditing = !!editingQuestion;
             if (qType === 'essay') {
                 const body = { ...questionForm, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
-                if (editingQuestion) {
+                if (isEditing) {
                     await axios.put(`/api/exam/soal-essay/${editingQuestion.id}`, body, { headers });
                 } else {
                     await axios.post('/api/exam/soal-essay', body, { headers });
                 }
             } else {
                 const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
-                if (editingQuestion) {
+                if (isEditing) {
                     await axios.put(`/api/exam/soal-pg/${editingQuestion.id}`, body, { headers });
                 } else {
                     await axios.post('/api/exam/soal-pg', body, { headers });
                 }
             }
             resetQuestionForm();
-            handleManageQuestions(viewingQuestions);
+            await handleManageQuestions(viewingQuestions);
+            alert(`Berhasil! Soal berhasil ${isEditing ? 'diperbarui' : 'disimpan'}.`);
         } catch (err) {
             console.error(err);
             const msg = err.response?.data?.message || err.message || 'Gagal simpan soal';
             alert('Error Simpan: ' + msg);
+        } finally {
+            setSavingQuestion(false);
         }
     };
 
@@ -624,15 +630,15 @@ const ExamManagement = () => {
     };
 
     const handleDeleteSoal = async (id, type) => {
-        alert('DEBUG: Clicked Hapus Soal ID ' + id + ', Type: ' + type);
-        if (!window.confirm('Hapus soal ini?')) return;
+        if (!window.confirm('Yakin ingin menghapus soal ini?')) return;
         const token = localStorage.getItem('token');
         try {
             const endpoint = type === 'essay' ? `/api/exam/soal-essay/${id}` : `/api/exam/soal-pg/${id}`;
             await axios.delete(endpoint, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            handleManageQuestions(viewingQuestions);
+            await handleManageQuestions(viewingQuestions);
+            alert('Soal berhasil dihapus.');
         } catch (err) {
             alert('Gagal hapus soal');
         }
@@ -905,9 +911,9 @@ const ExamManagement = () => {
                                     </div>
 
                                     <div className="form-actions-v2">
-                                        <button type="submit" className="btn-save-v2">
-                                            {editingQuestion ? <Save size={20} /> : <Plus size={20} />}
-                                            <span>{editingQuestion ? 'Perbarui Soal' : 'Simpan Soal'}</span>
+                                        <button type="submit" className="btn-save-v2" disabled={savingQuestion}>
+                                            {savingQuestion ? <RefreshCw size={20} className="animate-spin" /> : (editingQuestion ? <Save size={20} /> : <Plus size={20} />)}
+                                            <span>{savingQuestion ? 'Menyimpan...' : (editingQuestion ? 'Perbarui Soal' : 'Simpan Soal')}</span>
                                         </button>
 
                                         {editingQuestion && (
