@@ -2320,7 +2320,7 @@ const StudentExams = () => {
                                     </div>
                                 </div>
 
-                                {ex.isFinished || JSON.parse(localStorage.getItem('finishedExams') || '{}')[`${user.profileId}_${ex.id}`] ? (
+                                {ex.isFinished ? (
                                     <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                                         {ex.tampilkanNilai && (
                                             <button className="start-btn" style={{ flex: 1, background: '#ecfdf5', color: '#10b981', borderColor: '#10b981' }} onClick={() => handleViewTranscript(ex)}>

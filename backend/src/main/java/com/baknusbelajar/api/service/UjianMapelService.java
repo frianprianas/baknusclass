@@ -40,6 +40,7 @@ public class UjianMapelService {
     private final JawabanPGService jawabanPGService;
     private final com.baknusbelajar.api.repository.SoalPGRepository soalPGRepository;
     private final com.baknusbelajar.api.repository.JawabanPGRepository jawabanPGRepository;
+    private final ExamStatusService examStatusService;
 
     public List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO> getExamMonitoring(Long ujianId,
             java.util.Set<String> onlineStudents) {
@@ -407,5 +408,63 @@ public class UjianMapelService {
         }
         
         return dto;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void resetUjianForStudent(Long ujianId, Long siswaId) {
+        log.info("Resetting exam ID {} for student ID {}", ujianId, siswaId);
+
+        // 1. Hapus record status pengerjaan siswa pada ujian ini
+        siswaUjianStatusRepository.findBySiswaIdAndUjianMapelId(siswaId, ujianId).ifPresent(status -> {
+            siswaUjianStatusRepository.delete(status);
+        });
+
+        // 2. Hapus seluruh jawaban PG siswa pada ujian ini
+        var pgAnswers = jawabanPGRepository.findBySiswaIdAndSoalPG_UjianMapel_Id(siswaId, ujianId);
+        if (pgAnswers != null && !pgAnswers.isEmpty()) {
+            jawabanPGRepository.deleteAll(pgAnswers);
+        }
+
+        // 3. Hapus seluruh jawaban Essay siswa pada ujian ini
+        var essayAnswers = jawabanSiswaRepository.findBySiswaIdAndSoalEssay_UjianMapel_Id(siswaId, ujianId);
+        if (essayAnswers != null && !essayAnswers.isEmpty()) {
+            jawabanSiswaRepository.deleteAll(essayAnswers);
+        }
+
+        // 4. Reset device lock dan sesi aktif di redis jika ada
+        siswaRepository.findById(siswaId).ifPresent(siswa -> {
+            if (siswa.getNisn() != null && examStatusService != null) {
+                try {
+                    examStatusService.resetPeserta(ujianId, siswa.getNisn());
+                    examStatusService.removeStudent(ujianId, siswa.getNisn(), siswa.getNamaLengkap());
+                } catch (Exception e) {
+                    log.warn("Redis resetPeserta ignored: {}", e.getMessage());
+                }
+            }
+        });
+
+        log.info("Exam ID {} reset successfully for student ID {}", ujianId, siswaId);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void resetUjianForAllStudents(Long ujianId) {
+        log.info("Resetting exam ID {} for all students", ujianId);
+
+        var statuses = siswaUjianStatusRepository.findByUjianMapelId(ujianId);
+        if (statuses != null && !statuses.isEmpty()) {
+            siswaUjianStatusRepository.deleteAll(statuses);
+        }
+
+        var pgAnswers = jawabanPGRepository.findBySoalPG_UjianMapel_Id(ujianId);
+        if (pgAnswers != null && !pgAnswers.isEmpty()) {
+            jawabanPGRepository.deleteAll(pgAnswers);
+        }
+
+        var essayAnswers = jawabanSiswaRepository.findBySoalEssay_UjianMapel_Id(ujianId);
+        if (essayAnswers != null && !essayAnswers.isEmpty()) {
+            jawabanSiswaRepository.deleteAll(essayAnswers);
+        }
+
+        log.info("Exam ID {} reset successfully for all students", ujianId);
     }
 }

@@ -166,4 +166,18 @@ public class UjianMapelController {
         examStatusService.removeStudent(id, nisn, "");
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/{id}/reset-siswa/{siswaId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<String> resetUjianSiswa(@PathVariable Long id, @PathVariable Long siswaId) {
+        ujianMapelService.resetUjianForStudent(id, siswaId);
+        return ResponseEntity.ok("Ujian berhasil direset untuk siswa tersebut. Siswa sekarang dapat mengulang ujian.");
+    }
+
+    @PostMapping("/{id}/reset-all")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<String> resetUjianAll(@PathVariable Long id) {
+        ujianMapelService.resetUjianForAllStudents(id);
+        return ResponseEntity.ok("Ujian berhasil direset untuk seluruh siswa.");
+    }
 }

@@ -537,6 +537,25 @@ const ExamScoring = () => {
         }
     };
 
+    
+    const handleResetStudentExam = async () => {
+        if (!selectedStudent || !selectedExam) return;
+        const confirmMsg = `Yakin ingin mengizinkan ${selectedStudent.namaSiswa} untuk mengulang ujian ini?\n\nStatus pengerjaan dan seluruh jawaban siswa sebelumnya akan direset agar siswa dapat mulai mengerjakan kembali dari nomor 1.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/reset-siswa/${selectedStudent.siswaId}`, {}, { headers });
+            alert(`Berhasil! Ujian untuk ${selectedStudent.namaSiswa} telah direset. Siswa sekarang dapat membuka menu ujian dan mengulanginya.`);
+            setSelectedStudent(null);
+            fetchExamData();
+        } catch (err) {
+            console.error('Failed to reset exam for student', err);
+            alert('Gagal mereset ujian siswa: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
     const handleSyncToDrive = async () => {
         if (!selectedExam) return;
         setLoadingSync(true);
