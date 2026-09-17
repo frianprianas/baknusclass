@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
-    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw
+    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw, RotateCcw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -538,21 +538,43 @@ const ExamScoring = () => {
     };
 
     
-    const handleResetStudentExam = async () => {
-        if (!selectedStudent || !selectedExam) return;
-        const confirmMsg = `Yakin ingin mengizinkan ${selectedStudent.namaSiswa} untuk mengulang ujian ini?\n\nStatus pengerjaan dan seluruh jawaban siswa sebelumnya akan direset agar siswa dapat mulai mengerjakan kembali dari nomor 1.`;
+    const handleResetStudentExam = async (targetStudent = null) => {
+        const student = targetStudent || selectedStudent;
+        if (!student || !selectedExam) return;
+        const confirmMsg = `Yakin ingin mengizinkan ${student.namaSiswa} untuk mengulang ujian ini?\n\nStatus pengerjaan dan seluruh jawaban siswa sebelumnya akan direset agar siswa dapat mulai mengerjakan kembali dari nomor 1.`;
         if (!window.confirm(confirmMsg)) return;
 
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
-            await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/reset-siswa/${selectedStudent.siswaId}`, {}, { headers });
-            alert(`Berhasil! Ujian untuk ${selectedStudent.namaSiswa} telah direset. Siswa sekarang dapat membuka menu ujian dan mengulanginya.`);
-            setSelectedStudent(null);
+            await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/reset-siswa/${student.siswaId}`, {}, { headers });
+            alert(`Berhasil! Ujian untuk ${student.namaSiswa} telah direset. Siswa sekarang dapat membuka menu ujian dan mengulanginya.`);
+            if (selectedStudent?.siswaId === student.siswaId) {
+                setSelectedStudent(null);
+            }
             fetchExamData();
         } catch (err) {
             console.error('Failed to reset exam for student', err);
             alert('Gagal mereset ujian siswa: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const handleResetAllExam = async () => {
+        if (!selectedExam) return;
+        const confirmMsg = `PERINGATAN: Yakin ingin mereset SEMUA peserta ujian untuk mapel ini?\n\nSeluruh status pengerjaan siswa akan direset dan mereka dapat mengulang ujian kembali dari awal.`;
+        if (!window.confirm(confirmMsg)) return;
+        if (!window.confirm(`Konfirmasi sekali lagi: Reset SEMUA (${studentsData.length}) peserta ujian?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/reset-all`, {}, { headers });
+            alert('Berhasil! Seluruh peserta ujian telah direset dan dapat mengulang ujian.');
+            setSelectedStudent(null);
+            fetchExamData();
+        } catch (err) {
+            console.error('Failed to reset all students', err);
+            alert('Gagal mereset semua ujian: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -840,8 +862,29 @@ const ExamScoring = () => {
                     <div className="scoring-grid">
                         {/* LEFT: STUDENT LIST */}
                         <div className="student-list-card">
-                            <div className="list-title">
-                                <UserCheck size={18} /> Daftar Submisi Siswa ({studentsData.length})
+                            <div className="list-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span><UserCheck size={18} /> Daftar Submisi Siswa ({studentsData.length})</span>
+                                {studentsData.length > 0 && (
+                                    <button
+                                        onClick={handleResetAllExam}
+                                        title="Izinkan SEMUA siswa mengulang ujian ini dari awal"
+                                        style={{
+                                            background: '#fef2f2',
+                                            color: '#b91c1c',
+                                            border: '1px solid #fecaca',
+                                            padding: '4px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.7rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        <RotateCcw size={11} /> Reset Semua
+                                    </button>
+                                )}
                             </div>
                             {loading ? <p className="p-4 text-center">Memuat jawaban...</p> : (
                                 <div className="student-scroll">
@@ -889,6 +932,30 @@ const ExamScoring = () => {
                                                         <Clock size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                                                         Durasi: <strong>{std.durasiStr}</strong>
                                                     </div>
+                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleResetStudentExam(std);
+                                                            }}
+                                                            style={{
+                                                                background: '#fff7ed',
+                                                                color: '#c2410c',
+                                                                border: '1px solid #fed7aa',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                            title="Izinkan siswa ini mengulang ujian"
+                                                        >
+                                                            <RotateCcw size={11} /> Ujian Ulang
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -915,6 +982,32 @@ const ExamScoring = () => {
                                             <h2>Koreksi: {selectedStudent.namaSiswa}</h2>
                                             <div style={{ color: '#64748b', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                                                 <Clock size={14} /> Waktu Mengerjakan: <strong>{selectedStudent.durasiStr}</strong>
+                                            </div>
+                                            <div style={{ marginTop: '10px' }}>
+                                                <button
+                                                    onClick={() => handleResetStudentExam(selectedStudent)}
+                                                    className="btn-reset-single-exam"
+                                                    title="Hapus jawaban dan status agar siswa dapat mengulang ujian kembali dari awal"
+                                                    style={{
+                                                        background: '#fff7ed',
+                                                        color: '#c2410c',
+                                                        border: '1.5px solid #fed7aa',
+                                                        padding: '7px 14px',
+                                                        borderRadius: '8px',
+                                                        fontWeight: 800,
+                                                        fontSize: '0.82rem',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => { e.currentTarget.style.background = '#ffedd5'; }}
+                                                    onMouseOut={(e) => { e.currentTarget.style.background = '#fff7ed'; }}
+                                                >
+                                                    <RotateCcw size={15} /> Izinkan Siswa Ujian Ulang (Reset)
+                                                </button>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

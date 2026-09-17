@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import {
-    ShieldCheck, RefreshCw, Clock, Key, Calendar, Activity, X, Search,
+    ShieldCheck, RefreshCw, RotateCcw, Clock, Key, Calendar, Activity, X, Search,
     Filter, Users, CheckCircle2, AlertCircle, Copy, Check, UserCheck, BookOpen, LayoutGrid, List
 } from 'lucide-react';
 
@@ -182,6 +182,26 @@ const SecurityToken = () => {
             fetchExamsAndMonitoring(selectedEventId);
         } catch (err) {
             alert('Gagal refresh token');
+        }
+    };
+
+    const handleResetUjianSiswa = async (siswaId, namaSiswa, ujianId) => {
+        const targetUjianId = ujianId || (selectedMapelFilter !== 'ALL' ? selectedMapelFilter : null);
+        if (!targetUjianId) {
+            alert('Pilih mata pelajaran terlebih dahulu untuk mereset ujian.');
+            return;
+        }
+        if (!window.confirm(`Yakin ingin mengizinkan ${namaSiswa} untuk mengulang ujian ini?\n\nStatus pengerjaan dan semua jawaban siswa akan direset agar siswa dapat mulai mengerjakan kembali dari awal.`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post(`/api/exam/ujian-mapel/${targetUjianId}/reset-siswa/${siswaId}`, {}, { headers });
+            alert(`Berhasil! Ujian untuk ${namaSiswa} telah direset. Siswa dapat login dan mengerjakan ujian dari awal.`);
+            fetchMonitoringData();
+        } catch (err) {
+            console.error('Failed to reset exam for student', err);
+            alert('Gagal mereset ujian siswa: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -662,13 +682,35 @@ const SecurityToken = () => {
                                                     </span>
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <button
-                                                        onClick={() => handleResetPeserta(std.nisn, std.namaSiswa, std.ujianId)}
-                                                        className="btn-reset-session"
-                                                        title="Gunakan jika siswa terkendala perangkat atau browser tertutup"
-                                                    >
-                                                        Reset Login
-                                                    </button>
+                                                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                                        <button
+                                                            onClick={() => handleResetPeserta(std.nisn, std.namaSiswa, std.ujianId)}
+                                                            className="btn-reset-session"
+                                                            title="Gunakan jika siswa terkendala perangkat atau browser tertutup"
+                                                        >
+                                                            Reset Login
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleResetUjianSiswa(std.siswaId, std.namaSiswa, std.ujianId)}
+                                                            className="btn-reset-exam-action"
+                                                            style={{
+                                                                background: '#fff7ed',
+                                                                color: '#c2410c',
+                                                                border: '1px solid #fed7aa',
+                                                                padding: '5px 10px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '0.75rem',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                            title="Hapus status pengerjaan dan jawaban agar siswa bisa mengulang ujian dari awal"
+                                                        >
+                                                            <RotateCcw size={11} /> Ulangi Ujian
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );

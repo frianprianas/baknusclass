@@ -16,7 +16,7 @@ import {
     Clock,
     Key,
     Info,
-    RefreshCw,
+    RefreshCw, RotateCcw,
     ArrowLeft,
     Save,
     Search,
@@ -2847,6 +2847,15 @@ const ExamManagement = () => {
                                                                 >
                                                                     <CloudUpload size={14} style={{ marginRight: '4px' }} />
                                                                     Upload Drive
+                                                                </button>
+                                                                <button
+                                                                    className="btn-lengkapi"
+                                                                    style={{ background: '#fff7ed', color: '#c2410c', border: '1.5px solid #fed7aa', display: 'inline-flex', alignItems: 'center' }}
+                                                                    onClick={() => window.location.href = '/exam-scoring'}
+                                                                    title="Buka menu Koreksi Nilai & Reset / Ulangi Ujian Siswa"
+                                                                >
+                                                                    <RotateCcw size={13} style={{ marginRight: '4px' }} />
+                                                                    Koreksi & Reset
                                                                 </button>
                                                                 {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && exam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId)) && (
                                                                     <>
