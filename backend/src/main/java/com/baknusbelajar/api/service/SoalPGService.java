@@ -123,7 +123,7 @@ public class SoalPGService {
     private SoalPGDTO mapToDTO(SoalPG s) {
         SoalPGDTO dto = new SoalPGDTO();
         dto.setId(s.getId());
-        dto.setUjianId(s.getUjianMapel().getId());
+        dto.setUjianId(s.getUjianMapel() != null ? s.getUjianMapel().getId() : null);
         dto.setPertanyaan(s.getPertanyaan());
         dto.setPilihanA(s.getPilihanA());
         dto.setPilihanB(s.getPilihanB());
@@ -132,6 +132,28 @@ public class SoalPGService {
         dto.setPilihanE(s.getPilihanE());
         dto.setKunciJawaban(s.getKunciJawaban());
         dto.setBobotNilai(s.getBobotNilai());
+
+        // Smart detection of tipeSoal
+        String tipe = s.getTipeSoal();
+        if (tipe == null || tipe.trim().isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
+            if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
+                ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB())) &&
+                (s.getPilihanC() == null || "-".equals(s.getPilihanC().trim()) || s.getPilihanC().trim().isEmpty())) {
+                tipe = "BENAR_SALAH";
+            } else if (s.getKunciJawaban() != null && s.getKunciJawaban().contains(",")) {
+                tipe = "PG_KOMPLEKS";
+            } else {
+                tipe = "PG_BIASA";
+            }
+        }
+        dto.setTipeSoal(tipe);
+
+        if ("BENAR_SALAH".equalsIgnoreCase(tipe)) {
+            if ("-".equals(dto.getPilihanC())) dto.setPilihanC("");
+            if ("-".equals(dto.getPilihanD())) dto.setPilihanD("");
+            if ("-".equals(dto.getPilihanE())) dto.setPilihanE("");
+        }
+
         return dto;
     }
 }

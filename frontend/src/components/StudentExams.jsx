@@ -8,6 +8,7 @@ import {
     CheckCircle2,
     CheckSquare,
     AlertCircle,
+    XCircle,
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
@@ -422,7 +423,28 @@ const StudentExams = () => {
                 axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
             ]);
 
-            const pgQuestions = (pgResp.data || []).map(q => ({ ...q, qType: 'pg' }));
+            const pgQuestions = (pgResp.data || []).map(q => {
+                let resolvedTipe = q.tipeSoal;
+                const isBS = resolvedTipe === 'BENAR_SALAH' || (
+                    q.pilihanA && q.pilihanB &&
+                    (q.pilihanA.trim().toLowerCase() === 'benar' || q.pilihanA.trim().toLowerCase() === 'true') &&
+                    (q.pilihanB.trim().toLowerCase() === 'salah' || q.pilihanB.trim().toLowerCase() === 'false') &&
+                    (!q.pilihanC || q.pilihanC === '-' || q.pilihanC.trim() === '')
+                );
+                const isKompleks = resolvedTipe === 'PG_KOMPLEKS' || (
+                    q.kunciJawaban && q.kunciJawaban.includes(',')
+                );
+
+                if (isBS) resolvedTipe = 'BENAR_SALAH';
+                else if (isKompleks) resolvedTipe = 'PG_KOMPLEKS';
+                else if (!resolvedTipe) resolvedTipe = 'PG_BIASA';
+
+                return {
+                    ...q,
+                    qType: 'pg',
+                    tipeSoal: resolvedTipe
+                };
+            });
             const essayQuestions = (essayResp.data || []).map(q => ({ ...q, qType: 'essay' }));
             const allQuestions = [...pgQuestions, ...essayQuestions];
 
@@ -788,62 +810,111 @@ const StudentExams = () => {
                                     <div className="cbt-answer-area">
                                         {q?.qType === 'pg' ? (
                                             <div className="cbt-pg-answer-container">
+                                                {/* TIPE 1: KHUSUS SOAL BENAR / SALAH (DESAIN EKSKLUSIF BUKAN PILIHAN GANDA BIASA) */}
                                                 {q.tipeSoal === 'BENAR_SALAH' ? (
-                                                    <div className="cbt-tf-options">
-                                                        <p className="cbt-pg-instruction">Tentukan apakah pernyataan di atas Benar atau Salah:</p>
-                                                        <div className="cbt-tf-grid">
+                                                    <div className="cbt-tf-decision-container">
+                                                        <div className="cbt-tf-header-guide">
+                                                            <div className="tf-guide-icon">⚖️</div>
+                                                            <div className="tf-guide-text">
+                                                                <strong>Keputusan Pernyataan: Benar atau Salah</strong>
+                                                                <p>Telaah pernyataan di atas secara saksama, lalu klik salah satu kartu keputusan di bawah:</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="cbt-tf-decision-cards">
+                                                            {/* Kartu Keputusan: BENAR */}
                                                             <button
                                                                 type="button"
-                                                                className={`cbt-tf-btn btn-true ${answers[q.id] === 'A' || answers[q.id] === 'Benar' ? 'selected' : ''}`}
+                                                                className={`tf-decision-card card-true ${(answers[q.id] === 'A' || answers[q.id] === 'Benar') ? 'selected-true' : ''}`}
                                                                 onClick={() => {
                                                                     const val = 'A';
                                                                     setAnswers({ ...answers, [q.id]: val });
                                                                     saveAnswerPG(q.id, val, raguState[q.id]);
                                                                 }}
                                                             >
-                                                                <div className="tf-badge">A</div>
-                                                                <div className="tf-content">
-                                                                    <span className="tf-title">BENAR</span>
-                                                                    <span className="tf-sub">Pernyataan ini sesuai / benar</span>
+                                                                <div className="tf-card-icon-wrapper true-icon">
+                                                                    <CheckCircle2 size={36} />
                                                                 </div>
-                                                                {(answers[q.id] === 'A' || answers[q.id] === 'Benar') && <CheckCircle2 size={24} className="tf-checked-icon" />}
+                                                                <div className="tf-card-info">
+                                                                    <span className="tf-card-title">BENAR</span>
+                                                                    <span className="tf-card-subtitle">Pernyataan pada soal ini tepat & sesuai fakta</span>
+                                                                </div>
+                                                                {(answers[q.id] === 'A' || answers[q.id] === 'Benar') ? (
+                                                                    <div className="tf-choice-badge chosen-true">
+                                                                        <Check size={16} strokeWidth={3} /> Pilihan Anda
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="tf-choice-prompt">Klik Jika Benar</div>
+                                                                )}
                                                             </button>
 
+                                                            {/* Kartu Keputusan: SALAH */}
                                                             <button
                                                                 type="button"
-                                                                className={`cbt-tf-btn btn-false ${answers[q.id] === 'B' || answers[q.id] === 'Salah' ? 'selected' : ''}`}
+                                                                className={`tf-decision-card card-false ${(answers[q.id] === 'B' || answers[q.id] === 'Salah') ? 'selected-false' : ''}`}
                                                                 onClick={() => {
                                                                     const val = 'B';
                                                                     setAnswers({ ...answers, [q.id]: val });
                                                                     saveAnswerPG(q.id, val, raguState[q.id]);
                                                                 }}
                                                             >
-                                                                <div className="tf-badge">B</div>
-                                                                <div className="tf-content">
-                                                                    <span className="tf-title">SALAH</span>
-                                                                    <span className="tf-sub">Pernyataan ini tidak sesuai / salah</span>
+                                                                <div className="tf-card-icon-wrapper false-icon">
+                                                                    <XCircle size={36} />
                                                                 </div>
-                                                                {(answers[q.id] === 'B' || answers[q.id] === 'Salah') && <CheckCircle2 size={24} className="tf-checked-icon" />}
+                                                                <div className="tf-card-info">
+                                                                    <span className="tf-card-title">SALAH</span>
+                                                                    <span className="tf-card-subtitle">Pernyataan pada soal ini tidak tepat / keliru</span>
+                                                                </div>
+                                                                {(answers[q.id] === 'B' || answers[q.id] === 'Salah') ? (
+                                                                    <div className="tf-choice-badge chosen-false">
+                                                                        <Check size={16} strokeWidth={3} /> Pilihan Anda
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="tf-choice-prompt">Klik Jika Salah</div>
+                                                                )}
                                                             </button>
+                                                        </div>
+
+                                                        {/* Status Bar Keputusan */}
+                                                        <div className="tf-status-bar">
+                                                            {(answers[q.id] === 'A' || answers[q.id] === 'Benar') ? (
+                                                                <div className="tf-status-msg is-true">
+                                                                    <CheckCircle2 size={16} /> Anda memutuskan: <strong>PERNYATAAN BENAR</strong> (Tersimpan otomatis)
+                                                                </div>
+                                                            ) : (answers[q.id] === 'B' || answers[q.id] === 'Salah') ? (
+                                                                <div className="tf-status-msg is-false">
+                                                                    <XCircle size={16} /> Anda memutuskan: <strong>PERNYATAAN SALAH</strong> (Tersimpan otomatis)
+                                                                </div>
+                                                            ) : (
+                                                                <div className="tf-status-msg is-empty">
+                                                                    <AlertCircle size={16} /> Anda belum memilih. Silakan klik kartu <b>BENAR</b> atau <b>SALAH</b> di atas.
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ) : q.tipeSoal === 'PG_KOMPLEKS' ? (
+                                                    /* TIPE 2: PILIHAN GANDA KOMPLEKS (BISA >1 JAWABAN BENAR DENGAN CHECKBOXES) */
                                                     <div className="cbt-complex-options">
-                                                        <div className="cbt-pg-tip-box">
-                                                            <CheckSquare size={16} />
-                                                            <span><strong>Pilihan Ganda Kompleks:</strong> Klik opsi untuk memilih satu atau lebih jawaban yang benar. {((answers[q.id] || '').split(',').filter(Boolean).length > 0) && <strong style={{ color: '#4338ca', marginLeft: '6px' }}>({(answers[q.id] || '').split(',').filter(Boolean).length} opsi terpilih)</strong>}</span>
+                                                        <div className="cbt-pg-tip-box complex-tip">
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <CheckSquare size={18} />
+                                                                <span><strong>Soal Pilihan Ganda Kompleks:</strong> Centang semua opsi yang menurutmu benar (bisa 2 atau lebih jawaban).</span>
+                                                            </div>
+                                                            <div className="cbt-complex-pill">
+                                                                {((answers[q.id] || '').split(',').filter(Boolean).length)} Opsi Terpilih
+                                                            </div>
                                                         </div>
                                                         <div className="cbt-opt-list">
                                                             {['A', 'B', 'C', 'D', 'E'].map(opt => {
                                                                 const optText = q[`pilihan${opt}`];
-                                                                if (!optText) return null;
+                                                                if (!optText || optText === '-') return null;
                                                                 const currentKeys = (answers[q.id] || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
                                                                 const isChecked = currentKeys.includes(opt);
 
                                                                 return (
                                                                     <div
                                                                         key={opt}
-                                                                        className={`cbt-opt-row ${isChecked ? 'selected' : ''}`}
+                                                                        className={`cbt-opt-row complex-row ${isChecked ? 'selected' : ''}`}
                                                                         onClick={() => {
                                                                             let newKeys;
                                                                             if (isChecked) {
@@ -856,11 +927,12 @@ const StudentExams = () => {
                                                                             saveAnswerPG(q.id, val, raguState[q.id]);
                                                                         }}
                                                                     >
-                                                                        <div className={`cbt-opt-check ${isChecked ? 'checked' : ''}`}>
-                                                                            {isChecked ? <CheckCircle2 size={20} /> : opt}
+                                                                        <div className={`cbt-checkbox-box ${isChecked ? 'checked' : ''}`}>
+                                                                            {isChecked ? <Check size={18} strokeWidth={3} /> : null}
                                                                         </div>
+                                                                        <div className="cbt-opt-letter-tag">{opt}</div>
                                                                         <div className={`cbt-opt-text ${fontClass}`}>
-                                                                            <strong>{opt}.</strong> {optText}
+                                                                            {optText}
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -868,18 +940,22 @@ const StudentExams = () => {
                                                         </div>
                                                     </div>
                                                 ) : (
+                                                    /* TIPE 3: PILIHAN GANDA BIASA (1 KUNCI DENGAN RADIO BUTTON) */
                                                     <div className="cbt-single-options">
-                                                        <p className="cbt-pg-instruction">Pilih salah satu jawaban yang paling tepat:</p>
+                                                        <div className="cbt-pg-tip-box single-tip">
+                                                            <CheckCircle size={18} />
+                                                            <span><strong>Pilihan Ganda Tunggal:</strong> Pilihlah salah satu jawaban yang paling tepat (1 jawaban).</span>
+                                                        </div>
                                                         <div className="cbt-opt-list">
                                                             {['A', 'B', 'C', 'D', 'E'].map(opt => {
                                                                 const optText = q[`pilihan${opt}`];
-                                                                if (!optText) return null;
+                                                                if (!optText || optText === '-') return null;
                                                                 const isSelected = answers[q.id] === opt;
 
                                                                 return (
                                                                     <div
                                                                         key={opt}
-                                                                        className={`cbt-opt-row ${isSelected ? 'selected' : ''}`}
+                                                                        className={`cbt-opt-row single-row ${isSelected ? 'selected' : ''}`}
                                                                         onClick={() => {
                                                                             setAnswers({ ...answers, [q.id]: opt });
                                                                             saveAnswerPG(q.id, opt, raguState[q.id]);
@@ -889,7 +965,7 @@ const StudentExams = () => {
                                                                             {opt}
                                                                         </div>
                                                                         <div className={`cbt-opt-text ${fontClass}`}>
-                                                                            <strong>{opt}.</strong> {optText}
+                                                                            {optText}
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -1345,6 +1421,369 @@ const StudentExams = () => {
                         background: #0f172a;
                         border-color: #334155;
                         color: #f1f5f9;
+                    }
+
+                    
+                    /* Benar / Salah Decision Panel UI (Sangat Beda dari Pilihan Ganda) */
+                    .cbt-tf-decision-container {
+                        margin-top: 10px;
+                        animation: fadeIn 0.3s ease;
+                    }
+                    .cbt-tf-header-guide {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        background: #fffbeb;
+                        border: 1.5px solid #fde68a;
+                        padding: 12px 18px;
+                        border-radius: 14px;
+                        margin-bottom: 20px;
+                    }
+                    .tf-guide-icon {
+                        font-size: 1.8rem;
+                        line-height: 1;
+                    }
+                    .tf-guide-text strong {
+                        display: block;
+                        font-size: 0.95rem;
+                        color: #92400e;
+                        font-weight: 800;
+                    }
+                    .tf-guide-text p {
+                        margin: 2px 0 0 0;
+                        font-size: 0.83rem;
+                        color: #b45309;
+                    }
+
+                    .cbt-tf-decision-cards {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 20px;
+                        margin-bottom: 16px;
+                    }
+                    @media (max-width: 640px) {
+                        .cbt-tf-decision-cards {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                    .tf-decision-card {
+                        background: #ffffff;
+                        border: 2.5px solid #e2e8f0;
+                        border-radius: 20px;
+                        padding: 24px 20px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        text-align: center;
+                        cursor: pointer;
+                        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                        position: relative;
+                        outline: none;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+                    }
+                    .tf-decision-card:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.1);
+                    }
+                    .tf-card-icon-wrapper {
+                        width: 72px;
+                        height: 72px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-bottom: 14px;
+                        transition: all 0.25s;
+                    }
+                    .true-icon {
+                        background: #ecfdf5;
+                        color: #059669;
+                    }
+                    .false-icon {
+                        background: #fff1f2;
+                        color: #e11d48;
+                    }
+                    .tf-card-title {
+                        display: block;
+                        font-size: 1.6rem;
+                        font-weight: 950;
+                        letter-spacing: 0.5px;
+                        margin-bottom: 4px;
+                    }
+                    .card-true .tf-card-title {
+                        color: #047857;
+                    }
+                    .card-false .tf-card-title {
+                        color: #be123c;
+                    }
+                    .tf-card-subtitle {
+                        font-size: 0.84rem;
+                        color: #64748b;
+                        line-height: 1.4;
+                        margin-bottom: 16px;
+                    }
+
+                    /* Selected State for True */
+                    .tf-decision-card.card-true.selected-true {
+                        border-color: #10b981;
+                        background: linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%);
+                        box-shadow: 0 12px 30px -4px rgba(16, 185, 129, 0.3);
+                        transform: translateY(-2px);
+                    }
+                    .tf-decision-card.card-true.selected-true .true-icon {
+                        background: #10b981;
+                        color: #ffffff;
+                        transform: scale(1.1);
+                    }
+
+                    /* Selected State for False */
+                    .tf-decision-card.card-false.selected-false {
+                        border-color: #f43f5e;
+                        background: linear-gradient(145deg, #fff1f2 0%, #ffe4e6 100%);
+                        box-shadow: 0 12px 30px -4px rgba(244, 63, 94, 0.3);
+                        transform: translateY(-2px);
+                    }
+                    .tf-decision-card.card-false.selected-false .false-icon {
+                        background: #f43f5e;
+                        color: #ffffff;
+                        transform: scale(1.1);
+                    }
+
+                    .tf-choice-badge {
+                        padding: 8px 18px;
+                        border-radius: 50px;
+                        font-size: 0.85rem;
+                        font-weight: 900;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    }
+                    .tf-choice-badge.chosen-true {
+                        background: #059669;
+                        color: #ffffff;
+                        box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3);
+                    }
+                    .tf-choice-badge.chosen-false {
+                        background: #e11d48;
+                        color: #ffffff;
+                        box-shadow: 0 4px 10px rgba(225, 29, 72, 0.3);
+                    }
+                    .tf-choice-prompt {
+                        padding: 6px 16px;
+                        border-radius: 50px;
+                        font-size: 0.8rem;
+                        font-weight: 700;
+                        background: #f1f5f9;
+                        color: #64748b;
+                        border: 1px solid #e2e8f0;
+                    }
+
+                    .tf-status-bar {
+                        padding: 12px 18px;
+                        border-radius: 14px;
+                        border: 1px solid #e2e8f0;
+                        background: #f8fafc;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .tf-status-msg {
+                        font-size: 0.88rem;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-weight: 600;
+                    }
+                    .tf-status-msg.is-true {
+                        color: #047857;
+                    }
+                    .tf-status-msg.is-false {
+                        color: #be123c;
+                    }
+                    .tf-status-msg.is-empty {
+                        color: #64748b;
+                    }
+
+                    /* Complex PG Options & Checkboxes */
+                    .cbt-pg-tip-box.complex-tip {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        flex-wrap: wrap;
+                        gap: 10px;
+                        background: #f5f3ff;
+                        border: 1.5px solid #ddd6fe;
+                        color: #5b21b6;
+                        padding: 12px 18px;
+                        border-radius: 14px;
+                        margin-bottom: 18px;
+                    }
+                    .cbt-complex-pill {
+                        background: #6d28d9;
+                        color: #ffffff;
+                        padding: 4px 12px;
+                        border-radius: 50px;
+                        font-size: 0.8rem;
+                        font-weight: 900;
+                        letter-spacing: 0.3px;
+                    }
+                    .cbt-pg-tip-box.single-tip {
+                        background: #eff6ff;
+                        border: 1.5px solid #bfdbfe;
+                        color: #1e40af;
+                        padding: 12px 18px;
+                        border-radius: 14px;
+                        margin-bottom: 18px;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+
+                    /* Checkbox styling */
+                    .cbt-opt-row.complex-row {
+                        border: 2px solid #e2e8f0;
+                        border-radius: 16px;
+                        padding: 14px 18px;
+                        margin-bottom: 12px;
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        background: #ffffff;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .cbt-opt-row.complex-row:hover {
+                        border-color: #818cf8;
+                        background: #faf5ff;
+                    }
+                    .cbt-opt-row.complex-row.selected {
+                        border-color: #6366f1;
+                        background: #f5f3ff;
+                        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
+                    }
+                    .cbt-checkbox-box {
+                        width: 28px;
+                        height: 28px;
+                        min-width: 28px;
+                        border-radius: 8px;
+                        border: 2px solid #cbd5e1;
+                        background: #ffffff;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        transition: all 0.2s;
+                    }
+                    .cbt-checkbox-box.checked {
+                        background: #6366f1;
+                        border-color: #6366f1;
+                    }
+                    .cbt-opt-letter-tag {
+                        width: 28px;
+                        height: 28px;
+                        min-width: 28px;
+                        border-radius: 6px;
+                        background: #f1f5f9;
+                        color: #475569;
+                        font-weight: 900;
+                        font-size: 0.85rem;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .cbt-opt-row.complex-row.selected .cbt-opt-letter-tag {
+                        background: #e0e7ff;
+                        color: #4338ca;
+                    }
+
+                    /* Single PG styling */
+                    .cbt-opt-row.single-row {
+                        border: 2px solid #e2e8f0;
+                        border-radius: 16px;
+                        padding: 14px 18px;
+                        margin-bottom: 12px;
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        background: #ffffff;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .cbt-opt-row.single-row:hover {
+                        border-color: #93c5fd;
+                        background: #f8fafc;
+                    }
+                    .cbt-opt-row.single-row.selected {
+                        border-color: #2563eb;
+                        background: #eff6ff;
+                        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+                    }
+
+                    /* Dark Mode Overrides */
+                    body.dark-theme .tf-decision-card,
+                    .dark .tf-decision-card {
+                        background: #1e293b;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .tf-decision-card.card-true.selected-true,
+                    .dark .tf-decision-card.card-true.selected-true {
+                        background: rgba(16, 185, 129, 0.2);
+                        border-color: #10b981;
+                    }
+                    body.dark-theme .tf-decision-card.card-false.selected-false,
+                    .dark .tf-decision-card.card-false.selected-false {
+                        background: rgba(244, 63, 94, 0.2);
+                        border-color: #f43f5e;
+                    }
+                    body.dark-theme .tf-card-subtitle,
+                    .dark .tf-card-subtitle {
+                        color: #94a3b8;
+                    }
+                    body.dark-theme .cbt-tf-header-guide,
+                    .dark .cbt-tf-header-guide {
+                        background: rgba(180, 83, 9, 0.2);
+                        border-color: #d97706;
+                    }
+                    body.dark-theme .tf-guide-text strong,
+                    .dark .tf-guide-text strong {
+                        color: #fde68a;
+                    }
+                    body.dark-theme .tf-guide-text p,
+                    .dark .tf-guide-text p {
+                        color: #fcd34d;
+                    }
+                    body.dark-theme .tf-status-bar,
+                    .dark .tf-status-bar {
+                        background: #0f172a;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .cbt-opt-row.complex-row,
+                    .dark .cbt-opt-row.complex-row,
+                    body.dark-theme .cbt-opt-row.single-row,
+                    .dark .cbt-opt-row.single-row {
+                        background: #1e293b;
+                        border-color: #334155;
+                    }
+                    body.dark-theme .cbt-opt-row.complex-row.selected,
+                    .dark .cbt-opt-row.complex-row.selected {
+                        background: rgba(99, 102, 241, 0.2);
+                        border-color: #818cf8;
+                    }
+                    body.dark-theme .cbt-opt-row.single-row.selected,
+                    .dark .cbt-opt-row.single-row.selected {
+                        background: rgba(37, 99, 235, 0.2);
+                        border-color: #3b82f6;
+                    }
+                    body.dark-theme .cbt-checkbox-box,
+                    .dark .cbt-checkbox-box {
+                        background: #0f172a;
+                        border-color: #475569;
+                    }
+                    body.dark-theme .cbt-opt-letter-tag,
+                    .dark .cbt-opt-letter-tag {
+                        background: #0f172a;
+                        color: #94a3b8;
                     }
 
                     /* Practice Banner */

@@ -81,7 +81,16 @@ public class JawabanPGService {
         String kunci = soal.getKunciJawaban() != null ? soal.getKunciJawaban().trim().toUpperCase() : "";
         String jawaban = jawabanSiswa.trim().toUpperCase();
         double bobot = soal.getBobotNilai() != null ? soal.getBobotNilai() : 1.0;
-        String tipe = soal.getTipeSoal() != null ? soal.getTipeSoal() : "PG_BIASA";
+        String tipe = soal.getTipeSoal();
+        if (tipe == null || tipe.trim().isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
+            if (kunci.contains(",")) {
+                tipe = "PG_KOMPLEKS";
+            } else if ("Benar".equalsIgnoreCase(soal.getPilihanA()) && "Salah".equalsIgnoreCase(soal.getPilihanB())) {
+                tipe = "BENAR_SALAH";
+            } else {
+                tipe = "PG_BIASA";
+            }
+        }
 
         if ("PG_KOMPLEKS".equalsIgnoreCase(tipe)) {
             // Split keys and answers into sets (e.g. "A,C" -> {"A", "C"})
@@ -116,6 +125,10 @@ public class JawabanPGService {
         } else {
             // PG_BIASA & BENAR_SALAH
             boolean match = jawaban.equalsIgnoreCase(kunci);
+            if (!match && "BENAR_SALAH".equalsIgnoreCase(tipe)) {
+                match = (("A".equalsIgnoreCase(jawaban) || "BENAR".equalsIgnoreCase(jawaban)) && ("A".equalsIgnoreCase(kunci) || "BENAR".equalsIgnoreCase(kunci))) ||
+                        (("B".equalsIgnoreCase(jawaban) || "SALAH".equalsIgnoreCase(jawaban)) && ("B".equalsIgnoreCase(kunci) || "SALAH".equalsIgnoreCase(kunci)));
+            }
             return new ScoringResult(match ? bobot : 0.0, match);
         }
     }
