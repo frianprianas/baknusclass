@@ -477,4 +477,42 @@ public class UjianMapelService {
 
         log.info("Exam ID {} reset successfully for all students", ujianId);
     }
+
+    public com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO getExamClassSummary(Long ujianId) {
+        var monitoringList = getExamMonitoring(ujianId, null);
+        UjianMapel ujian = ujianMapelRepository.findById(ujianId)
+                .orElseThrow(() -> new RuntimeException("Ujian not found"));
+
+        com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO result = new com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO();
+        result.setUjianId(ujianId);
+        result.setNamaMapel(ujian.getMapel() != null ? ujian.getMapel().getNamaMapel() : "-");
+        result.setNamaGuru(ujian.getGuru() != null ? ujian.getGuru().getNamaLengkap() : "-");
+
+        java.util.Map<String, java.util.List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO>> perClass = monitoringList.stream()
+                .collect(Collectors.groupingBy(m -> m.getNamaKelas() != null ? m.getNamaKelas() : "Tanpa Kelas", java.util.LinkedHashMap::new, Collectors.toList()));
+
+        java.util.List<com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO.ClassSummaryItem> items = new java.util.ArrayList<>();
+        int totalSiswa = monitoringList.size();
+        int totalSelesai = 0;
+
+        for (java.util.Map.Entry<String, java.util.List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO>> entry : perClass.entrySet()) {
+            String namaKelas = entry.getKey();
+            var students = entry.getValue();
+            Long kelasId = students.isEmpty() ? null : students.get(0).getKelasId();
+            int jmlSiswa = students.size();
+            int jmlSelesai = (int) students.stream().filter(s -> Boolean.TRUE.equals(s.getIsFinished())).count();
+            int jmlBelum = jmlSiswa - jmlSelesai;
+            totalSelesai += jmlSelesai;
+
+            items.add(new com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO.ClassSummaryItem(kelasId, namaKelas, jmlSiswa, jmlSelesai, jmlBelum));
+        }
+
+        result.setTotalSiswa(totalSiswa);
+        result.setTotalSelesai(totalSelesai);
+        result.setTotalBelum(totalSiswa - totalSelesai);
+        result.setKelasList(items);
+
+        return result;
+    }
+
 }

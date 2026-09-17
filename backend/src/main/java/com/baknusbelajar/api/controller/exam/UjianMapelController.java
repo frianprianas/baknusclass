@@ -180,4 +180,12 @@ public class UjianMapelController {
         ujianMapelService.resetUjianForAllStudents(id);
         return ResponseEntity.ok("Ujian berhasil direset untuk seluruh siswa.");
     }
+
+    @GetMapping("/{id}/summary")
+    @PreAuthorize("hasAnyRole('TU', 'GURU', 'ADMIN')")
+    public ResponseEntity<com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO> getExamClassSummary(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ujianMapelService.getExamClassSummary(id));
+    }
+
 }
