@@ -327,14 +327,6 @@ const StudentExams = () => {
             return;
         }
 
-        const isLatihan = (selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi'))) || Number(exam.durasi) === 0;
-
-        // Practice exams can be started directly without waiting for proctor token
-        if (isLatihan) {
-            startExam(exam);
-            return;
-        }
-
         setTokenInput('');
         setShowTokenOverlay(exam);
     };
@@ -408,6 +400,12 @@ const StudentExams = () => {
     };
 
     const handleVerifyToken = async (e) => {
+        if (e) e.preventDefault();
+        const trimmedToken = tokenInput.trim().toUpperCase();
+        if (!trimmedToken) {
+            alert('Masukkan token ujian terlebih dahulu!');
+            return;
+        }
         setIsSubmitting(true);
         try {
             let deviceId = localStorage.getItem('deviceId');
@@ -416,20 +414,22 @@ const StudentExams = () => {
                 localStorage.setItem('deviceId', deviceId);
             }
 
-            const trimmedToken = tokenInput.trim();
             const resp = await axios.post(`/api/exam/ujian-mapel/${showTokenOverlay.id}/validate-token?ujianToken=${trimmedToken}&deviceId=${deviceId}`, {}, { headers });
             if (resp.data === true) {
-                startExam(showTokenOverlay);
+                const examToStart = showTokenOverlay;
                 setShowTokenOverlay(null);
+                startExam(examToStart);
             } else {
-                alert('Token Ujian Salah!');
+                alert('Token Ujian Salah! Silakan cek kembali token yang diberikan pengawas ujian.');
             }
         } catch (err) {
             if (err.response && err.response.data && typeof err.response.data === 'string') {
                 alert(err.response.data);
             } else {
-                alert('Gagal verifikasi token. ' + (err.response?.data?.message || ''));
+                alert('Gagal verifikasi token: ' + (err.response?.data?.message || 'Token Ujian Salah'));
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -439,7 +439,6 @@ const StudentExams = () => {
             if (!exam.isPractice && exam.id !== 'practice_default_simulasi') {
                 let deviceId = localStorage.getItem('deviceId') || ('dev_' + Math.random().toString(36).substring(2) + Date.now());
                 localStorage.setItem('deviceId', deviceId);
-                await axios.post(`/api/exam/ujian-mapel/${exam.id}/validate-token?ujianToken=${exam.token || 'LATIHAN'}&deviceId=${deviceId}`, {}, { headers }).catch(e => console.warn('Bypass validateToken:', e));
             }
 
             // Fetch both PG and Essay questions in parallel
@@ -2384,29 +2383,39 @@ const StudentExams = () => {
             )}
 
             {showTokenOverlay && (
-                <div className="modal-overlay">
-                    <div className="modal-content token-modal">
+                <div className="modal-overlay" onClick={() => !isSubmitting && setShowTokenOverlay(null)}>
+                    <div className="modal-content token-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="shield-icon">
-                            <Shield size={40} />
+                            <Shield size={42} />
                         </div>
-                        <h2>Token Keamanan</h2>
-                        <p>Masukkan token yang diberikan oleh pengawas untuk memulai ujian <strong>{showTokenOverlay.namaMapel}</strong>.</p>
+                        <h2>Token Keamanan Ujian</h2>
+                        <p>Masukkan token ujian yang diberikan oleh guru / pengawas untuk memulai <strong>{showTokenOverlay.namaMapel}</strong>.</p>
 
-                        <input
-                            type="text"
-                            placeholder="6 Karakter Token..."
-                            maxLength={6}
-                            value={tokenInput}
-                            onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
-                            className="token-field"
-                        />
+                        <form onSubmit={handleVerifyToken}>
+                            <input
+                                type="text"
+                                placeholder="MASUKKAN TOKEN..."
+                                maxLength={10}
+                                autoFocus
+                                value={tokenInput}
+                                onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                                className="token-field"
+                                disabled={isSubmitting}
+                            />
 
-                        <div className="modal-actions">
-                            <button className="btn-cancel" onClick={() => setShowTokenOverlay(null)}>Batal</button>
-                            <button className="btn-confirm" onClick={handleVerifyToken} disabled={tokenInput.length < 5}>
-                                Konfirmasi & Mulai
-                            </button>
-                        </div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '18px', fontStyle: 'italic' }}>
+                                *Token ujian diumumkan oleh pengawas di ruang ujian.
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="btn-cancel" onClick={() => setShowTokenOverlay(null)} disabled={isSubmitting}>
+                                    Batal
+                                </button>
+                                <button type="submit" className="btn-confirm" disabled={isSubmitting || !tokenInput.trim()}>
+                                    {isSubmitting ? 'Memverifikasi...' : 'Konfirmasi & Masuk Ujian'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
