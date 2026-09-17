@@ -51,9 +51,12 @@ public class SoalPGService {
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
         String tipe = dto.getTipeSoal();
-        if (tipe == null || tipe.isEmpty() || "PG_BIASA".equals(tipe)) {
+        String kj = dto.getKunciJawaban() != null ? dto.getKunciJawaban().trim() : "";
+        if (tipe == null || tipe.isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
             if ("Benar".equalsIgnoreCase(dto.getPilihanA()) && "Salah".equalsIgnoreCase(dto.getPilihanB())) {
                 tipe = "BENAR_SALAH";
+            } else if (kj.contains(",") || kj.contains(";") || kj.length() > 1) {
+                tipe = "PG_KOMPLEKS";
             }
         }
         entity.setTipeSoal(tipe != null ? tipe : "PG_BIASA");
@@ -97,9 +100,12 @@ public class SoalPGService {
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
         String upTipe = dto.getTipeSoal();
-        if (upTipe == null || upTipe.isEmpty() || "PG_BIASA".equals(upTipe)) {
+        String upKj = dto.getKunciJawaban() != null ? dto.getKunciJawaban().trim() : "";
+        if (upTipe == null || upTipe.isEmpty() || "PG_BIASA".equalsIgnoreCase(upTipe)) {
             if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
                 upTipe = "BENAR_SALAH";
+            } else if (upKj.contains(",") || upKj.contains(";") || upKj.length() > 1) {
+                upTipe = "PG_KOMPLEKS";
             }
         }
         if (upTipe != null) entity.setTipeSoal(upTipe);
@@ -135,12 +141,17 @@ public class SoalPGService {
 
         // Smart detection of tipeSoal
         String tipe = s.getTipeSoal();
+        String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
+        String pert = s.getPertanyaan() != null ? s.getPertanyaan().toLowerCase() : "";
+        boolean hasComplexHint = pert.contains("lebih dari 1") || pert.contains("lebih dari satu") ||
+                pert.contains("kompleks") || pert.contains("pilih 2") || pert.contains("pilihlah dua");
+
         if (tipe == null || tipe.trim().isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
             if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
                 ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB())) &&
                 (s.getPilihanC() == null || "-".equals(s.getPilihanC().trim()) || s.getPilihanC().trim().isEmpty())) {
                 tipe = "BENAR_SALAH";
-            } else if (s.getKunciJawaban() != null && s.getKunciJawaban().contains(",")) {
+            } else if (kj.contains(",") || kj.contains(";") || kj.length() > 1 || hasComplexHint) {
                 tipe = "PG_KOMPLEKS";
             } else {
                 tipe = "PG_BIASA";

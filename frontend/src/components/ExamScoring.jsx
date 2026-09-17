@@ -948,8 +948,17 @@ const ExamScoring = () => {
                                                 const studentChoicesList = studentChoice.split(/[,;\s]+/).map(s => stripHtml(s).toUpperCase()).filter(Boolean);
                                                 const keyChoicesList = keyAnswer.split(/[,;\s]+/).map(s => stripHtml(s).toUpperCase()).filter(Boolean);
 
-                                                const isBS = q.tipeSoal === 'BENAR_SALAH';
-                                                const isKompleks = q.tipeSoal === 'PG_KOMPLEKS';
+                                                const isBS = q.tipeSoal === 'BENAR_SALAH' || (
+                                                    q.pilihanA && q.pilihanB &&
+                                                    (q.pilihanA.trim().toLowerCase() === 'benar' || q.pilihanA.trim().toLowerCase() === 'true') &&
+                                                    (q.pilihanB.trim().toLowerCase() === 'salah' || q.pilihanB.trim().toLowerCase() === 'false') &&
+                                                    (!q.pilihanC || q.pilihanC === '-' || q.pilihanC.trim() === '')
+                                                );
+                                                const isKompleks = !isBS && (
+                                                    (q.tipeSoal && q.tipeSoal.toUpperCase().includes('KOMPLEKS')) ||
+                                                    (q.kunciJawaban && (q.kunciJawaban.includes(',') || q.kunciJawaban.includes(';'))) ||
+                                                    (studentChoice && (studentChoice.includes(',') || studentChoice.includes(';')))
+                                                );
 
                                                 const options = isBS ? [
                                                     { key: 'A', text: q.pilihanA || 'Benar' },

@@ -448,20 +448,31 @@ const StudentExams = () => {
             ]);
 
             const pgQuestions = (pgResp.data || []).map(q => {
-                let resolvedTipe = q.tipeSoal;
+                let resolvedTipe = (q.tipeSoal || '').toUpperCase().trim();
+                const pertHtml = (q.pertanyaan || '').toLowerCase();
                 const isBS = resolvedTipe === 'BENAR_SALAH' || (
                     q.pilihanA && q.pilihanB &&
                     (q.pilihanA.trim().toLowerCase() === 'benar' || q.pilihanA.trim().toLowerCase() === 'true') &&
                     (q.pilihanB.trim().toLowerCase() === 'salah' || q.pilihanB.trim().toLowerCase() === 'false') &&
                     (!q.pilihanC || q.pilihanC === '-' || q.pilihanC.trim() === '')
                 );
-                const isKompleks = resolvedTipe === 'PG_KOMPLEKS' || (
-                    q.kunciJawaban && q.kunciJawaban.includes(',')
+                const hasComplexTextHint = pertHtml.includes('lebih dari 1') || 
+                                          pertHtml.includes('lebih dari satu') || 
+                                          pertHtml.includes('kompleks') || 
+                                          pertHtml.includes('pilih 2') ||
+                                          pertHtml.includes('pilihlah 2') ||
+                                          pertHtml.includes('pilihlah dua') ||
+                                          pertHtml.includes('jawaban benar lebih');
+
+                const isKompleks = !isBS && (
+                    resolvedTipe.includes('KOMPLEKS') ||
+                    (q.kunciJawaban && (q.kunciJawaban.includes(',') || q.kunciJawaban.includes(';') || q.kunciJawaban.trim().length > 1)) ||
+                    hasComplexTextHint
                 );
 
                 if (isBS) resolvedTipe = 'BENAR_SALAH';
                 else if (isKompleks) resolvedTipe = 'PG_KOMPLEKS';
-                else if (!resolvedTipe) resolvedTipe = 'PG_BIASA';
+                else resolvedTipe = 'PG_BIASA';
 
                 return {
                     ...q,
@@ -507,8 +518,9 @@ const StudentExams = () => {
             });
 
             (pgAnswersResp.data || []).forEach(ans => {
-                existingAnswers[ans.soalId] = ans.jawabanDipilih;
-                existingRagu[ans.soalId] = ans.raguRagu;
+                const sId = ans.soalPGId || ans.soalId;
+                existingAnswers[sId] = ans.jawabanDipilih || ans.jawaban || '';
+                existingRagu[sId] = ans.raguRagu;
             });
 
             setAnswers(prev => ({ ...prev, ...existingAnswers }));
@@ -550,6 +562,25 @@ const StudentExams = () => {
     }, [currentExam, timer]);
 
     const [isSaving, setIsSaving] = useState(false);
+
+    const handleToggleComplexOption = (soalId, opt) => {
+        setAnswers(prevAnswers => {
+            const currentStr = prevAnswers[soalId] || '';
+            const currentKeys = currentStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            let newKeys;
+            if (currentKeys.includes(opt)) {
+                newKeys = currentKeys.filter(k => k !== opt);
+            } else {
+                newKeys = [...currentKeys, opt].sort();
+            }
+            const val = newKeys.join(',');
+            saveAnswerPG(soalId, val, raguState[soalId]);
+            return {
+                ...prevAnswers,
+                [soalId]: val
+            };
+        });
+    };
 
     const saveAnswerPG = async (soalId, selectedOption, isRagu = false) => {
         const effectiveSiswaId = user.profileId || user.userId || user.id;
@@ -953,17 +984,7 @@ const StudentExams = () => {
                                                                     <div
                                                                         key={opt}
                                                                         className={`cbt-opt-row complex-row ${isChecked ? 'selected' : ''}`}
-                                                                        onClick={() => {
-                                                                            let newKeys;
-                                                                            if (isChecked) {
-                                                                                newKeys = currentKeys.filter(k => k !== opt);
-                                                                            } else {
-                                                                                newKeys = [...currentKeys, opt].sort();
-                                                                            }
-                                                                            const val = newKeys.join(',');
-                                                                            setAnswers({ ...answers, [q.id]: val });
-                                                                            saveAnswerPG(q.id, val, raguState[q.id]);
-                                                                        }}
+                                                                        onClick={() => handleToggleComplexOption(q.id, opt)}
                                                                     >
                                                                         <div className={`cbt-checkbox-box ${isChecked ? 'checked' : ''}`}>
                                                                             {isChecked ? <Check size={18} strokeWidth={3} /> : null}
