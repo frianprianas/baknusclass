@@ -62,7 +62,7 @@ public class JawabanPGService {
     }
 
     @Transactional
-    public JawabanPGDTO submitJawaban(JawabanPGDTO dto) {
+    public JawabanPGDTO submitJawaban(JawabanPGDTO dto, org.springframework.security.core.Authentication authentication) {
         Long targetSoalId = dto.getSoalPGId() != null ? dto.getSoalPGId() : dto.getSoalId();
         if (targetSoalId == null) {
             throw new RuntimeException("Soal ID tidak boleh kosong");
@@ -71,10 +71,22 @@ public class JawabanPGService {
 
         SoalPG soal = soalPGRepository.findById(targetSoalId)
                 .orElseThrow(() -> new RuntimeException("Soal PG not found (ID: " + targetSoalId + ")"));
-        Siswa siswa = siswaRepository.findById(dto.getSiswaId())
-                .orElseThrow(() -> new RuntimeException("Siswa not found (ID: " + dto.getSiswaId() + ")"));
 
-        JawabanPG entity = jawabanPGRepository.findBySiswaIdAndSoalPGId(dto.getSiswaId(), targetSoalId)
+        // Resolusi Siswa otomatis & aman:
+        Siswa siswa = null;
+        if (authentication != null && authentication.getPrincipal() instanceof com.baknusbelajar.api.security.CustomUserDetails userDetails) {
+            siswa = siswaRepository.findByUserId(userDetails.getId()).orElse(null);
+        }
+        if (siswa == null && dto.getSiswaId() != null) {
+            siswa = siswaRepository.findById(dto.getSiswaId())
+                    .or(() -> siswaRepository.findByUserId(dto.getSiswaId()))
+                    .orElse(null);
+        }
+        if (siswa == null) {
+            throw new RuntimeException("Siswa tidak ditemukan untuk pengerjaan soal PG ID: " + targetSoalId);
+        }
+
+        JawabanPG entity = jawabanPGRepository.findBySiswaIdAndSoalPGId(siswa.getId(), targetSoalId)
                 .orElse(new JawabanPG());
 
         entity.setSoalPG(soal);

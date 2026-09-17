@@ -32,8 +32,8 @@ public class JawabanPGController {
 
     @PostMapping("/submit")
     @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'GURU', 'TU')")
-    public ResponseEntity<JawabanPGDTO> submitJawaban(@RequestBody JawabanPGDTO dto) {
-        return ResponseEntity.ok(jawabanPGService.submitJawaban(dto));
+    public ResponseEntity<JawabanPGDTO> submitJawaban(@RequestBody JawabanPGDTO dto, org.springframework.security.core.Authentication authentication) {
+        return ResponseEntity.ok(jawabanPGService.submitJawaban(dto, authentication));
     }
 
     @PutMapping("/{id}/nilai")

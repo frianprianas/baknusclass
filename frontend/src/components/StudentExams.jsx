@@ -552,7 +552,7 @@ const StudentExams = () => {
     const [isSaving, setIsSaving] = useState(false);
 
     const saveAnswerPG = async (soalId, selectedOption, isRagu = false) => {
-        if (!user.profileId) return;
+        const effectiveSiswaId = user.profileId || user.userId || user.id;
         setIsSaving(true);
         try {
             const token = localStorage.getItem('token');
@@ -560,7 +560,7 @@ const StudentExams = () => {
             const payload = {
                 soalId,
                 soalPGId: soalId,
-                siswaId: user.profileId,
+                siswaId: effectiveSiswaId,
                 jawaban: selectedOption || '',
                 jawabanDipilih: selectedOption || '',
                 raguRagu: isRagu
@@ -636,6 +636,18 @@ const StudentExams = () => {
     const confirmFinishExam = async (forced = false) => {
         setLoading(true);
         try {
+            // Safety flush all PG answers before marking finished
+            const pgQuestionsToSave = questions.filter(q => q.qType === 'pg');
+            if (pgQuestionsToSave.length > 0) {
+                await Promise.all(pgQuestionsToSave.map(q => {
+                    const ansVal = answers[q.id];
+                    if (ansVal !== undefined && ansVal !== null && ansVal !== '') {
+                        return saveAnswerPG(q.id, ansVal, raguState[q.id]);
+                    }
+                    return Promise.resolve();
+                }));
+            }
+
             await axios.post(`/api/exam/ujian-mapel/${currentExam.id}/finish`, {}, { headers });
 
             // Save finished state locally as backup
