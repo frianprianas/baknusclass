@@ -26,6 +26,10 @@ public class SoalPGService {
     @Transactional
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
         List<SoalPG> soalList = soalPGRepository.findByUjianMapelId(ujianId);
+        if (soalList.isEmpty()) {
+            tryAutoCopyQuestions(ujianId);
+            soalList = soalPGRepository.findByUjianMapelId(ujianId);
+        }
         return soalList.stream().map(s -> {
             // Auto-detect and synchronize PG_KOMPLEKS or BENAR_SALAH directly into DB entity
             String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
@@ -225,5 +229,44 @@ public class SoalPGService {
         }
 
         return dto;
+    }
+
+    private void tryAutoCopyQuestions(Long targetId) {
+        try {
+            UjianMapel target = ujianMapelRepository.findById(targetId).orElse(null);
+            if (target == null || target.getMapel() == null) return;
+            String targetMapelName = target.getMapel().getNamaMapel() != null ? target.getMapel().getNamaMapel().toLowerCase() : "";
+
+            List<UjianMapel> all = ujianMapelRepository.findAll();
+            for (UjianMapel other : all) {
+                if (other.getId().equals(targetId)) continue;
+                String otherMapel = (other.getMapel() != null && other.getMapel().getNamaMapel() != null)
+                        ? other.getMapel().getNamaMapel().toLowerCase() : "";
+                if (otherMapel.equals(targetMapelName) || (targetMapelName.contains("ujicoba") && otherMapel.contains("ujicoba"))) {
+                    List<SoalPG> otherPG = soalPGRepository.findByUjianMapelId(other.getId());
+                    if (!otherPG.isEmpty()) {
+                        log.info("[SoalPG] On-demand auto-copying {} PG questions from exam {} to exam {}", otherPG.size(), other.getId(), targetId);
+                        for (SoalPG spg : otherPG) {
+                            SoalPG newPG = SoalPG.builder()
+                                    .ujianMapel(target)
+                                    .pertanyaan(spg.getPertanyaan())
+                                    .pilihanA(spg.getPilihanA())
+                                    .pilihanB(spg.getPilihanB())
+                                    .pilihanC(spg.getPilihanC())
+                                    .pilihanD(spg.getPilihanD())
+                                    .pilihanE(spg.getPilihanE())
+                                    .kunciJawaban(spg.getKunciJawaban())
+                                    .bobotNilai(spg.getBobotNilai())
+                                    .tipeSoal(spg.getTipeSoal() != null ? spg.getTipeSoal() : "PG_BIASA")
+                                    .build();
+                            soalPGRepository.save(newPG);
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SoalPG] tryAutoCopyQuestions error: {}", e.getMessage());
+        }
     }
 }

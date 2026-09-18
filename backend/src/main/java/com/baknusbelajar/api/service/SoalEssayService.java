@@ -23,7 +23,12 @@ public class SoalEssayService {
 
     @Cacheable(value = "soalEssayCache", key = "#ujianId + '-' + #withKunci")
     public List<SoalEssayDTO> getSoalByUjian(Long ujianId, boolean withKunci) {
-        return soalEssayRepository.findByUjianMapelId(ujianId).stream()
+        List<SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
+        if (essayList.isEmpty()) {
+            tryAutoCopyEssay(ujianId);
+            essayList = soalEssayRepository.findByUjianMapelId(ujianId);
+        }
+        return essayList.stream()
                 .map(entity -> mapToDTO(entity, withKunci))
                 .collect(Collectors.toList());
     }
@@ -85,5 +90,35 @@ public class SoalEssayService {
             dto.setUjianMapelId(entity.getUjianMapel().getId());
         }
         return dto;
+    }
+
+    private void tryAutoCopyEssay(Long targetId) {
+        try {
+            UjianMapel target = ujianMapelRepository.findById(targetId).orElse(null);
+            if (target == null || target.getMapel() == null) return;
+            String targetMapelName = target.getMapel().getNamaMapel() != null ? target.getMapel().getNamaMapel().toLowerCase() : "";
+
+            List<UjianMapel> all = ujianMapelRepository.findAll();
+            for (UjianMapel other : all) {
+                if (other.getId().equals(targetId)) continue;
+                String otherMapel = (other.getMapel() != null && other.getMapel().getNamaMapel() != null)
+                        ? other.getMapel().getNamaMapel().toLowerCase() : "";
+                if (otherMapel.equals(targetMapelName) || (targetMapelName.contains("ujicoba") && otherMapel.contains("ujicoba"))) {
+                    List<SoalEssay> otherEssay = soalEssayRepository.findByUjianMapelId(other.getId());
+                    if (!otherEssay.isEmpty()) {
+                        for (SoalEssay se : otherEssay) {
+                            SoalEssay newEssay = SoalEssay.builder()
+                                    .ujianMapel(target)
+                                    .pertanyaan(se.getPertanyaan())
+                                    .kunciJawaban(se.getKunciJawaban())
+                                    .bobotNilai(se.getBobotNilai())
+                                    .build();
+                            soalEssayRepository.save(newEssay);
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
     }
 }

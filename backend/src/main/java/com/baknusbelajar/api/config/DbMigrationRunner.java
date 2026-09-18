@@ -138,62 +138,45 @@ public class DbMigrationRunner implements CommandLineRunner {
     }
 
     private void copyQuestionsFrom16To17Sep() {
-        System.out.println("====== Checking Auto-Copy Soal 16 Sep -> 17 Sep ======");
+        System.out.println("====== Auto-Copy Soal: Checking Exams for Ujicoba ======");
         try {
-            boolean alreadyCopied = false;
-            try (Connection conn = dataSource.getConnection();
-                 Statement stmt = conn.createStatement()) {
-                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_app_settings WHERE config_key = 'copy_soal_16_to_17_sep_v1'")) {
-                    if (rs.next() && rs.getInt(1) > 0) {
-                        alreadyCopied = true;
-                    }
-                } catch (Exception ignored) {}
-            } catch (Exception e) {
-                System.out.println("Flag check error: " + e.getMessage());
-            }
-
-            if (alreadyCopied) {
-                System.out.println("====== Auto-Copy Soal 16 to 17 Sep: Skipped (Flag already set) ======");
-                return;
-            }
-
             List<UjianMapel> allExams = ujianMapelRepository.findAll();
+            List<UjianMapel> ujicobaExams = new java.util.ArrayList<>();
+
+            for (UjianMapel u : allExams) {
+                String mapelName = (u.getMapel() != null && u.getMapel().getNamaMapel() != null)
+                        ? u.getMapel().getNamaMapel().toLowerCase() : "";
+                if (mapelName.contains("ujicoba")) {
+                    ujicobaExams.add(u);
+                }
+            }
+
+            System.out.println("Found " + ujicobaExams.size() + " ujicoba exams in database.");
+
             UjianMapel sourceExam = null;
             UjianMapel targetExam = null;
 
-            for (UjianMapel u : allExams) {
-                if (u.getWaktuMulai() == null) continue;
+            for (UjianMapel u : ujicobaExams) {
+                int pgCount = soalPGRepository.findByUjianMapelId(u.getId()).size();
+                int essayCount = soalEssayRepository.findByUjianMapelId(u.getId()).size();
+                System.out.println("Exam ID " + u.getId() + " (" + (u.getMapel() != null ? u.getMapel().getNamaMapel() : "") + ") at " + u.getWaktuMulai() + ": " + pgCount + " PG, " + essayCount + " Essay");
 
-                String mapelName = (u.getMapel() != null && u.getMapel().getNamaMapel() != null)
-                        ? u.getMapel().getNamaMapel().toLowerCase() : "";
-                int day = u.getWaktuMulai().getDayOfMonth();
-                int month = u.getWaktuMulai().getMonthValue();
-                int hour = u.getWaktuMulai().getHour();
-                int minute = u.getWaktuMulai().getMinute();
-
-                // Match 16 Sep (Row 1 in UI: 16 Sep, 19.11)
-                if (month == 9 && day == 16) {
-                    if (sourceExam == null || (hour == 19 && minute == 11) || mapelName.contains("ujicoba")) {
+                if (pgCount > 0 || essayCount > 0) {
+                    if (sourceExam == null) {
                         sourceExam = u;
                     }
-                }
-
-                // Match 17 Sep (Row 2 in UI: 17 Sep, 01.03)
-                if (month == 9 && day == 17) {
-                    if (targetExam == null || (hour == 1 && minute == 3) || mapelName.contains("ujicoba")) {
+                } else {
+                    if (targetExam == null) {
                         targetExam = u;
                     }
                 }
             }
 
             if (sourceExam != null && targetExam != null) {
-                System.out.println("Source Exam: ID=" + sourceExam.getId() + " (" + (sourceExam.getMapel() != null ? sourceExam.getMapel().getNamaMapel() : "-") + ", Waktu: " + sourceExam.getWaktuMulai() + ")");
-                System.out.println("Target Exam: ID=" + targetExam.getId() + " (" + (targetExam.getMapel() != null ? targetExam.getMapel().getNamaMapel() : "-") + ", Waktu: " + targetExam.getWaktuMulai() + ")");
-
                 List<SoalPG> sourcePG = soalPGRepository.findByUjianMapelId(sourceExam.getId());
                 List<SoalEssay> sourceEssay = soalEssayRepository.findByUjianMapelId(sourceExam.getId());
 
-                System.out.println("Found " + sourcePG.size() + " PG and " + sourceEssay.size() + " Essay in Source Exam ID " + sourceExam.getId());
+                System.out.println("Copying " + sourcePG.size() + " PG and " + sourceEssay.size() + " Essay from Exam ID " + sourceExam.getId() + " to Exam ID " + targetExam.getId());
 
                 int copiedPG = 0;
                 for (SoalPG spg : sourcePG) {
@@ -225,20 +208,12 @@ public class DbMigrationRunner implements CommandLineRunner {
                     copiedEssay++;
                 }
 
-                System.out.println("Successfully auto-copied " + copiedPG + " PG and " + copiedEssay + " Essay from 16 Sep to 17 Sep!");
-
-                try (Connection conn = dataSource.getConnection();
-                     Statement stmt = conn.createStatement()) {
-                    stmt.executeUpdate("INSERT INTO tb_app_settings (config_key, config_value) VALUES ('copy_soal_16_to_17_sep_v1', 'true')");
-                    System.out.println("Flag copy_soal_16_to_17_sep_v1 saved successfully.");
-                } catch (Exception e) {
-                    System.out.println("Error saving app settings flag: " + e.getMessage());
-                }
+                System.out.println("Successfully copied " + copiedPG + " PG and " + copiedEssay + " Essay into Exam ID " + targetExam.getId() + "!");
             } else {
-                System.out.println("Exam matching info: sourceExam=" + sourceExam + ", targetExam=" + targetExam);
+                System.out.println("Auto-copy check finished: sourceExam=" + (sourceExam != null ? sourceExam.getId() : "null") + ", targetExam=" + (targetExam != null ? targetExam.getId() : "null"));
             }
         } catch (Exception e) {
-            System.err.println("Auto-copy error: " + e.getMessage());
+            System.err.println("Auto-copy error in DbMigrationRunner: " + e.getMessage());
             e.printStackTrace();
         }
     }
