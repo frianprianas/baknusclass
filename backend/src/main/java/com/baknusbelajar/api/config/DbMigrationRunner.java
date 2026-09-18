@@ -5,14 +5,30 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import com.baknusbelajar.api.entity.SoalEssay;
+import com.baknusbelajar.api.entity.SoalPG;
+import com.baknusbelajar.api.entity.UjianMapel;
+import com.baknusbelajar.api.repository.SoalEssayRepository;
+import com.baknusbelajar.api.repository.SoalPGRepository;
+import com.baknusbelajar.api.repository.UjianMapelRepository;
+import java.util.List;
 
 @Component
 public class DbMigrationRunner implements CommandLineRunner {
 
     private final DataSource dataSource;
+    private final UjianMapelRepository ujianMapelRepository;
+    private final SoalPGRepository soalPGRepository;
+    private final SoalEssayRepository soalEssayRepository;
 
-    public DbMigrationRunner(DataSource dataSource) {
+    public DbMigrationRunner(DataSource dataSource,
+                             UjianMapelRepository ujianMapelRepository,
+                             SoalPGRepository soalPGRepository,
+                             SoalEssayRepository soalEssayRepository) {
         this.dataSource = dataSource;
+        this.ujianMapelRepository = ujianMapelRepository;
+        this.soalPGRepository = soalPGRepository;
+        this.soalEssayRepository = soalEssayRepository;
     }
 
     @Override
@@ -115,8 +131,115 @@ public class DbMigrationRunner implements CommandLineRunner {
             }
 
             System.out.println("====== Oracle DB Schema Migration Completed Successfully ======");
+            copyQuestionsFrom16To17Sep();
         } catch (Exception e) {
             System.err.println("Oracle Migration Fatal Error: " + e.getMessage());
+        }
+    }
+
+    private void copyQuestionsFrom16To17Sep() {
+        System.out.println("====== Checking Auto-Copy Soal 16 Sep -> 17 Sep ======");
+        try {
+            boolean alreadyCopied = false;
+            try (Connection conn = dataSource.getConnection();
+                 Statement stmt = conn.createStatement()) {
+                try (var rs = stmt.executeQuery("SELECT COUNT(*) FROM tb_app_settings WHERE config_key = 'copy_soal_16_to_17_sep_v1'")) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        alreadyCopied = true;
+                    }
+                } catch (Exception ignored) {}
+            } catch (Exception e) {
+                System.out.println("Flag check error: " + e.getMessage());
+            }
+
+            if (alreadyCopied) {
+                System.out.println("====== Auto-Copy Soal 16 to 17 Sep: Skipped (Flag already set) ======");
+                return;
+            }
+
+            List<UjianMapel> allExams = ujianMapelRepository.findAll();
+            UjianMapel sourceExam = null;
+            UjianMapel targetExam = null;
+
+            for (UjianMapel u : allExams) {
+                if (u.getWaktuMulai() == null) continue;
+
+                String mapelName = (u.getMapel() != null && u.getMapel().getNamaMapel() != null)
+                        ? u.getMapel().getNamaMapel().toLowerCase() : "";
+                int day = u.getWaktuMulai().getDayOfMonth();
+                int month = u.getWaktuMulai().getMonthValue();
+                int hour = u.getWaktuMulai().getHour();
+                int minute = u.getWaktuMulai().getMinute();
+
+                // Match 16 Sep (Row 1 in UI: 16 Sep, 19.11)
+                if (month == 9 && day == 16) {
+                    if (sourceExam == null || (hour == 19 && minute == 11) || mapelName.contains("ujicoba")) {
+                        sourceExam = u;
+                    }
+                }
+
+                // Match 17 Sep (Row 2 in UI: 17 Sep, 01.03)
+                if (month == 9 && day == 17) {
+                    if (targetExam == null || (hour == 1 && minute == 3) || mapelName.contains("ujicoba")) {
+                        targetExam = u;
+                    }
+                }
+            }
+
+            if (sourceExam != null && targetExam != null) {
+                System.out.println("Source Exam: ID=" + sourceExam.getId() + " (" + (sourceExam.getMapel() != null ? sourceExam.getMapel().getNamaMapel() : "-") + ", Waktu: " + sourceExam.getWaktuMulai() + ")");
+                System.out.println("Target Exam: ID=" + targetExam.getId() + " (" + (targetExam.getMapel() != null ? targetExam.getMapel().getNamaMapel() : "-") + ", Waktu: " + targetExam.getWaktuMulai() + ")");
+
+                List<SoalPG> sourcePG = soalPGRepository.findByUjianMapelId(sourceExam.getId());
+                List<SoalEssay> sourceEssay = soalEssayRepository.findByUjianMapelId(sourceExam.getId());
+
+                System.out.println("Found " + sourcePG.size() + " PG and " + sourceEssay.size() + " Essay in Source Exam ID " + sourceExam.getId());
+
+                int copiedPG = 0;
+                for (SoalPG spg : sourcePG) {
+                    SoalPG newPG = SoalPG.builder()
+                            .ujianMapel(targetExam)
+                            .pertanyaan(spg.getPertanyaan())
+                            .pilihanA(spg.getPilihanA())
+                            .pilihanB(spg.getPilihanB())
+                            .pilihanC(spg.getPilihanC())
+                            .pilihanD(spg.getPilihanD())
+                            .pilihanE(spg.getPilihanE())
+                            .kunciJawaban(spg.getKunciJawaban())
+                            .bobotNilai(spg.getBobotNilai())
+                            .tipeSoal(spg.getTipeSoal() != null ? spg.getTipeSoal() : "PG_BIASA")
+                            .build();
+                    soalPGRepository.save(newPG);
+                    copiedPG++;
+                }
+
+                int copiedEssay = 0;
+                for (SoalEssay se : sourceEssay) {
+                    SoalEssay newEssay = SoalEssay.builder()
+                            .ujianMapel(targetExam)
+                            .pertanyaan(se.getPertanyaan())
+                            .kunciJawaban(se.getKunciJawaban())
+                            .bobotNilai(se.getBobotNilai())
+                            .build();
+                    soalEssayRepository.save(newEssay);
+                    copiedEssay++;
+                }
+
+                System.out.println("Successfully auto-copied " + copiedPG + " PG and " + copiedEssay + " Essay from 16 Sep to 17 Sep!");
+
+                try (Connection conn = dataSource.getConnection();
+                     Statement stmt = conn.createStatement()) {
+                    stmt.executeUpdate("INSERT INTO tb_app_settings (config_key, config_value) VALUES ('copy_soal_16_to_17_sep_v1', 'true')");
+                    System.out.println("Flag copy_soal_16_to_17_sep_v1 saved successfully.");
+                } catch (Exception e) {
+                    System.out.println("Error saving app settings flag: " + e.getMessage());
+                }
+            } else {
+                System.out.println("Exam matching info: sourceExam=" + sourceExam + ", targetExam=" + targetExam);
+            }
+        } catch (Exception e) {
+            System.err.println("Auto-copy error: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

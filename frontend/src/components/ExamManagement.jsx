@@ -29,7 +29,8 @@ import {
     Image as ImageIcon,
     Eye,
     ZoomIn,
-    X
+    X,
+    Copy
 } from 'lucide-react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -181,6 +182,9 @@ const ExamManagement = () => {
 
     // Sub-view for entering questions
     const [viewingQuestions, setViewingQuestions] = useState(null); // Will hold exam object
+    const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+    const [selectedSourceExamId, setSelectedSourceExamId] = useState('');
+    const [isCopying, setIsCopying] = useState(false);
     const [qType, setQType] = useState('essay'); // 'essay' or 'pg'
     const [questions, setQuestions] = useState([]);
     const [questionsPG, setQuestionsPG] = useState([]);
@@ -775,6 +779,26 @@ const ExamManagement = () => {
         }
     };
 
+    const handleCopyQuestions = async () => {
+        if (!selectedSourceExamId || !viewingQuestions) return;
+        if (!window.confirm('Apakah Anda yakin ingin menyalin seluruh soal dan kunci jawaban dari ujian terpilih ke ujian ini?')) return;
+        setIsCopying(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`/api/exam/ujian-mapel/${viewingQuestions.id}/copy-from/${selectedSourceExamId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(res.data.message || 'Berhasil menyalin seluruh soal dan kunci jawaban!');
+            setIsCopyModalOpen(false);
+            setSelectedSourceExamId('');
+            await handleManageQuestions(viewingQuestions);
+        } catch (err) {
+            alert(err.response?.data?.message || 'Gagal menyalin soal');
+        } finally {
+            setIsCopying(false);
+        }
+    };
+
     const handleDeleteSoal = async (id, type) => {
         if (!window.confirm('Yakin ingin menghapus soal ini?')) return;
         const token = localStorage.getItem('token');
@@ -851,7 +875,33 @@ const ExamManagement = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="header-stats">
+                        <div className="header-stats" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedSourceExamId('');
+                                    setIsCopyModalOpen(true);
+                                }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 18px',
+                                    borderRadius: '12px',
+                                    background: '#ecfdf5',
+                                    color: '#059669',
+                                    border: '1.5px solid #a7f3d0',
+                                    fontWeight: 800,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.1)',
+                                    transition: 'all 0.2s'
+                                }}
+                                title="Salin semua soal dari ujian lain ke ujian ini"
+                            >
+                                <Copy size={16} />
+                                <span>Salin Soal dari Ujian Lain</span>
+                            </button>
                             <div className="stat-item">
                                 <label>Total Soal</label>
                                 <div className="value">{questions.length + questionsPG.length}</div>
@@ -2418,6 +2468,96 @@ const ExamManagement = () => {
 `}</style>
 
                 </div>
+
+                {/* Modal Salin Soal dari Ujian Lain */}
+                {isCopyModalOpen && (
+                    <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'rgba(15, 23, 42, 0.75)', zIndex: 100000, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backdropFilter: 'blur(6px)' }}>
+                        <div className="modal-content animate-slide-up" style={{
+                            maxWidth: '560px',
+                            width: '100%',
+                            borderRadius: '20px',
+                            background: '#ffffff',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ background: '#ecfdf5', color: '#059669', padding: '10px', borderRadius: '12px' }}>
+                                        <Copy size={22} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Salin Soal dari Ujian Lain</h3>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                                            Target: <strong>{viewingQuestions.namaMapel}</strong> ({new Date(viewingQuestions.waktuMulai).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})
+                                        </p>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setIsCopyModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                                    <XCircle size={22} />
+                                </button>
+                            </div>
+
+                            <div style={{ padding: '24px' }}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#334155', marginBottom: '8px' }}>
+                                        Pilih Ujian Sumber (Yang Akan Disalin)
+                                    </label>
+                                    <select
+                                        value={selectedSourceExamId}
+                                        onChange={(e) => setSelectedSourceExamId(e.target.value)}
+                                        style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '0.9rem', color: '#1e293b', background: '#fff' }}
+                                    >
+                                        <option value="">-- Pilih Ujian Sumber --</option>
+                                        {exams
+                                            .filter(e => e.id !== viewingQuestions.id)
+                                            .map(e => (
+                                                <option key={e.id} value={e.id}>
+                                                    {e.namaMapel} • {e.namaEvent || 'Event'} ({new Date(e.waktuMulai).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})
+                                                </option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
+                                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px', marginBottom: '24px' }}>
+                                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
+                                        💡 <strong>Informasi:</strong> Seluruh soal Pilihan Ganda (termasuk opsi pilihan A-E & kunci jawaban) dan soal Essay beserta bobot nilai akan disalin langsung ke ujian ini.
+                                    </p>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCopyModalOpen(false)}
+                                        style={{ padding: '10px 20px', borderRadius: '10px', fontWeight: 700, background: '#f1f5f9', border: 'none', color: '#475569', cursor: 'pointer' }}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={!selectedSourceExamId || isCopying}
+                                        onClick={handleCopyQuestions}
+                                        style={{
+                                            padding: '10px 22px',
+                                            borderRadius: '10px',
+                                            fontWeight: 800,
+                                            background: !selectedSourceExamId || isCopying ? '#94a3b8' : '#059669',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            cursor: !selectedSourceExamId || isCopying ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        {isCopying ? <RefreshCw size={16} className="animate-spin" /> : <Copy size={16} />}
+                                        {isCopying ? 'Menyalin...' : 'Salin Soal Sekarang'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Modal Kartu Soal consistently defined here for the Questions View */}
                 {isKartuModalOpen && (

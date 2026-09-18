@@ -521,4 +521,61 @@ public class UjianMapelService {
         return result;
     }
 
+
+    @org.springframework.transaction.annotation.Transactional
+    public java.util.Map<String, Object> copyQuestions(Long targetUjianId, Long sourceUjianId) {
+        log.info("Copying questions from source exam ID {} to target exam ID {}", sourceUjianId, targetUjianId);
+        UjianMapel target = ujianMapelRepository.findById(targetUjianId)
+                .orElseThrow(() -> new RuntimeException("Ujian target tidak ditemukan (ID: " + targetUjianId + ")"));
+        UjianMapel source = ujianMapelRepository.findById(sourceUjianId)
+                .orElseThrow(() -> new RuntimeException("Ujian sumber tidak ditemukan (ID: " + sourceUjianId + ")"));
+
+        java.util.List<com.baknusbelajar.api.entity.SoalPG> sourcePG = soalPGRepository.findByUjianMapelId(sourceUjianId);
+        java.util.List<com.baknusbelajar.api.entity.SoalEssay> sourceEssay = soalEssayRepository.findByUjianMapelId(sourceUjianId);
+
+        if (sourcePG.isEmpty() && sourceEssay.isEmpty()) {
+            throw new RuntimeException("Ujian sumber tidak memiliki soal untuk disalin.");
+        }
+
+        int copiedPG = 0;
+        for (var spg : sourcePG) {
+            var newPG = com.baknusbelajar.api.entity.SoalPG.builder()
+                    .ujianMapel(target)
+                    .pertanyaan(spg.getPertanyaan())
+                    .pilihanA(spg.getPilihanA())
+                    .pilihanB(spg.getPilihanB())
+                    .pilihanC(spg.getPilihanC())
+                    .pilihanD(spg.getPilihanD())
+                    .pilihanE(spg.getPilihanE())
+                    .kunciJawaban(spg.getKunciJawaban())
+                    .bobotNilai(spg.getBobotNilai())
+                    .tipeSoal(spg.getTipeSoal() != null ? spg.getTipeSoal() : "PG_BIASA")
+                    .build();
+            soalPGRepository.save(newPG);
+            copiedPG++;
+        }
+
+        int copiedEssay = 0;
+        for (var se : sourceEssay) {
+            var newEssay = com.baknusbelajar.api.entity.SoalEssay.builder()
+                    .ujianMapel(target)
+                    .pertanyaan(se.getPertanyaan())
+                    .kunciJawaban(se.getKunciJawaban())
+                    .bobotNilai(se.getBobotNilai())
+                    .build();
+            soalEssayRepository.save(newEssay);
+            copiedEssay++;
+        }
+
+        log.info("Successfully copied {} PG and {} Essay questions from exam {} to exam {}",
+                copiedPG, copiedEssay, sourceUjianId, targetUjianId);
+
+        java.util.Map<String, Object> resp = new java.util.HashMap<>();
+        resp.put("success", true);
+        resp.put("copiedPG", copiedPG);
+        resp.put("copiedEssay", copiedEssay);
+        resp.put("totalCopied", copiedPG + copiedEssay);
+        resp.put("message", "Berhasil menyalin " + (copiedPG + copiedEssay) + " soal (" + copiedPG + " PG, " + copiedEssay + " Essay)");
+        return resp;
+    }
 }

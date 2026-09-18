@@ -188,4 +188,20 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.getExamClassSummary(id));
     }
 
+
+    @PostMapping("/{targetId}/copy-from/{sourceId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> copyQuestions(
+            @PathVariable Long targetId,
+            @PathVariable Long sourceId) {
+        log.info("[UjianMapel] Copy questions request from sourceId={} to targetId={}", sourceId, targetId);
+        try {
+            return ResponseEntity.ok(ujianMapelService.copyQuestions(targetId, sourceId));
+        } catch (Exception e) {
+            log.error("[UjianMapel] Error copying questions: ", e);
+            java.util.Map<String, String> err = new java.util.HashMap<>();
+            err.put("message", e.getMessage() != null ? e.getMessage() : "Gagal menyalin soal");
+            return ResponseEntity.badRequest().body(err);
+        }
+    }
 }
