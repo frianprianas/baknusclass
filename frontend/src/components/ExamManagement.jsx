@@ -499,15 +499,30 @@ const ExamManagement = () => {
         const headers = { Authorization: `Bearer ${token}` };
 
         const ev = events.find(e => e.id == examForm.eventId);
-        const isLatihan = ev?.namaEvent && (ev.namaEvent.toLowerCase().includes('latihan') || ev.namaEvent.toLowerCase().includes('simulasi'));
+        const isLatihan = ev?.namaEvent && (
+            ev.namaEvent.toLowerCase().includes('latihan') || 
+            ev.namaEvent.toLowerCase().includes('simulasi') || 
+            ev.namaEvent.toLowerCase().includes('ujicoba') || 
+            ev.namaEvent.toLowerCase().includes('tryout')
+        );
 
         let startIso = examForm.waktuMulai;
-        if (!startIso && isLatihan) {
+        if (!startIso) {
             startIso = new Date().toISOString().substring(0, 16);
         }
 
         const startDate = new Date(startIso);
-        const endDate = new Date(startDate.getTime() + (Number(examForm.durasi) || 0) * 60 * 1000);
+        const durasiNum = Number(examForm.durasi) || 0;
+        let endDate;
+        if (examForm.waktuSelesai) {
+            endDate = new Date(examForm.waktuSelesai);
+        } else if (durasiNum > 0) {
+            endDate = new Date(startDate.getTime() + durasiNum * 60 * 1000);
+        } else if (ev && ev.tanggalSelesai) {
+            endDate = new Date(ev.tanggalSelesai + "T23:59:59");
+        } else {
+            endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        }
 
         let sanitizedToken = (examForm.token || '').trim().toUpperCase();
         if (sanitizedToken.length > 20) sanitizedToken = sanitizedToken.substring(0, 20);
@@ -519,10 +534,10 @@ const ExamManagement = () => {
             mapelId: Number(examForm.mapelId),
             guruId: Number(examForm.guruId),
             waktuSelesai: endDate.toISOString(),
-            durasi: Number(examForm.durasi)
+            durasi: durasiNum
         };
 
-        // Validation against Event Range (skip for Latihan events)
+        // Validation against Event Range (allow override for latihan, ujicoba, simulasi)
         if (!isLatihan && ev && ev.tanggalMulai && ev.tanggalSelesai) {
             const evStart = new Date(ev.tanggalMulai + "T00:00");
             const evEnd = new Date(ev.tanggalSelesai + "T23:59");
@@ -3107,28 +3122,74 @@ const ExamManagement = () => {
                                             <label>Waktu Mulai</label>
                                             <input
                                                 type="datetime-local"
-                                                value={examForm.waktuMulai}
-                                                onChange={(e) => setExamForm({ ...examForm, waktuMulai: e.target.value })}
-                                                min={(() => {
-                                                    const ev = events.find(e => e.id == examForm.eventId);
-                                                    if (!ev || !ev.tanggalMulai) return '';
-                                                    const isInvalid = new Date(ev.tanggalSelesai) < new Date(ev.tanggalMulai);
-                                                    // Jika invalid, jangan batasi min agar user tetap bisa pilih (admin bisa fix nanti)
-                                                    return isInvalid ? '' : `${ev.tanggalMulai}T00:00`;
-                                                })()}
-                                                max={(() => {
-                                                    const ev = events.find(e => e.id == examForm.eventId);
-                                                    if (!ev || !ev.tanggalSelesai) return '';
-                                                    const isInvalid = new Date(ev.tanggalSelesai) < new Date(ev.tanggalMulai);
-                                                    return isInvalid ? '' : `${ev.tanggalSelesai}T23:59`;
-                                                })()}
+                                                value={examForm.waktuMulai || ''}
+                                                onChange={(e) => {
+                                                    const newStart = e.target.value;
+                                                    const dur = Number(examForm.durasi) || 0;
+                                                    let newEnd = examForm.waktuSelesai;
+                                                    if (newStart && dur > 0) {
+                                                        const s = new Date(newStart);
+                                                        const end = new Date(s.getTime() + dur * 60 * 1000);
+                                                        newEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                    }
+                                                    setExamForm({ ...examForm, waktuMulai: newStart, waktuSelesai: newEnd });
+                                                }}
                                                 required
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>Durasi (Menit) <span style={{ fontSize: "0.78rem", color: "#64748b", textTransform: "none", fontWeight: 500 }}>(Isi 0 jika Tanpa Batas Waktu / Ujian Latihan)</span></label>
-                                            <input type="number" value={examForm.durasi} onChange={(e) => setExamForm({ ...examForm, durasi: e.target.value })} required />
+                                            <label>Durasi (Menit) <span style={{ fontSize: "0.78rem", color: "#64748b", textTransform: "none", fontWeight: 500 }}>(Isi 0 jika Tanpa Batas Waktu / Latihan)</span></label>
+                                            <input 
+                                                type="number" 
+                                                value={examForm.durasi !== undefined ? examForm.durasi : ''} 
+                                                onChange={(e) => {
+                                                    const dur = Number(e.target.value) || 0;
+                                                    let newEnd = examForm.waktuSelesai;
+                                                    if (examForm.waktuMulai && dur > 0) {
+                                                        const s = new Date(examForm.waktuMulai);
+                                                        const end = new Date(s.getTime() + dur * 60 * 1000);
+                                                        newEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                    }
+                                                    setExamForm({ ...examForm, durasi: e.target.value, waktuSelesai: newEnd });
+                                                }} 
+                                                required 
+                                            />
                                         </div>
+                                    </div>
+                                    <div className="form-group" style={{ marginTop: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                            <label style={{ margin: 0 }}>Waktu Selesai (Batas Akhir Ujian)</label>
+                                            <button 
+                                                type="button" 
+                                                className="btn-icon-outline" 
+                                                style={{ width: 'auto', padding: '2px 8px', height: '24px', fontSize: '0.75rem', color: '#2563eb', borderColor: '#bfdbfe' }}
+                                                onClick={() => {
+                                                    const now = new Date();
+                                                    const nowStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                    const dur = Number(examForm.durasi) || 0;
+                                                    let endStr = nowStr;
+                                                    if (dur > 0) {
+                                                        const end = new Date(now.getTime() + dur * 60 * 1000);
+                                                        endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                    } else {
+                                                        const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                                                        endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                    }
+                                                    setExamForm({ ...examForm, waktuMulai: nowStr, waktuSelesai: endStr });
+                                                }}
+                                            >
+                                                ⚡ Set Waktu Sekarang (Ujicoba Langsung)
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="datetime-local"
+                                            value={examForm.waktuSelesai || ''}
+                                            onChange={(e) => setExamForm({ ...examForm, waktuSelesai: e.target.value })}
+                                            required
+                                        />
+                                        <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
+                                            {Number(examForm.durasi) === 0 ? '♾️ Durasi 0 = Waktu pengerjaan bebas / tanpa batas timer. Batas akhir di atas adalah batas akhir akses ujian.' : 'Otomatis dihitung dari Waktu Mulai + Durasi, tetapi dapat Anda sesuaikan ulang.'}
+                                        </span>
                                     </div>
                                     <div className="form-group">
                                         <label>Token Ujian</label>

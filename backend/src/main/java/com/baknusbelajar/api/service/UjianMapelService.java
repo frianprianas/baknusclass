@@ -151,13 +151,17 @@ public class UjianMapelService {
                     siswaUjianStatusRepository.findBySiswaIdAndUjianMapelId(siswa.getId(), e.getId())
                             .ifPresent(status -> {
                                 if (status.getWaktuMulaiSiswa() != null && !isFinished) {
-                                    long secondsElapsed = java.time.Duration
-                                            .between(status.getWaktuMulaiSiswa(), java.time.LocalDateTime.now())
-                                            .getSeconds();
-                                    long remainingDetik = (e.getDurasi() * 60) - secondsElapsed;
-                                    if (remainingDetik < 0)
-                                        remainingDetik = 0;
-                                    dto.setSisaWaktuDetik(remainingDetik);
+                                    if (e.getWaktuMulai() != null && status.getWaktuMulaiSiswa().isBefore(e.getWaktuMulai())) {
+                                        dto.setSisaWaktuDetik((long) (e.getDurasi() * 60));
+                                    } else {
+                                        long secondsElapsed = java.time.Duration
+                                                .between(status.getWaktuMulaiSiswa(), java.time.LocalDateTime.now())
+                                                .getSeconds();
+                                        long remainingDetik = (e.getDurasi() * 60) - secondsElapsed;
+                                        if (remainingDetik < 0)
+                                            remainingDetik = 0;
+                                        dto.setSisaWaktuDetik(remainingDetik);
+                                    }
                                 }
                             });
 
@@ -320,8 +324,10 @@ public class UjianMapelService {
                         return newStatus;
                     });
 
-            if (status.getWaktuMulaiSiswa() == null) {
+            if (status.getWaktuMulaiSiswa() == null || (entity.getWaktuMulai() != null && status.getWaktuMulaiSiswa().isBefore(entity.getWaktuMulai()))) {
                 status.setWaktuMulaiSiswa(java.time.LocalDateTime.now());
+                status.setStatusSelesai(false);
+                status.setWaktuSelesai(null);
             }
 
             siswaUjianStatusRepository.save(status);

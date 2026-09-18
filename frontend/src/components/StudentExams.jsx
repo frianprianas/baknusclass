@@ -2352,7 +2352,7 @@ const StudentExams = () => {
                                     </div>
                                     <div className="time-item">
                                         <Clock size={14} />
-                                        <span>Selesai: {new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        <span>Selesai: {Number(ex.durasi) === 0 ? "Bebas / Fleksibel" : new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                     </div>
                                 </div>
 
