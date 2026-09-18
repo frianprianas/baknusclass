@@ -24,7 +24,8 @@ import {
     RotateCcw,
     HelpCircle,
     RefreshCw,
-    Brush
+    Brush,
+    Maximize
 } from 'lucide-react';
 import Whiteboard from './Whiteboard';
 
@@ -49,6 +50,43 @@ const StudentExams = () => {
 
     // Exam Taking State
     const [currentExam, setCurrentExam] = useState(null);
+    const keysPressedRef = useRef(new Set());
+    const ctrlKeySequenceRef = useRef([]);
+    const allowExitFullscreenRef = useRef(false);
+    const [isFullscreenWarningOpen, setIsFullscreenWarningOpen] = useState(false);
+
+    const enterFullscreen = () => {
+        const elem = document.documentElement;
+        try {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(() => {
+                    if (currentExam && !allowExitFullscreenRef.current) {
+                        setIsFullscreenWarningOpen(true);
+                    }
+                });
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+        } catch (e) {
+            if (currentExam && !allowExitFullscreenRef.current) {
+                setIsFullscreenWarningOpen(true);
+            }
+        }
+    };
+
+    const exitFullscreenManually = () => {
+        try {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        } catch (e) {}
+    };
     const [questions, setQuestions] = useState([]);
     const [answers, setAnswers] = useState({}); // { soalId: text }
     const answersRef = useRef({});
@@ -79,6 +117,92 @@ const StudentExams = () => {
     useEffect(() => {
         fetchEvents();
     }, []);
+
+    // Fullscreen & Ctrl+B+H Key Combination Listener
+    useEffect(() => {
+        if (!currentExam) {
+            setIsFullscreenWarningOpen(false);
+            allowExitFullscreenRef.current = false;
+            keysPressedRef.current.clear();
+            ctrlKeySequenceRef.current = [];
+            return;
+        }
+
+        // Attempt automatic fullscreen when exam is active
+        enterFullscreen();
+
+        const handleKeyDown = (e) => {
+            const key = e.key ? e.key.toLowerCase() : '';
+            keysPressedRef.current.add(key);
+
+            if (e.ctrlKey || e.metaKey) {
+                if (key === 'b' || key === 'h') {
+                    ctrlKeySequenceRef.current.push(key);
+                    if (ctrlKeySequenceRef.current.length > 4) {
+                        ctrlKeySequenceRef.current.shift();
+                    }
+                }
+
+                // Check simultaneous press or sequential press of Ctrl + B + H
+                const simultaneousBH = keysPressedRef.current.has('b') && keysPressedRef.current.has('h');
+                const recentKeys = ctrlKeySequenceRef.current.join('');
+                const sequenceBH = recentKeys.endsWith('bh') || recentKeys.endsWith('hb');
+
+                if (simultaneousBH || sequenceBH) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    allowExitFullscreenRef.current = true;
+                    setIsFullscreenWarningOpen(false);
+                    exitFullscreenManually();
+                    ctrlKeySequenceRef.current = [];
+                    alert('Akses Pengawas: Mode Layar Penuh Berhasil Dinonaktifkan (Kombinasi Ctrl + B + H).');
+                    return;
+                }
+            }
+        };
+
+        const handleKeyUp = (e) => {
+            const key = e.key ? e.key.toLowerCase() : '';
+            keysPressedRef.current.delete(key);
+            if (!e.ctrlKey && !e.metaKey) {
+                ctrlKeySequenceRef.current = [];
+            }
+        };
+
+        const handleFullscreenChange = () => {
+            const isFull = !!(
+                document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement ||
+                document.msFullscreenElement
+            );
+
+            if (!isFull) {
+                if (!allowExitFullscreenRef.current) {
+                    setIsFullscreenWarningOpen(true);
+                    enterFullscreen();
+                }
+            } else {
+                setIsFullscreenWarningOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown, true);
+        window.addEventListener('keyup', handleKeyUp, true);
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown, true);
+            window.removeEventListener('keyup', handleKeyUp, true);
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+        };
+    }, [currentExam]);
 
     useEffect(() => {
         if (currentExam || showTokenOverlay || showFinishConfirm) {
@@ -322,6 +446,8 @@ const StudentExams = () => {
         ];
 
         setQuestions(sampleQuestions);
+        allowExitFullscreenRef.current = false;
+        enterFullscreen();
         setCurrentExam(practiceExam);
         setCurrentIndex(0);
         setTimer(0);
@@ -515,6 +641,8 @@ const StudentExams = () => {
                 return;
             }
 
+            allowExitFullscreenRef.current = false;
+            enterFullscreen();
             setQuestions(allQuestions);
             setCurrentExam(exam);
             setCurrentIndex(0);
@@ -716,6 +844,8 @@ const StudentExams = () => {
             if (!forced) alert('Ujian Selesai! Jawaban Anda telah tersimpan dan akan segera dinilai oleh sistem & Guru.');
             else alert('Waktu habis! Ujian telah diselesaikan otomatis.');
 
+            allowExitFullscreenRef.current = true;
+            exitFullscreenManually();
             if (currentExam.keepAliveInterval) clearInterval(currentExam.keepAliveInterval);
             setCurrentExam(null);
             setQuestions([]);
@@ -743,6 +873,63 @@ const StudentExams = () => {
 
         return (
             <div className="cbt-layout">
+                {/* Fullscreen Enforcer Warning Overlay */}
+                {isFullscreenWarningOpen && !allowExitFullscreenRef.current && (
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 999999,
+                        background: 'rgba(15, 23, 42, 0.96)',
+                        backdropFilter: 'blur(12px)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '24px',
+                        textAlign: 'center',
+                        color: '#ffffff'
+                    }}>
+                        <div style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '2px solid rgba(239, 68, 68, 0.4)',
+                            borderRadius: '50%',
+                            padding: '20px',
+                            marginBottom: '20px',
+                            display: 'inline-flex',
+                            color: '#ef4444'
+                        }}>
+                            <Maximize size={48} />
+                        </div>
+                        <h2 style={{ fontSize: '1.8rem', fontWeight: 900, marginBottom: '12px', color: '#ffffff' }}>
+                            Mode Layar Penuh (Fullscreen) Diwajibkan
+                        </h2>
+                        <p style={{ maxWidth: '520px', fontSize: '1rem', color: '#cbd5e1', lineHeight: 1.6, marginBottom: '24px' }}>
+                            Aplikasi ujian harus dikerjakan dalam mode layar penuh. Untuk keluar dari aplikasi layar penuh, pengawas harus menekan kombinasi tombol <kbd style={{ background: '#334155', padding: '4px 8px', borderRadius: '6px', fontWeight: 800, color: '#f8fafc', border: '1px solid #475569' }}>Ctrl + B + H</kbd>.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={enterFullscreen}
+                            style={{
+                                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '14px 32px',
+                                borderRadius: '14px',
+                                fontWeight: 800,
+                                fontSize: '1.05rem',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.5)'
+                            }}
+                        >
+                            <Maximize size={20} />
+                            Kembali ke Layar Penuh Ujian
+                        </button>
+                    </div>
+                )}
+
                 <header className="cbt-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div className="cbt-logo-circle">
@@ -753,9 +940,26 @@ const StudentExams = () => {
                             <span>{currentExam?.namaEvent || 'SMK Bakti Nusantara 666'}</span>
                         </div>
                     </div>
-                    <div className="cbt-userinfo">
-                        <User size={18} />
-                        <span>{user.name}</span>
+                    <div className="cbt-userinfo" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#f0fdf4',
+                            color: '#16a34a',
+                            border: '1px solid #bbf7d0',
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700
+                        }} title="Kombinasi tombol pengawas untuk keluar: Ctrl + B + H">
+                            <Maximize size={13} />
+                            <span>Layar Penuh (Keluar: Ctrl+B+H)</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <User size={18} />
+                            <span>{user.name}</span>
+                        </div>
                     </div>
                 </header>
 
