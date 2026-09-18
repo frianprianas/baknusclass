@@ -53,27 +53,18 @@ const StudentExams = () => {
     const keysPressedRef = useRef(new Set());
     const ctrlKeySequenceRef = useRef([]);
     const allowExitFullscreenRef = useRef(false);
-    const [isFullscreenWarningOpen, setIsFullscreenWarningOpen] = useState(false);
 
     const enterFullscreen = () => {
         const elem = document.documentElement;
         try {
             if (elem.requestFullscreen) {
-                elem.requestFullscreen().catch(() => {
-                    if (currentExam && !allowExitFullscreenRef.current) {
-                        setIsFullscreenWarningOpen(true);
-                    }
-                });
+                elem.requestFullscreen().catch(() => {});
             } else if (elem.webkitRequestFullscreen) {
                 elem.webkitRequestFullscreen();
             } else if (elem.msRequestFullscreen) {
                 elem.msRequestFullscreen();
             }
-        } catch (e) {
-            if (currentExam && !allowExitFullscreenRef.current) {
-                setIsFullscreenWarningOpen(true);
-            }
-        }
+        } catch (e) {}
     };
 
     const exitFullscreenManually = () => {
@@ -121,8 +112,7 @@ const StudentExams = () => {
     // Fullscreen & Ctrl+B+H Key Combination Listener
     useEffect(() => {
         if (!currentExam) {
-            setIsFullscreenWarningOpen(false);
-            allowExitFullscreenRef.current = false;
+                        allowExitFullscreenRef.current = false;
             keysPressedRef.current.clear();
             ctrlKeySequenceRef.current = [];
             return;
@@ -152,8 +142,7 @@ const StudentExams = () => {
                     e.preventDefault();
                     e.stopPropagation();
                     allowExitFullscreenRef.current = true;
-                    setIsFullscreenWarningOpen(false);
-                    exitFullscreenManually();
+                                        exitFullscreenManually();
                     ctrlKeySequenceRef.current = [];
                     alert('Akses Pengawas: Mode Layar Penuh Berhasil Dinonaktifkan.');
                     return;
@@ -177,13 +166,8 @@ const StudentExams = () => {
                 document.msFullscreenElement
             );
 
-            if (!isFull) {
-                if (!allowExitFullscreenRef.current) {
-                    setIsFullscreenWarningOpen(true);
-                    enterFullscreen();
-                }
-            } else {
-                setIsFullscreenWarningOpen(false);
+            if (!isFull && !allowExitFullscreenRef.current) {
+                enterFullscreen();
             }
         };
 
@@ -872,77 +856,23 @@ const StudentExams = () => {
         if (fontSizeScale === 3) fontClass = 'text-xl';
 
         return (
-            <div className="cbt-layout">
-                {/* Fullscreen Enforcer Warning Overlay */}
-                {isFullscreenWarningOpen && !allowExitFullscreenRef.current && (
-                    <div style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 999999,
-                        background: 'rgba(15, 23, 42, 0.96)',
-                        backdropFilter: 'blur(12px)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '24px',
-                        textAlign: 'center',
-                        color: '#ffffff'
-                    }}>
-                        <div style={{
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            border: '2px solid rgba(239, 68, 68, 0.4)',
-                            borderRadius: '50%',
-                            padding: '20px',
-                            marginBottom: '20px',
-                            display: 'inline-flex',
-                            color: '#ef4444'
-                        }}>
-                            <Maximize size={48} />
-                        </div>
-                        <h2 style={{ fontSize: '1.8rem', fontWeight: 900, marginBottom: '12px', color: '#ffffff' }}>
-                            Mode Layar Penuh (Fullscreen) Diwajibkan
-                        </h2>
-                        <p style={{ maxWidth: '520px', fontSize: '1rem', color: '#cbd5e1', lineHeight: 1.6, marginBottom: '24px' }}>
-                            Aplikasi ujian wajib dikerjakan dalam mode layar penuh. Silakan klik tombol di bawah untuk melanjutkan pengerjaan ujian.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={enterFullscreen}
-                            style={{
-                                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '14px 32px',
-                                borderRadius: '14px',
-                                fontWeight: 800,
-                                fontSize: '1.05rem',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.5)'
-                            }}
-                        >
-                            <Maximize size={20} />
-                            Kembali ke Layar Penuh Ujian
-                        </button>
-                    </div>
-                )}
+            <div className="cbt-layout" onClick={() => { if (!allowExitFullscreenRef.current && !document.fullscreenElement) enterFullscreen(); }}>
 
                 <header className="cbt-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="cbt-header-left">
                         <div className="cbt-logo-circle">
-                            <BookOpen size={24} color="#1e88e5" />
+                            <BookOpen size={22} color="#1d4ed8" />
                         </div>
                         <div className="cbt-title">
                             <strong>{currentExam?.namaMapel || 'Ujian CBT BaknusClass'}</strong>
                             <span>{currentExam?.namaEvent || 'SMK Bakti Nusantara 666'}</span>
                         </div>
                     </div>
-                    <div className="cbt-userinfo">
-                        <User size={18} />
-                        <span>{user.name}</span>
+                    <div className="cbt-header-right">
+                        <div className="cbt-userinfo">
+                            <div className="cbt-user-icon"><User size={16} /></div>
+                            <span>{user.name}</span>
+                        </div>
                     </div>
                 </header>
 
@@ -1299,21 +1229,25 @@ const StudentExams = () => {
                             </div>
 
                             <div className="cbt-footer">
-                                <button className="cbt-footer-btn cbt-btn-prev" disabled={currentIndex === 0} onClick={handlePrev}>
-                                    <div className="icon-circle"><ChevronLeft size={16} strokeWidth={3} /></div> Soal sebelumnya
+                                <button className="cbt-footer-btn cbt-btn-prev" disabled={currentIndex === 0} onClick={handlePrev} title="Soal sebelumnya">
+                                    <div className="icon-circle"><ChevronLeft size={16} strokeWidth={2.5} /></div>
+                                    <span>Soal Sebelumnya</span>
                                 </button>
 
-                                <button className={`cbt-footer-btn cbt-btn-ragu ${raguState[q?.id] ? 'active' : ''}`} onClick={toggleRagu}>
-                                    <div className={`checkbox-square ${raguState[q?.id] ? 'checked' : ''}`}></div> {raguState[q?.id] ? 'Batal Ragu' : 'Ragu - Ragu'}
+                                <button className={`cbt-footer-btn cbt-btn-ragu ${raguState[q?.id] ? 'active' : ''}`} onClick={toggleRagu} title="Tandai ragu-ragu">
+                                    <div className={`checkbox-square ${raguState[q?.id] ? 'checked' : ''}`}></div>
+                                    <span>{raguState[q?.id] ? 'Batal Ragu' : 'Ragu - Ragu'}</span>
                                 </button>
 
                                 {currentIndex === questions.length - 1 ? (
-                                    <button className="cbt-footer-btn cbt-btn-next finish" onClick={handleFinishExam}>
-                                        Selesai <div className="icon-circle"><Check size={16} strokeWidth={3} /></div>
+                                    <button className="cbt-footer-btn cbt-btn-next finish" onClick={handleFinishExam} title="Selesai dan kirim jawaban">
+                                        <span>Selesai Ujian</span>
+                                        <div className="icon-circle"><Check size={16} strokeWidth={2.5} /></div>
                                     </button>
                                 ) : (
-                                    <button className="cbt-footer-btn cbt-btn-next" onClick={handleNext}>
-                                        Soal berikutnya <div className="icon-circle"><ChevronRight size={16} strokeWidth={3} /></div>
+                                    <button className="cbt-footer-btn cbt-btn-next" onClick={handleNext} title="Soal berikutnya">
+                                        <span>Soal Berikutnya</span>
+                                        <div className="icon-circle"><ChevronRight size={16} strokeWidth={2.5} /></div>
                                     </button>
                                 )}
                             </div>
@@ -2220,12 +2154,15 @@ const StudentExams = () => {
                     [data-theme="dark"] .cbt-tf-btn.btn-false.selected { background: #7f1d1d; border-color: #ef4444; color: #fecaca; }
 
                     .cbt-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: #eef2f6; position: fixed; top: 0; left: 0; width: 100%; z-index: 2000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
-                    .cbt-header { background: #1e88e5; color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0; }
-                    .cbt-logo-circle { background: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-                    .cbt-title { display: flex; flex-direction: column; line-height: 1.1; }
-                    .cbt-title strong { font-size: 1.25rem; font-weight: 800; letter-spacing: 0.5px; margin:0; }
-                    .cbt-title span { font-size: 0.8rem; font-weight: 400; opacity: 0.9; }
-                    .cbt-userinfo { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 1rem; }
+                    .cbt-header { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%); color: white; padding: 14px 32px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 16px rgba(30, 58, 138, 0.18); flex-shrink: 0; min-height: 64px; z-index: 10; }
+                    .cbt-header-left { display: flex; align-items: center; gap: 14px; }
+                    .cbt-logo-circle { background: white; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.12); flex-shrink: 0; }
+                    .cbt-title { display: flex; flex-direction: column; line-height: 1.2; }
+                    .cbt-title strong { font-size: 1.18rem; font-weight: 800; letter-spacing: 0.3px; margin: 0; color: #ffffff; }
+                    .cbt-title span { font-size: 0.82rem; font-weight: 500; color: #e0f2fe; opacity: 0.9; margin-top: 2px; }
+                    .cbt-header-right { display: flex; align-items: center; gap: 12px; }
+                    .cbt-userinfo { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.92rem; background: rgba(255, 255, 255, 0.14); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 50px; border: 1px solid rgba(255, 255, 255, 0.22); color: #ffffff; }
+                    .cbt-user-icon { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
                     
                     .cbt-main { flex: 1; display: flex; justify-content: center; padding: 24px; overflow-y: auto; }
                     .cbt-container { background: white; width: 100%; max-width: 1300px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
@@ -2298,24 +2235,25 @@ const StudentExams = () => {
                     .cbt-answer-area textarea:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
                     .cbt-save-indicator { font-size: 0.85rem; color: #94a3b8; margin-top: 10px; display: flex; align-items: center; gap: 6px; font-style: italic; }
                     
-                    .cbt-footer { display: flex; justify-content: space-between; padding: 24px 40px; background: white; align-items: center; border-top: 1px solid #e2e8f0; }
-                    .cbt-footer-btn { display: flex; align-items: center; gap: 10px; padding: 10px 24px; border-radius: 50px; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; border: none; color: white; }
-                    .cbt-footer-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+                    .cbt-footer { display: flex; justify-content: space-between; padding: 20px 36px; background: white; align-items: center; border-top: 1px solid #e2e8f0; box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.04); gap: 16px; flex-wrap: wrap; }
+                    .cbt-footer-btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 26px; border-radius: 12px; font-weight: 700; font-size: 0.94rem; cursor: pointer; transition: all 0.2s ease-in-out; border: none; color: white; }
+                    .cbt-footer-btn:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.8); }
                     
-                    .cbt-btn-prev { background: #ef4444; }
-                    .cbt-btn-prev:hover:not(:disabled) { background: #dc2626; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+                    .cbt-btn-prev { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
+                    .cbt-btn-prev .icon-circle { background: #e2e8f0; color: #475569; }
+                    .cbt-btn-prev:hover:not(:disabled) { background: #e2e8f0; color: #1e293b; border-color: #94a3b8; transform: translateY(-1px); }
                     
-                    .cbt-btn-ragu { background: #f59e0b; color: white; }
-                    .cbt-btn-ragu:hover { background: #d97706; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+                    .cbt-btn-ragu { background: #fffbeb; color: #b45309; border: 1.5px solid #fde68a; }
+                    .cbt-btn-ragu:hover { background: #fef3c7; border-color: #f59e0b; transform: translateY(-1px); }
+                    .cbt-btn-ragu.active { background: #f59e0b; color: white; border-color: #d97706; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3); }
                     
-                    .cbt-btn-next { background: #3b82f6; }
-                    .cbt-btn-next.finish { background: #10b981; }
-                    .cbt-btn-next:hover:not(:disabled) { background: #2563eb; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
-                    .cbt-btn-next.finish:hover:not(:disabled) { background: #059669; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+                    .cbt-btn-next { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25); }
+                    .cbt-btn-next:hover:not(:disabled) { background: linear-gradient(135deg, #1d4ed8, #1e40af); box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35); transform: translateY(-1px); }
+                    .cbt-btn-next.finish { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25); }
+                    .cbt-btn-next.finish:hover:not(:disabled) { background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35); transform: translateY(-1px); }
                     
-                    .icon-circle { background: white; color: inherit; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
-                    .cbt-btn-prev .icon-circle { color: #ef4444; }
-                    .cbt-btn-next .icon-circle { color: #3b82f6; }
+                    .icon-circle { background: rgba(255, 255, 255, 0.25); color: inherit; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+                    .cbt-btn-next .icon-circle, .cbt-btn-next.finish .icon-circle { background: rgba(255, 255, 255, 0.25); color: white; }
                     .cbt-body { flex: 1; display: flex; overflow: hidden; background: #f8fafc; }
                     .cbt-sidebar { width: 320px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; padding: 24px; }
                     .sidebar-title { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #1e293b; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9; }
