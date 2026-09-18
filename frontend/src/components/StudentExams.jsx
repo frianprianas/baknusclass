@@ -155,7 +155,7 @@ const StudentExams = () => {
                     setIsFullscreenWarningOpen(false);
                     exitFullscreenManually();
                     ctrlKeySequenceRef.current = [];
-                    alert('Akses Pengawas: Mode Layar Penuh Berhasil Dinonaktifkan (Kombinasi Ctrl + B + H).');
+                    alert('Akses Pengawas: Mode Layar Penuh Berhasil Dinonaktifkan.');
                     return;
                 }
             }
@@ -904,7 +904,7 @@ const StudentExams = () => {
                             Mode Layar Penuh (Fullscreen) Diwajibkan
                         </h2>
                         <p style={{ maxWidth: '520px', fontSize: '1rem', color: '#cbd5e1', lineHeight: 1.6, marginBottom: '24px' }}>
-                            Aplikasi ujian harus dikerjakan dalam mode layar penuh. Untuk keluar dari aplikasi layar penuh, pengawas harus menekan kombinasi tombol <kbd style={{ background: '#334155', padding: '4px 8px', borderRadius: '6px', fontWeight: 800, color: '#f8fafc', border: '1px solid #475569' }}>Ctrl + B + H</kbd>.
+                            Aplikasi ujian wajib dikerjakan dalam mode layar penuh. Silakan klik tombol di bawah untuk melanjutkan pengerjaan ujian.
                         </p>
                         <button
                             type="button"
@@ -940,26 +940,9 @@ const StudentExams = () => {
                             <span>{currentExam?.namaEvent || 'SMK Bakti Nusantara 666'}</span>
                         </div>
                     </div>
-                    <div className="cbt-userinfo" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: '#f0fdf4',
-                            color: '#16a34a',
-                            border: '1px solid #bbf7d0',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700
-                        }} title="Kombinasi tombol pengawas untuk keluar: Ctrl + B + H">
-                            <Maximize size={13} />
-                            <span>Layar Penuh (Keluar: Ctrl+B+H)</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <User size={18} />
-                            <span>{user.name}</span>
-                        </div>
+                    <div className="cbt-userinfo">
+                        <User size={18} />
+                        <span>{user.name}</span>
                     </div>
                 </header>
 
