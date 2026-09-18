@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { User, Lock, Eye, EyeOff, Loader2, Info } from 'lucide-react';
 
 const Login = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +32,11 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify({ role, name, profileId, email, kelasId, userId, isCoAdmin }));
 
 
-      window.location.href = '/dashboard';
+      if (role === 'SISWA') {
+        navigate('/student-exams');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal. Periksa kembali username dan password.');
     } finally {

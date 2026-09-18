@@ -9,10 +9,10 @@ import com.baknusbelajar.api.entity.Users;
 import com.baknusbelajar.api.repository.GuruRepository;
 import com.baknusbelajar.api.repository.SiswaRepository;
 import com.baknusbelajar.api.repository.UserRepository;
+import com.baknusbelajar.api.security.CustomUserDetails;
 import com.baknusbelajar.api.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,27 +34,30 @@ public class AuthService {
     private final MailcowAuthService mailcowAuthService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
-    private final AuthenticationManager authenticationManager;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail();
         String password = request.getPassword();
 
-        // 1. Authenticate against Mailcow first to get the latest tags/roles
-        // This ensures if a user's role changes in Mailcow, it is reflected here
-        MailcowUserDTO mailcowUser = mailcowAuthService.authenticateAndGetTags(email, password);
+        // 1. FAST PATH: Cek apakah user sudah terdaftar di database lokal dan password cocok dengan hash
+        Optional<Users> existingUserOpt = userRepository.findByEmail(email);
+        if (existingUserOpt.isPresent()) {
+            Users existingUser = existingUserOpt.get();
+            if (!Boolean.TRUE.equals(existingUser.getIsActive())) {
+                throw new BadCredentialsException("Akun Anda telah dinonaktifkan oleh Admin.");
+            }
 
-        Optional<Users> existingUser = userRepository.findByEmail(email);
-        if (existingUser.isPresent() && !existingUser.get().getIsActive()) {
-            throw new BadCredentialsException("Akun Anda telah dinonaktifkan oleh Admin.");
+            // Jika password cocok dengan hash lokal (instant login ~50ms tanpa tunggu handshake IMAP)
+            if (existingUser.getPasswordHash() != null && passwordEncoder.matches(password, existingUser.getPasswordHash())) {
+                log.info("Fast-path login successful for: {}", email);
+                return generateTokensForUser(existingUser);
+            }
         }
 
+        // 2. SLOW PATH: User baru pertama kali login ATAU password baru saja diubah di Mailcow
+        MailcowUserDTO mailcowUser = mailcowAuthService.authenticateAndGetTags(email, password);
         if (mailcowUser == null) {
-            // If Mailcow fails, try fallback to Oracle DB only (for local accounts)
-            if (existingUser.isPresent() && passwordEncoder.matches(password, existingUser.get().getPasswordHash())) {
-                return generateTokensForUser(email, password, existingUser.get());
-            }
             throw new BadCredentialsException("Invalid Email or Password");
         }
 
@@ -62,15 +65,14 @@ public class AuthService {
             throw new BadCredentialsException("User account is disabled in Mailcow");
         }
 
-        // 2. Determine role from latest Mailcow tags
+        // Determine role from latest Mailcow tags
         List<String> tags = mailcowUser.getTags();
         log.info("Tags received from Mailcow for {}: {}", email, tags);
         String role = determineRoleFromTags(tags, email);
         log.info("Determined role for {}: {}", email, role);
 
-        // 3. Provision or Update User in Oracle Database
-        Optional<Users> userOpt = userRepository.findByEmail(email);
-        Users user = userOpt.orElseGet(() -> {
+        // Provision or Update User in Database
+        Users user = existingUserOpt.orElseGet(() -> {
             Users newUser = new Users();
             newUser.setEmail(email);
             newUser.setUsername(
@@ -88,11 +90,10 @@ public class AuthService {
         // Provision detailed profiles if they don't exist
         provisionUserProfile(savedUser, role, mailcowUser.getName(), mailcowUser.getTags());
 
-        return generateTokensForUser(email, password, savedUser);
+        return generateTokensForUser(savedUser);
     }
 
     private String determineRoleFromTags(List<String> tags, String email) {
-        // 1. Check Tags from Mailcow
         if (tags != null && !tags.isEmpty()) {
             for (String tag : tags) {
                 String t = tag.toLowerCase();
@@ -107,14 +108,13 @@ public class AuthService {
             }
         }
 
-        // 2. Fallback: Check email prefix for Admin/SuperUser (safety net)
         String prefix = email.split("@")[0].toLowerCase();
         if (prefix.equals("admin") || prefix.equals("super") || prefix.equals("superuser") ||
                 prefix.equals("it.support") || prefix.contains("superadmin") || prefix.contains("administrator")) {
             return "ADMIN";
         }
 
-        return "SISWA"; // Default role
+        return "SISWA";
     }
 
     private void provisionUserProfile(Users user, String role, String name, List<String> tags) {
@@ -123,44 +123,48 @@ public class AuthService {
                 Siswa siswa = new Siswa();
                 siswa.setUser(user);
                 siswa.setNamaLengkap(name != null && !name.isEmpty() ? name : user.getUsername());
-                Siswa savedSiswa = siswaRepository.saveAndFlush(siswa);
+                siswaRepository.saveAndFlush(siswa);
             }
         } else if ("GURU".equalsIgnoreCase(role) || "TU".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) {
             if (guruRepository.findByUserId(user.getId()).isEmpty()) {
                 Guru guru = new Guru();
                 guru.setUser(user);
                 guru.setNamaLengkap(name != null && !name.isEmpty() ? name : user.getUsername());
-                Guru savedGuru = guruRepository.saveAndFlush(guru);
+                guruRepository.saveAndFlush(guru);
             }
         }
     }
 
-    private AuthResponse generateTokensForUser(String email, String plainPassword, Users user) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(email, plainPassword));
-
-        String jwt = jwtTokenProvider.generateToken(authentication);
-
-        // Get the real name and profile ID from entity or profiles
+    private AuthResponse generateTokensForUser(Users user) {
         String name = user.getNamaLengkap() != null ? user.getNamaLengkap() : user.getUsername();
         Long profileId = null;
         Long kelasId = null;
+        Boolean isCoAdmin = false;
 
-        Boolean isCoAdmin = null;
         if ("SISWA".equalsIgnoreCase(user.getRole())) {
             var s = siswaRepository.findByUserId(user.getId());
-            name = s.map(Siswa::getNamaLengkap).orElse(name);
-            profileId = s.map(Siswa::getId).orElse(null);
-            kelasId = s.map(siswa -> siswa.getKelas() != null ? siswa.getKelas().getId() : null).orElse(null);
-        } else if ("GURU".equalsIgnoreCase(user.getRole()) || "TU".equalsIgnoreCase(user.getRole())
-                || "ADMIN".equalsIgnoreCase(user.getRole())) {
+            if (s.isPresent()) {
+                var siswa = s.get();
+                name = siswa.getNamaLengkap() != null ? siswa.getNamaLengkap() : name;
+                profileId = siswa.getId();
+                if (siswa.getKelas() != null) {
+                    kelasId = siswa.getKelas().getId();
+                }
+            }
+        } else {
             var g = guruRepository.findByUserId(user.getId());
-            name = g.map(Guru::getNamaLengkap).orElse(name);
-            profileId = g.map(Guru::getId).orElse(null);
-            isCoAdmin = g.map(Guru::getIsCoAdmin).orElse(false);
+            if (g.isPresent()) {
+                var guru = g.get();
+                name = guru.getNamaLengkap() != null ? guru.getNamaLengkap() : name;
+                profileId = guru.getId();
+                isCoAdmin = Boolean.TRUE.equals(guru.getIsCoAdmin());
+            }
         }
 
-        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId, isCoAdmin);
+        CustomUserDetails userDetails = CustomUserDetails.create(user, Boolean.TRUE.equals(isCoAdmin));
+        Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        String jwt = jwtTokenProvider.generateToken(authentication);
 
+        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId, isCoAdmin);
     }
 }

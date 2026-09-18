@@ -126,6 +126,8 @@ public class MailcowAuthService {
         props.put("mail.imap.port", "143");
         props.put("mail.imap.starttls.enable", "true");
         props.put("mail.imap.ssl.trust", "*");
+        props.put("mail.imap.connectiontimeout", "3000");
+        props.put("mail.imap.timeout", "3000");
 
         Session session = Session.getInstance(props);
         try (Store store = session.getStore("imap")) {
