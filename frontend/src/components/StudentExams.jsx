@@ -58,7 +58,12 @@ const StudentExams = () => {
         const elem = document.documentElement;
         try {
             if (elem.requestFullscreen) {
-                elem.requestFullscreen().catch(() => {});
+                elem.requestFullscreen().then(() => {
+                    // Lock Escape key via Keyboard Lock API (Chromium browsers)
+                    if (navigator.keyboard && typeof navigator.keyboard.lock === 'function') {
+                        navigator.keyboard.lock(['Escape', 'F11']).catch(() => {});
+                    }
+                }).catch(() => {});
             } else if (elem.webkitRequestFullscreen) {
                 elem.webkitRequestFullscreen();
             } else if (elem.msRequestFullscreen) {
@@ -69,6 +74,9 @@ const StudentExams = () => {
 
     const exitFullscreenManually = () => {
         try {
+            if (navigator.keyboard && typeof navigator.keyboard.unlock === 'function') {
+                navigator.keyboard.unlock();
+            }
             if (document.exitFullscreen) {
                 document.exitFullscreen().catch(() => {});
             } else if (document.webkitExitFullscreen) {
@@ -109,22 +117,48 @@ const StudentExams = () => {
         fetchEvents();
     }, []);
 
-    // Fullscreen & Ctrl+B+H Key Combination Listener
+    // Fullscreen & Lockdown (Escape, F11, X close protection, Ctrl+B+H)
     useEffect(() => {
         if (!currentExam) {
-                        allowExitFullscreenRef.current = false;
+            allowExitFullscreenRef.current = false;
             keysPressedRef.current.clear();
             ctrlKeySequenceRef.current = [];
             return;
         }
 
-        // Attempt automatic fullscreen when exam is active
+        // Enter fullscreen immediately
         enterFullscreen();
 
         const handleKeyDown = (e) => {
             const key = e.key ? e.key.toLowerCase() : '';
             keysPressedRef.current.add(key);
 
+            // Block Escape key from exiting fullscreen or closing modals unless unlocked
+            if (e.key === 'Escape' || e.code === 'Escape') {
+                if (!allowExitFullscreenRef.current) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            // Block F11 (browser fullscreen toggle)
+            if (e.key === 'F11') {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+
+            // Block common tab/window closure and refresh shortcuts (Ctrl+W, Ctrl+R, F5)
+            if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (key === 'r' || key === 'w' || key === 'q'))) {
+                if (!allowExitFullscreenRef.current) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            // Secret Proctor Unlock: Ctrl + B + H
             if (e.ctrlKey || e.metaKey) {
                 if (key === 'b' || key === 'h') {
                     ctrlKeySequenceRef.current.push(key);
@@ -133,7 +167,6 @@ const StudentExams = () => {
                     }
                 }
 
-                // Check simultaneous press or sequential press of Ctrl + B + H
                 const simultaneousBH = keysPressedRef.current.has('b') && keysPressedRef.current.has('h');
                 const recentKeys = ctrlKeySequenceRef.current.join('');
                 const sequenceBH = recentKeys.endsWith('bh') || recentKeys.endsWith('hb');
@@ -142,7 +175,7 @@ const StudentExams = () => {
                     e.preventDefault();
                     e.stopPropagation();
                     allowExitFullscreenRef.current = true;
-                                        exitFullscreenManually();
+                    exitFullscreenManually();
                     ctrlKeySequenceRef.current = [];
                     alert('Akses Pengawas: Mode Layar Penuh Berhasil Dinonaktifkan.');
                     return;
@@ -171,8 +204,26 @@ const StudentExams = () => {
             }
         };
 
+        // Prevent browser close (X button or Alt+F4) via beforeunload prompt
+        const handleBeforeUnload = (e) => {
+            if (!allowExitFullscreenRef.current) {
+                e.preventDefault();
+                e.returnValue = 'Ujian sedang berlangsung! Jangan menutup atau meninggalkan halaman ini.';
+                return e.returnValue;
+            }
+        };
+
+        // Disable right-click inspect/context menu during exam
+        const handleContextMenu = (e) => {
+            if (!allowExitFullscreenRef.current) {
+                e.preventDefault();
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown, true);
         window.addEventListener('keyup', handleKeyUp, true);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('contextmenu', handleContextMenu);
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
@@ -181,6 +232,8 @@ const StudentExams = () => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown, true);
             window.removeEventListener('keyup', handleKeyUp, true);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('contextmenu', handleContextMenu);
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
             document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
             document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
