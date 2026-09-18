@@ -578,4 +578,115 @@ public class UjianMapelService {
         resp.put("message", "Berhasil menyalin " + (copiedPG + copiedEssay) + " soal (" + copiedPG + " PG, " + copiedEssay + " Essay)");
         return resp;
     }
+
+    public List<ExamPesertaDTO> getPesertaUjian(Long ujianId, Long kelasId, String statusFilter) {
+        UjianMapel ujian = ujianMapelRepository.findById(ujianId)
+                .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan (ID: " + ujianId + ")"));
+
+        List<com.baknusbelajar.api.entity.Siswa> siswaList = new java.util.ArrayList<>();
+        if (kelasId != null) {
+            siswaList.addAll(siswaRepository.findByKelasId(kelasId));
+        } else if (ujian.getKelasList() != null && !ujian.getKelasList().isEmpty()) {
+            for (com.baknusbelajar.api.entity.Kelas k : ujian.getKelasList()) {
+                siswaList.addAll(siswaRepository.findByKelasId(k.getId()));
+            }
+        } else if (ujian.getGuru() != null && ujian.getMapel() != null) {
+            List<com.baknusbelajar.api.entity.GuruMapel> guruMapels = guruMapelRepository.findByGuruId(ujian.getGuru().getId())
+                    .stream()
+                    .filter(gm -> gm.getMapel() != null && gm.getMapel().getId().equals(ujian.getMapel().getId()))
+                    .collect(Collectors.toList());
+            for (com.baknusbelajar.api.entity.GuruMapel gm : guruMapels) {
+                if (gm.getKelas() != null) {
+                    siswaList.addAll(siswaRepository.findByKelasId(gm.getKelas().getId()));
+                }
+            }
+        }
+
+        // Deduplicate siswa
+        Map<Long, com.baknusbelajar.api.entity.Siswa> distinctSiswa = siswaList.stream()
+                .collect(Collectors.toMap(com.baknusbelajar.api.entity.Siswa::getId, s -> s, (s1, s2) -> s1, java.util.LinkedHashMap::new));
+
+        // Batch load status & answers
+        Map<Long, com.baknusbelajar.api.entity.SiswaUjianStatus> statusMap = siswaUjianStatusRepository.findByUjianMapelId(ujianId).stream()
+                .filter(st -> st.getSiswa() != null)
+                .collect(Collectors.toMap(st -> st.getSiswa().getId(), st -> st, (st1, st2) -> st1));
+
+        Map<Long, List<com.baknusbelajar.api.entity.JawabanPG>> pgMap = jawabanPGRepository.findBySoalPG_UjianMapel_Id(ujianId).stream()
+                .filter(j -> j.getSiswa() != null)
+                .collect(Collectors.groupingBy(j -> j.getSiswa().getId()));
+
+        Map<Long, List<com.baknusbelajar.api.entity.JawabanSiswa>> essayMap = jawabanSiswaRepository.findBySoalEssay_UjianMapel_Id(ujianId).stream()
+                .filter(j -> j.getSiswa() != null)
+                .collect(Collectors.groupingBy(j -> j.getSiswa().getId()));
+
+        Set<String> activeNisns = (examStatusService != null) ? examStatusService.getActiveStudents(ujianId, null) : Collections.emptySet();
+
+        String normalizedStatusFilter = (statusFilter != null && !statusFilter.trim().isEmpty())
+                ? statusFilter.trim().toUpperCase() : null;
+
+        List<ExamPesertaDTO> result = new java.util.ArrayList<>();
+
+        for (com.baknusbelajar.api.entity.Siswa siswa : distinctSiswa.values()) {
+            com.baknusbelajar.api.entity.SiswaUjianStatus st = statusMap.get(siswa.getId());
+            boolean isFinished = (st != null && Boolean.TRUE.equals(st.getStatusSelesai()));
+            boolean isOnline = (siswa.getNisn() != null && activeNisns != null &&
+                    activeNisns.stream().anyMatch(os -> os.startsWith(siswa.getNisn() + ":")));
+            boolean hasStarted = (st != null && st.getWaktuMulaiSiswa() != null);
+
+            String statusStr;
+            Double nilai = null;
+            java.time.LocalDateTime waktuMulai = null;
+            java.time.LocalDateTime waktuSelesai = null;
+
+            if (isFinished) {
+                statusStr = "SUDAH";
+                waktuMulai = st.getWaktuMulaiSiswa();
+                waktuSelesai = st.getWaktuSelesai();
+
+                double totalPg = pgMap.getOrDefault(siswa.getId(), Collections.emptyList()).stream()
+                        .mapToDouble(p -> p.getSkor() != null ? p.getSkor() : 0.0).sum();
+                double totalEssay = essayMap.getOrDefault(siswa.getId(), Collections.emptyList()).stream()
+                        .mapToDouble(e -> e.getSkorFinalGuru() != null ? e.getSkorFinalGuru() : (e.getSkorAi() != null ? e.getSkorAi() : 0.0)).sum();
+
+                nilai = Math.round((totalPg + totalEssay) * 10.0) / 10.0;
+            } else if (hasStarted || isOnline) {
+                statusStr = "SEDANG";
+                waktuMulai = (st != null) ? st.getWaktuMulaiSiswa() : null;
+            } else {
+                statusStr = "BELUM";
+            }
+
+            // Filter check
+            if (normalizedStatusFilter != null) {
+                boolean match = false;
+                if ((normalizedStatusFilter.equals("SUDAH") || normalizedStatusFilter.equals("SELESAI")) && statusStr.equals("SUDAH")) {
+                    match = true;
+                } else if ((normalizedStatusFilter.equals("SEDANG") || normalizedStatusFilter.equals("SEDANG_MENGERJAKAN")) && statusStr.equals("SEDANG")) {
+                    match = true;
+                } else if (normalizedStatusFilter.equals("BELUM") && statusStr.equals("BELUM")) {
+                    match = true;
+                }
+                if (!match) {
+                    continue;
+                }
+            }
+
+            ExamPesertaDTO dto = ExamPesertaDTO.builder()
+                    .siswaId(siswa.getId())
+                    .nama(siswa.getNamaLengkap())
+                    .nisn(siswa.getNisn())
+                    .kelasId(siswa.getKelas() != null ? siswa.getKelas().getId() : null)
+                    .namaKelas(siswa.getKelas() != null ? siswa.getKelas().getNamaKelas() : "-")
+                    .status(statusStr)
+                    .nilai(nilai)
+                    .waktuMulai(waktuMulai)
+                    .waktuSelesai(waktuSelesai)
+                    .build();
+
+            result.add(dto);
+        }
+
+        result.sort(Comparator.comparing(ExamPesertaDTO::getNama, String.CASE_INSENSITIVE_ORDER));
+        return result;
+    }
 }

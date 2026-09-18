@@ -204,4 +204,13 @@ public class UjianMapelController {
             return ResponseEntity.badRequest().body(err);
         }
     }
+
+    @GetMapping("/{ujianId}/peserta")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<List<ExamPesertaDTO>> getPesertaUjian(
+            @PathVariable Long ujianId,
+            @RequestParam(required = false) Long kelasId,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ujianMapelService.getPesertaUjian(ujianId, kelasId, status));
+    }
 }
