@@ -2912,12 +2912,27 @@ const ExamManagement = () => {
                                                                             onClick={() => {
                                                                                 setSelectedItem(exam);
                                                                                 setEditMode(true);
+                                                                                let startStr = '';
+                                                                                if (exam.waktuMulai) {
+                                                                                    const s = new Date(exam.waktuMulai);
+                                                                                    startStr = new Date(s.getTime() - s.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                                                }
+                                                                                let endStr = '';
+                                                                                if (exam.waktuSelesai) {
+                                                                                    const e = new Date(exam.waktuSelesai);
+                                                                                    endStr = new Date(e.getTime() - e.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                                                } else if (startStr && Number(exam.durasi) > 0) {
+                                                                                    const s = new Date(exam.waktuMulai);
+                                                                                    const end = new Date(s.getTime() + Number(exam.durasi) * 60 * 1000);
+                                                                                    endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                                                }
                                                                                 setExamForm({
                                                                                     ...examForm,
+                                                                                    eventId: exam.eventId || examForm.eventId,
                                                                                     mapelId: exam.mapelId,
                                                                                     guruId: exam.guruId,
-                                                                                    waktuMulai: exam.waktuMulai ? exam.waktuMulai.substring(0, 16) : '',
-                                                                                    waktuSelesai: exam.waktuSelesai ? exam.waktuSelesai.substring(0, 16) : '',
+                                                                                    waktuMulai: startStr,
+                                                                                    waktuSelesai: endStr,
                                                                                     durasi: exam.durasi !== undefined ? exam.durasi : 90,
                                                                                     token: exam.token || '',
                                                                                     kelasIds: exam.kelasIds || []
@@ -3036,39 +3051,81 @@ const ExamManagement = () => {
                                 <>
                                     <div className="form-group">
                                         <label>{(userRole === 'GURU' && !JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) ? 'Mata Pelajaran' : 'Pilih Mata Pelajaran & Guru'}</label>
-                                        <select
-                                            value={examForm.mapelId && examForm.guruId ? `${examForm.mapelId}-${examForm.guruId}` : (examForm.mapelId ? `${examForm.mapelId}` : '')}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val) {
-                                                    if (val.includes('-')) {
-                                                        const [mId, gId] = val.split('-');
-                                                        setExamForm({ ...examForm, mapelId: mId, guruId: gId });
-                                                    } else {
-                                                        const user = JSON.parse(localStorage.getItem('user') || '{}');
-                                                        setExamForm({ ...examForm, mapelId: val, guruId: userRole === 'GURU' ? (user.profileId || '') : (teachers[0]?.profileId || '') });
+                                        {(() => {
+                                            const user = JSON.parse(localStorage.getItem('user') || '{}');
+                                            const optionMap = new Map();
+
+                                            if (Array.isArray(myAssignments) && myAssignments.length > 0) {
+                                                myAssignments.forEach(a => {
+                                                    const mId = a.mapelId || a.id;
+                                                    const gId = a.guruId || (userRole === 'GURU' ? (user.profileId || '') : '');
+                                                    const key = `${mId}___${gId}`;
+                                                    if (!optionMap.has(key)) {
+                                                        optionMap.set(key, {
+                                                            mapelId: mId,
+                                                            guruId: gId,
+                                                            label: a.namaGuru ? `${a.namaMapel} (${a.namaGuru})` : a.namaMapel
+                                                        });
                                                     }
-                                                } else {
-                                                    setExamForm({ ...examForm, mapelId: '', guruId: '' });
+                                                });
+                                            }
+
+                                            if (Array.isArray(allMapels) && allMapels.length > 0) {
+                                                allMapels.forEach(m => {
+                                                    const gId = userRole === 'GURU' ? (user.profileId || '') : (teachers[0]?.profileId || '');
+                                                    const key = `${m.id}___${gId}`;
+                                                    if (!optionMap.has(key)) {
+                                                        optionMap.set(key, {
+                                                            mapelId: m.id,
+                                                            guruId: gId,
+                                                            label: m.namaMapel
+                                                        });
+                                                    }
+                                                });
+                                            }
+
+                                            if (editMode && selectedItem && selectedItem.mapelId) {
+                                                const curMId = selectedItem.mapelId;
+                                                const curGId = selectedItem.guruId || (userRole === 'GURU' ? (user.profileId || '') : '');
+                                                const key = `${curMId}___${curGId}`;
+                                                if (!optionMap.has(key)) {
+                                                    optionMap.set(key, {
+                                                        mapelId: curMId,
+                                                        guruId: curGId,
+                                                        label: selectedItem.namaMapel ? `${selectedItem.namaMapel} ${selectedItem.namaGuru ? '(' + selectedItem.namaGuru + ')' : ''}` : `Mapel #${curMId}`
+                                                    });
                                                 }
-                                            }}
-                                            required
-                                        >
-                                            <option value="">-- Pilih Mata Pelajaran --</option>
-                                            {myAssignments.length > 0 ? (
-                                                Array.from(new Map(myAssignments.map(a => [`${a.mapelId}-${a.guruId}`, a])).values()).map(a => (
-                                                    <option key={`${a.mapelId}-${a.guruId}`} value={`${a.mapelId}-${a.guruId}`}>
-                                                        {a.namaMapel} ({a.namaGuru})
-                                                    </option>
-                                                ))
-                                            ) : (
-                                                allMapels.map(m => (
-                                                    <option key={m.id} value={`${m.id}`}>
-                                                        {m.namaMapel}
-                                                    </option>
-                                                ))
-                                            )}
-                                        </select>
+                                            }
+
+                                            const options = Array.from(optionMap.values());
+                                            const currentSelected = options.find(o => String(o.mapelId) === String(examForm.mapelId) && (!examForm.guruId || String(o.guruId) === String(examForm.guruId)))
+                                                || options.find(o => String(o.mapelId) === String(examForm.mapelId));
+
+                                            const selectValue = currentSelected ? `${currentSelected.mapelId}___${currentSelected.guruId}` : '';
+
+                                            return (
+                                                <select
+                                                    value={selectValue}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val && val.includes('___')) {
+                                                            const [mId, gId] = val.split('___');
+                                                            setExamForm(prev => ({ ...prev, mapelId: Number(mId) || mId, guruId: Number(gId) || gId }));
+                                                        } else {
+                                                            setExamForm(prev => ({ ...prev, mapelId: '', guruId: '' }));
+                                                        }
+                                                    }}
+                                                    required
+                                                >
+                                                    <option value="">-- Pilih Mata Pelajaran --</option>
+                                                    {options.map(o => (
+                                                        <option key={`${o.mapelId}___${o.guruId}`} value={`${o.mapelId}___${o.guruId}`}>
+                                                            {o.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            );
+                                        })()}
                                     </div>
 
                                     {(userRole === 'ADMIN' || userRole === 'TU' || JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin) && (
