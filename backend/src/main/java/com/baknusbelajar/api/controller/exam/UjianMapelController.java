@@ -1,5 +1,7 @@
 package com.baknusbelajar.api.controller.exam;
 
+import com.baknusbelajar.api.dto.exam.ExamPesertaDTO;
+
 import com.baknusbelajar.api.dto.exam.UjianMapelDTO;
 import com.baknusbelajar.api.service.UjianMapelService;
 import lombok.RequiredArgsConstructor;
