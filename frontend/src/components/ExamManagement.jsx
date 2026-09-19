@@ -219,10 +219,8 @@ const ExamManagement = () => {
         return m ? m[1] : null;
     };
 
-    const handleOptImageUpload = async (opt, e) => {
-        const file = e.target.files?.[0];
+    const uploadOptImageFile = async (opt, file) => {
         if (!file) return;
-        e.target.value = '';
         setUploadingOpt(opt);
         try {
             const formData = new FormData();
@@ -281,6 +279,55 @@ const ExamManagement = () => {
             reader.readAsDataURL(file);
         } finally {
             setUploadingOpt(null);
+        }
+    };
+
+    const handleOptImageUpload = (opt, e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        uploadOptImageFile(opt, file);
+    };
+
+    const handleOptPaste = (opt, e) => {
+        const clipboardData = e.clipboardData;
+        if (!clipboardData) return;
+
+        let imageFile = null;
+        if (clipboardData.items) {
+            for (let i = 0; i < clipboardData.items.length; i++) {
+                const item = clipboardData.items[i];
+                if (item.type && item.type.startsWith('image/')) {
+                    imageFile = item.getAsFile();
+                    break;
+                }
+            }
+        }
+
+        if (!imageFile && clipboardData.files && clipboardData.files.length > 0) {
+            for (let i = 0; i < clipboardData.files.length; i++) {
+                const file = clipboardData.files[i];
+                if (file.type && file.type.startsWith('image/')) {
+                    imageFile = file;
+                    break;
+                }
+            }
+        }
+
+        if (imageFile) {
+            e.preventDefault();
+            uploadOptImageFile(opt, imageFile);
+        }
+    };
+
+    const handleOptDrop = (opt, e) => {
+        e.preventDefault();
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            if (file.type && file.type.startsWith('image/')) {
+                uploadOptImageFile(opt, file);
+            }
         }
     };
 
@@ -1228,7 +1275,10 @@ const ExamManagement = () => {
                                             ) : (
                                                 <div>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                                        <label className="section-label">Opsi Jawaban & Kunci</label>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                            <label className="section-label" style={{ margin: 0 }}>Opsi Jawaban & Kunci</label>
+                                                            <span className="opt-paste-badge">💡 Bisa langsung tekan Ctrl+V (Paste screenshot) pada tiap opsi</span>
+                                                        </div>
                                                         {questionFormPG.tipeSoal === 'PG_KOMPLEKS' && (
                                                             <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 600 }}>
                                                                 *Klik tombol opsi (A-E) untuk memilih satu atau lebih kunci jawaban benar
@@ -1262,7 +1312,13 @@ const ExamManagement = () => {
                                                             const optTextOnly = optRaw.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
 
                                                             return (
-                                                                <div key={opt} className={`opt-row-container ${isSelected ? 'is-selected-row' : ''}`}>
+                                                                <div
+                                                                    key={opt}
+                                                                    className={`opt-row-container ${isSelected ? 'is-selected-row' : ''}`}
+                                                                    onPaste={(e) => handleOptPaste(opt, e)}
+                                                                    onDragOver={(e) => e.preventDefault()}
+                                                                    onDrop={(e) => handleOptDrop(opt, e)}
+                                                                >
                                                                     <div className={`opt-input-v2 ${isSelected ? 'selected' : ''}`}>
                                                                         <button
                                                                             type="button"
@@ -1296,7 +1352,8 @@ const ExamManagement = () => {
                                                                                     : newText;
                                                                                 setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: combined });
                                                                             }}
-                                                                            placeholder={`Pilihan ${opt}... (teks & gambar)`}
+                                                                            placeholder={`Pilihan ${opt}... (Ketik teks / Tekan Ctrl+V untuk Paste Screenshot Gambar)`}
+                                                                            onPaste={(e) => handleOptPaste(opt, e)}
                                                                             required={opt !== 'E' && !optImgSrc}
                                                                         />
                                                                         <button
@@ -2599,6 +2656,17 @@ const ExamManagement = () => {
                     [data-theme="dark"] .btn-secondary { background: #0f172a; color: #cbd5e1; border: 1px solid #334155; }
                     [data-theme="dark"] .btn-secondary:hover { background: #334155; color: #f8fafc; }
 /* Option Image Upload and Preview Styles */
+                    
+                    .opt-paste-badge {
+                        background: #ecfdf5;
+                        color: #047857;
+                        border: 1px solid #a7f3d0;
+                        padding: 3px 10px;
+                        border-radius: 20px;
+                        font-size: 0.76rem;
+                        font-weight: 700;
+                    }
+
                     .opt-row-container { margin-bottom: 12px; }
                     .opt-input-v2 { display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; padding: 8px 12px 8px 8px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
                     .opt-input-v2 input { flex: 1; border: none; background: transparent; outline: none; font-size: 0.92rem; font-weight: 600; color: #1e293b; padding: 6px 4px; }
