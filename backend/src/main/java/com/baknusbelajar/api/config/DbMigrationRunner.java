@@ -47,7 +47,14 @@ public class DbMigrationRunner implements CommandLineRunner {
             "ALTER TABLE tb_ujian_mapel MODIFY token VARCHAR2(20)",
             "ALTER TABLE tb_soal_pg MODIFY pilihan_c NULL",
             "ALTER TABLE tb_soal_pg MODIFY pilihan_d NULL",
-            "ALTER TABLE tb_soal_pg MODIFY pilihan_e NULL"
+            "ALTER TABLE tb_soal_pg MODIFY pilihan_e NULL",
+            "ALTER TABLE tb_soal_pg MODIFY kunci_jawaban VARCHAR2(50)",
+            "ALTER TABLE tb_soal_pg MODIFY pilihan_a VARCHAR2(2000)",
+            "ALTER TABLE tb_soal_pg MODIFY pilihan_b VARCHAR2(2000)",
+            "ALTER TABLE tb_soal_pg MODIFY pilihan_c VARCHAR2(2000)",
+            "ALTER TABLE tb_soal_pg MODIFY pilihan_d VARCHAR2(2000)",
+            "ALTER TABLE tb_soal_pg MODIFY pilihan_e VARCHAR2(2000)",
+            "ALTER TABLE tb_soal_pg ADD tipe_soal VARCHAR2(20) DEFAULT 'PG_BIASA'"
         };
 
         try (Connection conn = dataSource.getConnection();

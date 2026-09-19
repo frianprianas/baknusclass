@@ -1243,9 +1243,16 @@ const StudentExams = () => {
                                                                             {isChecked ? <Check size={18} strokeWidth={3} /> : null}
                                                                         </div>
                                                                         <div className="cbt-opt-letter-tag">{opt}</div>
-                                                                        <div className={`cbt-opt-text ${fontClass}`}>
-                                                                            {optText}
-                                                                        </div>
+                                                                        <div
+                                                                            className={`cbt-opt-text ${fontClass}`}
+                                                                            dangerouslySetInnerHTML={{ __html: optText }}
+                                                                            onClick={(e) => {
+                                                                                if (e.target.tagName === 'IMG') {
+                                                                                    e.stopPropagation();
+                                                                                    setEnlargedImg(e.target.src);
+                                                                                }
+                                                                            }}
+                                                                        />
                                                                     </div>
                                                                 );
                                                             })}
@@ -1277,9 +1284,16 @@ const StudentExams = () => {
                                                                         <div className={`cbt-opt-radio ${isSelected ? 'selected' : ''}`}>
                                                                             {opt}
                                                                         </div>
-                                                                        <div className={`cbt-opt-text ${fontClass}`}>
-                                                                            {optText}
-                                                                        </div>
+                                                                        <div
+                                                                            className={`cbt-opt-text ${fontClass}`}
+                                                                            dangerouslySetInnerHTML={{ __html: optText }}
+                                                                            onClick={(e) => {
+                                                                                if (e.target.tagName === 'IMG') {
+                                                                                    e.stopPropagation();
+                                                                                    setEnlargedImg(e.target.src);
+                                                                                }
+                                                                            }}
+                                                                        />
                                                                     </div>
                                                                 );
                                                             })}
@@ -2474,6 +2488,24 @@ const StudentExams = () => {
                     [data-theme="dark"] .cbt-modal-head { border-color: #334155; }
                     [data-theme="dark"] .cbt-close-nav { background: #0f172a; color: #94a3b8; }
                     [data-theme="dark"] .cbt-close-nav:hover { background: #334155; color: #f8fafc; }
+
+                    /* Option Image Styling in CBT */
+                    .cbt-opt-text img {
+                        max-height: 180px;
+                        max-width: 100%;
+                        border-radius: 10px;
+                        margin-top: 8px;
+                        display: block;
+                        cursor: zoom-in;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    .cbt-opt-text img:hover {
+                        transform: scale(1.02);
+                    }
+                    [data-theme="dark"] .cbt-opt-text img {
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+                    }
                 `}</style>
             </div>
         );

@@ -210,6 +210,88 @@ const ExamManagement = () => {
     const [savingQuestion, setSavingQuestion] = useState(false);
     const [enlargedImage, setEnlargedImage] = useState(null);
     const directImageInputRef = useRef(null);
+    const optFileInputRefs = useRef({});
+    const [uploadingOpt, setUploadingOpt] = useState(null);
+
+    const extractImgSrc = (html) => {
+        if (!html || typeof html !== 'string') return null;
+        const m = html.match(/<img[^>]+src="([^">]+)"/i);
+        return m ? m[1] : null;
+    };
+
+    const handleOptImageUpload = async (opt, e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        setUploadingOpt(opt);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/exam/upload-image', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            const imgUrl = res.data.url;
+            const currentVal = questionFormPG[`pilihan${opt}`] || '';
+            const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+            const newTag = `<p><img src="${imgUrl}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`;
+            const combined = textOnly ? `${textOnly} ${newTag}` : newTag;
+            setQuestionFormPG(prev => ({
+                ...prev,
+                [`pilihan${opt}`]: combined
+            }));
+        } catch (err) {
+            console.error('Upload option image via API failed, using compressed local fallback', err);
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new window.Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 800;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressed = canvas.toDataURL('image/jpeg', 0.85);
+                    const currentVal = questionFormPG[`pilihan${opt}`] || '';
+                    const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+                    const newTag = `<p><img src="${compressed}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`;
+                    const combined = textOnly ? `${textOnly} ${newTag}` : newTag;
+                    setQuestionFormPG(prev => ({
+                        ...prev,
+                        [`pilihan${opt}`]: combined
+                    }));
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setUploadingOpt(null);
+        }
+    };
+
+    const handleRemoveOptImage = (opt) => {
+        const currentVal = questionFormPG[`pilihan${opt}`] || '';
+        const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+        setQuestionFormPG(prev => ({
+            ...prev,
+            [`pilihan${opt}`]: textOnly
+        }));
+    };
 
     const handleDirectImageUpload = (e) => {
         const file = e.target.files?.[0];
@@ -1175,38 +1257,81 @@ const ExamManagement = () => {
                                                         {['A', 'B', 'C', 'D', 'E'].map(opt => {
                                                             const selectedKeys = (questionFormPG.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
                                                             const isSelected = selectedKeys.includes(opt);
+                                                            const optRaw = questionFormPG[`pilihan${opt}`] || '';
+                                                            const optImgSrc = extractImgSrc(optRaw);
+                                                            const optTextOnly = optRaw.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
 
                                                             return (
-                                                                <div key={opt} className={`opt-input-v2 ${isSelected ? 'selected' : ''}`}>
-                                                                    <button
-                                                                        type="button"
-                                                                        className={`opt-check ${isSelected ? 'is-key-selected' : ''}`}
-                                                                        onClick={() => {
-                                                                            let newKeys;
-                                                                            if (selectedKeys.includes(opt)) {
-                                                                                newKeys = selectedKeys.filter(k => k !== opt);
-                                                                            } else {
-                                                                                newKeys = [...selectedKeys, opt].sort();
-                                                                            }
-                                                                            const finalKunci = newKeys.join(',') || opt;
-                                                                            setQuestionFormPG({
-                                                                                ...questionFormPG,
-                                                                                kunciJawaban: finalKunci,
-                                                                                tipeSoal: newKeys.length > 1 ? 'PG_KOMPLEKS' : questionFormPG.tipeSoal
-                                                                            });
-                                                                        }}
-                                                                        style={isSelected ? { background: '#4338ca', color: '#fff', borderColor: '#3730a3' } : {}}
-                                                                        title={isSelected ? 'Kunci terpilih (klik untuk batalkan)' : 'Klik untuk jadikan sebagai kunci jawaban'}
-                                                                    >
-                                                                        {isSelected ? `✓ ${opt}` : opt}
-                                                                    </button>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={questionFormPG[`pilihan${opt}`] || ''}
-                                                                        onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
-                                                                        placeholder={`Pilihan ${opt}...`}
-                                                                        required={opt !== 'E'}
-                                                                    />
+                                                                <div key={opt} className={`opt-row-container ${isSelected ? 'is-selected-row' : ''}`}>
+                                                                    <div className={`opt-input-v2 ${isSelected ? 'selected' : ''}`}>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`opt-check ${isSelected ? 'is-key-selected' : ''}`}
+                                                                            onClick={() => {
+                                                                                let newKeys;
+                                                                                if (selectedKeys.includes(opt)) {
+                                                                                    newKeys = selectedKeys.filter(k => k !== opt);
+                                                                                } else {
+                                                                                    newKeys = [...selectedKeys, opt].sort();
+                                                                                }
+                                                                                const finalKunci = newKeys.join(',') || opt;
+                                                                                setQuestionFormPG({
+                                                                                    ...questionFormPG,
+                                                                                    kunciJawaban: finalKunci,
+                                                                                    tipeSoal: newKeys.length > 1 ? 'PG_KOMPLEKS' : questionFormPG.tipeSoal
+                                                                                });
+                                                                            }}
+                                                                            style={isSelected ? { background: '#4338ca', color: '#fff', borderColor: '#3730a3' } : {}}
+                                                                            title={isSelected ? 'Kunci terpilih (klik untuk batalkan)' : 'Klik untuk jadikan sebagai kunci jawaban'}
+                                                                        >
+                                                                            {isSelected ? `✓ ${opt}` : opt}
+                                                                        </button>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={optTextOnly}
+                                                                            onChange={(e) => {
+                                                                                const newText = e.target.value;
+                                                                                const combined = optImgSrc
+                                                                                    ? (newText ? `${newText} <p><img src="${optImgSrc}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>` : `<p><img src="${optImgSrc}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`)
+                                                                                    : newText;
+                                                                                setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: combined });
+                                                                            }}
+                                                                            placeholder={`Pilihan ${opt}... (teks & gambar)`}
+                                                                            required={opt !== 'E' && !optImgSrc}
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`btn-opt-img-attach ${optImgSrc ? 'has-img' : ''}`}
+                                                                            onClick={() => optFileInputRefs.current[opt]?.click()}
+                                                                            title={`Sisipkan / Upload Gambar ke Opsi ${opt}`}
+                                                                        >
+                                                                            <ImageIcon size={15} />
+                                                                            <span>{uploadingOpt === opt ? 'Mengunggah...' : optImgSrc ? 'Ganti Gbr' : 'Sisipkan Gbr'}</span>
+                                                                        </button>
+                                                                        <input
+                                                                            type="file"
+                                                                            ref={el => optFileInputRefs.current[opt] = el}
+                                                                            accept="image/*"
+                                                                            style={{ display: 'none' }}
+                                                                            onChange={(e) => handleOptImageUpload(opt, e)}
+                                                                        />
+                                                                    </div>
+                                                                    {optImgSrc && (
+                                                                        <div className="opt-preview-container">
+                                                                            <div className="opt-thumb-wrapper" onClick={() => setEnlargedImage(optImgSrc)} title="Klik untuk memperbesar gambar opsi">
+                                                                                <img src={optImgSrc} alt={`Preview Opsi ${opt}`} className="opt-preview-thumb" />
+                                                                                <span className="opt-zoom-hint"><ZoomIn size={12} /> Perbesar Gambar</span>
+                                                                            </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn-opt-img-remove"
+                                                                                onClick={() => handleRemoveOptImage(opt)}
+                                                                                title="Hapus gambar dari opsi ini"
+                                                                            >
+                                                                                <X size={13} /> Hapus Gambar
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })}
@@ -1382,7 +1507,15 @@ const ExamManagement = () => {
                                                                     return (
                                                                         <div key={opt} className={`opt-item-v2 ${isCorrect ? 'is-correct' : ''}`}>
                                                                             <div className="opt-marker">{opt}</div>
-                                                                            <div className="opt-text">{optVal}</div>
+                                                                            <div
+                                                                                className="opt-text"
+                                                                                dangerouslySetInnerHTML={{ __html: optVal }}
+                                                                                onClick={(e) => {
+                                                                                    if (e.target.tagName === 'IMG') {
+                                                                                        setEnlargedImage(e.target.src);
+                                                                                    }
+                                                                                }}
+                                                                            />
                                                                             {isCorrect && (
                                                                                 <div className="opt-key-pill">
                                                                                     <CheckCircle2 size={13} /> Kunci Benar
@@ -2465,7 +2598,78 @@ const ExamManagement = () => {
                     [data-theme="dark"] .form-group input, [data-theme="dark"] .form-group select, [data-theme="dark"] .form-group textarea { background: #0f172a; border-color: #334155; color: #f8fafc; }
                     [data-theme="dark"] .btn-secondary { background: #0f172a; color: #cbd5e1; border: 1px solid #334155; }
                     [data-theme="dark"] .btn-secondary:hover { background: #334155; color: #f8fafc; }
-`}</style>
+/* Option Image Upload and Preview Styles */
+                    .opt-row-container { margin-bottom: 12px; }
+                    .opt-input-v2 { display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 2px solid #f1f5f9; border-radius: 16px; padding: 8px 12px 8px 8px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+                    .opt-input-v2 input { flex: 1; border: none; background: transparent; outline: none; font-size: 0.92rem; font-weight: 600; color: #1e293b; padding: 6px 4px; }
+                    .btn-opt-img-attach {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 8px 12px;
+                        background: #eef2ff;
+                        color: #4f46e5;
+                        border: 1px solid #c7d2fe;
+                        border-radius: 10px;
+                        font-size: 0.78rem;
+                        font-weight: 700;
+                        cursor: pointer;
+                        white-space: nowrap;
+                        transition: all 0.2s;
+                    }
+                    .btn-opt-img-attach:hover { background: #e0e7ff; border-color: #a5b4fc; }
+                    .btn-opt-img-attach.has-img { background: #f0fdf4; color: #15803d; border-color: #86efac; }
+                    .opt-preview-container {
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        margin: 6px 0 6px 54px;
+                        padding: 8px 14px;
+                        background: #f8fafc;
+                        border: 1.5px dashed #cbd5e1;
+                        border-radius: 12px;
+                    }
+                    .opt-thumb-wrapper { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+                    .opt-preview-thumb {
+                        max-height: 85px;
+                        max-width: 150px;
+                        border-radius: 8px;
+                        border: 1px solid #e2e8f0;
+                        object-fit: contain;
+                        background: white;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+                        transition: transform 0.2s;
+                    }
+                    .opt-preview-thumb:hover { transform: scale(1.04); }
+                    .opt-zoom-hint { font-size: 0.78rem; color: #3b82f6; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+                    .btn-opt-img-remove {
+                        margin-left: auto;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 6px 12px;
+                        background: #fee2e2;
+                        color: #b91c1c;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 0.78rem;
+                        font-weight: 700;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .btn-opt-img-remove:hover { background: #fecaca; }
+                    .opt-text img {
+                        max-height: 160px;
+                        max-width: 100%;
+                        border-radius: 8px;
+                        margin-top: 6px;
+                        display: block;
+                        cursor: zoom-in;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                        transition: transform 0.2s;
+                    }
+                    .opt-text img:hover { transform: scale(1.02); }
+                `}</style>
 
                 </div>
 
