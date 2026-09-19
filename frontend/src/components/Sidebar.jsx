@@ -27,6 +27,36 @@ const Sidebar = ({ activePage, setActivePage }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const role = user.role || 'SISWA';
   const token = localStorage.getItem('token');
+  const [studentKelas, setStudentKelas] = useState(user.namaKelas || '');
+
+  useEffect(() => {
+    if (role === 'SISWA') {
+      if (user.namaKelas) {
+        setStudentKelas(user.namaKelas);
+      } else if (user.kelasId) {
+        axios.get(`/api/master/kelas/${user.kelasId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => {
+          if (res.data?.namaKelas) {
+            setStudentKelas(res.data.namaKelas);
+            const updated = { ...user, namaKelas: res.data.namaKelas };
+            localStorage.setItem('user', JSON.stringify(updated));
+          }
+        }).catch(() => {});
+      } else {
+        axios.get('/api/enrollment/siswa-mapel/my', {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(res => {
+          if (res.data && res.data.length > 0 && res.data[0].namaKelas) {
+            const kName = res.data[0].namaKelas;
+            setStudentKelas(kName);
+            const updated = { ...user, namaKelas: kName, kelasId: res.data[0].kelasId || user.kelasId };
+            localStorage.setItem('user', JSON.stringify(updated));
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [role, token]);
 
   let userEmail = user.email;
   // Fallback to JWT sub
@@ -149,14 +179,29 @@ const Sidebar = ({ activePage, setActivePage }) => {
           </div>
           <div className="user-details">
             <p className="user-name">{user.name || 'User'}</p>
-            <p className="user-role">
-              {getRoleLabel(role)}
-              {userEmail && (
-                <span style={{ display: 'block', fontSize: '0.75rem', marginTop: '2px', color: '#94a3b8', fontWeight: '700' }}>
-                  {role === 'SISWA' ? 'NIS' : 'NIP'}: {userEmail.split('@')[0]}
-                </span>
+            <div className="user-role">
+              <div>{getRoleLabel(role)}</div>
+              {role === 'SISWA' ? (
+                <>
+                  {userEmail && (
+                    <span className="user-sub-info nis-info">
+                      NIS: {userEmail.split('@')[0]}
+                    </span>
+                  )}
+                  {studentKelas && (
+                    <span className="user-sub-info kelas-info">
+                      KELAS: {studentKelas}
+                    </span>
+                  )}
+                </>
+              ) : (
+                userEmail && (
+                  <span className="user-sub-info nis-info">
+                    NIP: {userEmail.split('@')[0]}
+                  </span>
+                )
               )}
-            </p>
+            </div>
           </div>
         </div>
         <button className="theme-toggle-btn" onClick={() => window.open(BAKNUS_MAIL_URL, '_blank')} style={{ background: '#eff6ff', color: '#1e40af', marginBottom: '12px' }}>
@@ -319,6 +364,25 @@ const Sidebar = ({ activePage, setActivePage }) => {
         .user-role {
           font-size: 0.8rem;
           color: #64748b;
+        }
+
+        .user-sub-info {
+          display: block;
+          font-size: 0.75rem;
+          margin-top: 2px;
+          font-weight: 700;
+        }
+
+        .user-sub-info.nis-info {
+          color: #94a3b8;
+        }
+
+        .user-sub-info.kelas-info {
+          color: #0284c7;
+        }
+
+        [data-theme="dark"] .user-sub-info.kelas-info {
+          color: #38bdf8;
         }
 
         .logout-button {

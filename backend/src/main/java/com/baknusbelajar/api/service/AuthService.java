@@ -139,16 +139,21 @@ public class AuthService {
         String name = user.getNamaLengkap() != null ? user.getNamaLengkap() : user.getUsername();
         Long profileId = null;
         Long kelasId = null;
+        String namaKelas = null;
         Boolean isCoAdmin = false;
 
         if ("SISWA".equalsIgnoreCase(user.getRole())) {
             var s = siswaRepository.findByUserId(user.getId());
+            if (s.isEmpty()) {
+                s = siswaRepository.findFirstByUserIdOrderByIdAsc(user.getId());
+            }
             if (s.isPresent()) {
                 var siswa = s.get();
                 name = siswa.getNamaLengkap() != null ? siswa.getNamaLengkap() : name;
                 profileId = siswa.getId();
                 if (siswa.getKelas() != null) {
                     kelasId = siswa.getKelas().getId();
+                    namaKelas = siswa.getKelas().getNamaKelas();
                 }
             }
         } else {
@@ -165,6 +170,6 @@ public class AuthService {
         Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
         String jwt = jwtTokenProvider.generateToken(authentication);
 
-        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId, isCoAdmin);
+        return new AuthResponse(jwt, user.getRole(), user.getEmail(), name, profileId, user.getId(), kelasId, namaKelas, isCoAdmin);
     }
 }

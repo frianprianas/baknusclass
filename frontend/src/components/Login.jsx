@@ -27,9 +27,9 @@ const Login = () => {
         email: loginIdentifier,
         password
       });
-      const { token, role, name, profileId, email, kelasId, userId, isCoAdmin } = response.data;
+      const { token, role, name, profileId, email, kelasId, namaKelas, userId, isCoAdmin } = response.data;
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({ role, name, profileId, email, kelasId, userId, isCoAdmin }));
+      localStorage.setItem('user', JSON.stringify({ role, name, profileId, email, kelasId, namaKelas, userId, isCoAdmin }));
 
 
       navigate('/dashboard');
