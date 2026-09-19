@@ -32,11 +32,7 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify({ role, name, profileId, email, kelasId, userId, isCoAdmin }));
 
 
-      if (role === 'SISWA') {
-        navigate('/student-exams');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login gagal. Periksa kembali username dan password.');
     } finally {

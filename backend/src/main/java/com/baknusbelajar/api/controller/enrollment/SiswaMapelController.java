@@ -23,6 +23,12 @@ public class SiswaMapelController {
         return ResponseEntity.ok(siswaMapelService.getAllSiswaMapel());
     }
 
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('SISWA')")
+    public ResponseEntity<List<SiswaMapelDTO>> getMyMapel(org.springframework.security.core.Authentication auth) {
+        return ResponseEntity.ok(siswaMapelService.getMapelForStudent(auth.getName()));
+    }
+
     @GetMapping("/siswa/{siswaId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'SISWA')")
     public ResponseEntity<List<SiswaMapelDTO>> getBySiswa(@PathVariable Long siswaId) {

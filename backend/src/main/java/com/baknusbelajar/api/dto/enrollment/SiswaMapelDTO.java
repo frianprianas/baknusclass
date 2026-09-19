@@ -12,4 +12,6 @@ public class SiswaMapelDTO {
     private String namaKelas;
     private Long mapelId;
     private String namaMapel;
+    private String namaGuru;
+    private String kodeMapel;
 }
