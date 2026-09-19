@@ -850,7 +850,7 @@ const ExamManagement = () => {
                         pert.includes('jawaban benar lebih') || pert.includes('bisa lebih') ||
                         pert.includes('centang') || pert.includes('checkbox') || pert.includes('multi');
 
-                if (body.tipeSoal !== 'BENAR_SALAH' && (isMultiKey || hasComplexHint)) {
+                if (body.tipeSoal !== 'BENAR_SALAH' && body.tipeSoal !== 'BS_MAJEMUK' && (isMultiKey || hasComplexHint)) {
                     body.tipeSoal = 'PG_KOMPLEKS';
                 }
                 // Pastikan pilihan C, D, E tidak null/kosong agar tidak terkena constraint ORA-01400 pada Oracle
@@ -946,6 +946,17 @@ const ExamManagement = () => {
 
 
     const getQuestionMeta = (q) => {
+        if (q.tipeSoal === 'BS_MAJEMUK') {
+            return {
+                typeKey: 'bs_majemuk',
+                typeLabel: '📊 Tabel Benar / Salah (Poin per Butir)',
+                shortLabel: 'Tabel Benar / Salah',
+                badgeClass: 'badge-bs-majemuk',
+                cardClass: 'pg-bs-majemuk',
+                subLabel: 'Matriks Pernyataan (Nilai Parsial)',
+                kunciDesc: q.kunciJawaban || 'B,B,S,B'
+            };
+        }
         const isBS = q.tipeSoal === 'BENAR_SALAH' || (
             q.pilihanA && q.pilihanB &&
             q.pilihanA.trim().toLowerCase() === 'benar' &&
@@ -1247,6 +1258,25 @@ const ExamManagement = () => {
                                                     >
                                                         ⚖️ Pernyataan Benar / Salah
                                                     </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn-type-toggle ${questionFormPG.tipeSoal === 'BS_MAJEMUK' ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            const existingKj = (questionFormPG.kunciJawaban || '').includes(',') ? questionFormPG.kunciJawaban : 'B,B,S,B';
+                                                            setQuestionFormPG({
+                                                                ...questionFormPG,
+                                                                tipeSoal: 'BS_MAJEMUK',
+                                                                pilihanA: questionFormPG.pilihanA && questionFormPG.pilihanA !== 'Benar' ? questionFormPG.pilihanA : '',
+                                                                pilihanB: questionFormPG.pilihanB && questionFormPG.pilihanB !== 'Salah' ? questionFormPG.pilihanB : '',
+                                                                pilihanC: questionFormPG.pilihanC && questionFormPG.pilihanC !== '-' ? questionFormPG.pilihanC : '',
+                                                                pilihanD: questionFormPG.pilihanD && questionFormPG.pilihanD !== '-' ? questionFormPG.pilihanD : '',
+                                                                pilihanE: questionFormPG.pilihanE && questionFormPG.pilihanE !== '-' ? questionFormPG.pilihanE : '',
+                                                                kunciJawaban: existingKj
+                                                            });
+                                                        }}
+                                                    >
+                                                        📊 Tabel Benar / Salah (Poin per Butir)
+                                                    </button>
                                                 </div>
                                             </div>
 
@@ -1270,6 +1300,91 @@ const ExamManagement = () => {
                                                             <div className="tf-label">SALAH</div>
                                                             {questionFormPG.kunciJawaban === 'B' && <CheckCircle2 className="tf-check" size={20} />}
                                                         </div>
+                                                    </div>
+                                                </div>
+                                            ) : questionFormPG.tipeSoal === 'BS_MAJEMUK' ? (
+                                                <div className="bs-majemuk-form-container">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                        <div>
+                                                            <label className="section-label" style={{ margin: 0 }}>Daftar Butir Pernyataan & Kunci [Benar / Salah]</label>
+                                                            <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                                                                Tentukan pernyataan dan pilih kunci (B/S) untuk tiap butir. Skor siswa dihitung otomatis per butir yang tepat.
+                                                            </p>
+                                                        </div>
+                                                        <span className="opt-paste-badge">💡 Tekan Ctrl+V untuk tempel gambar bila butuh ilustrasi</span>
+                                                    </div>
+
+                                                    <div className="bs-majemuk-table-editor">
+                                                        {['A', 'B', 'C', 'D', 'E'].map((opt, idx) => {
+                                                            const keys = (questionFormPG.kunciJawaban || 'B,B,S,B').split(',');
+                                                            const currentKey = keys[idx] || 'B';
+                                                            const isVisible = idx < 4 || (questionFormPG.pilihanE && questionFormPG.pilihanE !== '-');
+
+                                                            if (!isVisible && idx >= 4) {
+                                                                return (
+                                                                    <div key={opt} style={{ textAlign: 'center', padding: '8px 0' }}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: 'Pernyataan 5' })}
+                                                                            style={{ background: '#eff6ff', border: '1.5px dashed #3b82f6', color: '#1d4ed8', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                                                                        >
+                                                                            + Tambah Pernyataan Ke-5
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <div key={opt} className="bs-statement-row">
+                                                                    <div className="bs-stmt-num">{idx + 1}</div>
+                                                                    <div className="bs-stmt-input-wrap">
+                                                                        <textarea
+                                                                            className="bs-stmt-textarea"
+                                                                            rows="2"
+                                                                            placeholder={`Tulis pernyataan ke-${idx + 1} di sini...`}
+                                                                            value={questionFormPG[`pilihan${opt}`] === '-' ? '' : (questionFormPG[`pilihan${opt}`] || '')}
+                                                                            onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="bs-stmt-key-toggle">
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`btn-bs-toggle btn-toggle-b ${currentKey === 'B' ? 'active-b' : ''}`}
+                                                                            onClick={() => {
+                                                                                const updatedKeys = [...keys];
+                                                                                while (updatedKeys.length <= idx) updatedKeys.push('B');
+                                                                                updatedKeys[idx] = 'B';
+                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: updatedKeys.join(',') });
+                                                                            }}
+                                                                        >
+                                                                            <CheckCircle2 size={14} /> BENAR (B)
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={`btn-bs-toggle btn-toggle-s ${currentKey === 'S' ? 'active-s' : ''}`}
+                                                                            onClick={() => {
+                                                                                const updatedKeys = [...keys];
+                                                                                while (updatedKeys.length <= idx) updatedKeys.push('B');
+                                                                                updatedKeys[idx] = 'S';
+                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: updatedKeys.join(',') });
+                                                                            }}
+                                                                        >
+                                                                            <X size={14} /> SALAH (S)
+                                                                        </button>
+                                                                    </div>
+                                                                    {idx === 4 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: '-' })}
+                                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                                            title="Hapus Pernyataan ke-5"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             ) : (
@@ -1525,8 +1640,38 @@ const ExamManagement = () => {
                                                             dangerouslySetInnerHTML={{ __html: q.pertanyaan }}
                                                         ></div>
 
-                                                        {/* Preview Ramah untuk Benar / Salah */}
-                                                        {meta.typeKey === 'tf' ? (
+                                                        {meta.typeKey === 'bs_majemuk' ? (
+                                                            <div className="bs-majemuk-preview-table-wrap">
+                                                                <table className="bs-majemuk-preview-table">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th style={{ width: '40px', textAlign: 'center' }}>No</th>
+                                                                            <th>Butir Pernyataan</th>
+                                                                            <th style={{ width: '130px', textAlign: 'center' }}>Kunci Guru</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {['A', 'B', 'C', 'D', 'E'].map((opt, idx) => {
+                                                                            const stmtVal = q[`pilihan${opt}`];
+                                                                            if (!stmtVal || stmtVal === '-') return null;
+                                                                            const keyList = (q.kunciJawaban || '').split(',').map(k => k.trim().toUpperCase());
+                                                                            const keyVal = keyList[idx] || 'B';
+                                                                            return (
+                                                                                <tr key={opt}>
+                                                                                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{idx + 1}</td>
+                                                                                    <td dangerouslySetInnerHTML={{ __html: stmtVal }}></td>
+                                                                                    <td style={{ textAlign: 'center' }}>
+                                                                                        <span className={`badge-bs-key ${keyVal.startsWith('B') ? 'is-b' : 'is-s'}`}>
+                                                                                            {keyVal.startsWith('B') ? '✓ BENAR (B)' : '✗ SALAH (S)'}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        ) : meta.typeKey === 'tf' ? (
                                                             <div className="tf-preview-row">
                                                                 <div className={`tf-preview-box ${q.kunciJawaban === 'A' ? 'is-key' : ''}`}>
                                                                     <div className="tf-p-badge">A</div>

@@ -250,12 +250,47 @@ public class JawabanPGService {
         String cleanPilA = cleanHtml(soal.getPilihanA()).toLowerCase();
         String cleanPilB = cleanHtml(soal.getPilihanB()).toLowerCase();
 
-        boolean looksLikeBS = "BENAR_SALAH".equalsIgnoreCase(tipe) ||
-                ((cleanPilA.equals("benar") || cleanPilA.equals("true")) &&
-                 (cleanPilB.equals("salah") || cleanPilB.equals("false")));
+        boolean looksLikeBSMajemuk = "BS_MAJEMUK".equalsIgnoreCase(tipe);
 
-        boolean looksLikeKompleks = "PG_KOMPLEKS".equalsIgnoreCase(tipe) ||
-                (!looksLikeBS && (rawKunci.contains(",") || rawJawaban.contains(",")));
+        boolean looksLikeBS = !looksLikeBSMajemuk && ("BENAR_SALAH".equalsIgnoreCase(tipe) ||
+                ((cleanPilA.equals("benar") || cleanPilA.equals("true")) &&
+                 (cleanPilB.equals("salah") || cleanPilB.equals("false"))));
+
+        boolean looksLikeKompleks = !looksLikeBSMajemuk && ("PG_KOMPLEKS".equalsIgnoreCase(tipe) ||
+                (!looksLikeBS && (rawKunci.contains(",") || rawJawaban.contains(","))));
+
+        if (looksLikeBSMajemuk) {
+            String[] keyParts = rawKunci.split("[,;\s]+");
+            String[] ansParts = rawJawaban.split("[,;\s]+");
+
+            int totalItems = keyParts.length;
+            if (totalItems == 0) {
+                return new ScoringResult(0.0, false);
+            }
+
+            int matchCount = 0;
+            for (int i = 0; i < totalItems; i++) {
+                String k = keyParts[i].trim().toUpperCase();
+                String a = (i < ansParts.length) ? ansParts[i].trim().toUpperCase() : "";
+
+                if (!k.isEmpty() && !a.isEmpty()) {
+                    boolean kIsB = k.startsWith("B") || k.equals("TRUE") || k.equals("1");
+                    boolean aIsB = a.startsWith("B") || a.equals("TRUE") || a.equals("1");
+                    if (kIsB == aIsB) {
+                        matchCount++;
+                    }
+                }
+            }
+
+            double partial = (double) matchCount / totalItems * bobot;
+            double rounded = Math.round(partial * 100.0) / 100.0;
+            boolean isFullMatch = (matchCount == totalItems);
+
+            log.info("Scoring BS_MAJEMUK [Soal {}]: Match={}/{} (Bobot={}) -> Skor={}",
+                    soal.getId(), matchCount, totalItems, bobot, rounded);
+
+            return new ScoringResult(rounded, isFullMatch);
+        }
 
         if (looksLikeBS) {
             Boolean studentTF = resolveTrueFalse(rawJawaban);

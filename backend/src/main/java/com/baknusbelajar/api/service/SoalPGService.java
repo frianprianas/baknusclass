@@ -102,6 +102,11 @@ public class SoalPGService {
         if ("BENAR_SALAH".equalsIgnoreCase(entity.getTipeSoal())) {
             fullPertanyaan = String.format("%s<br>A. %s<br>B. %s (Format Pernyataan Benar/Salah)",
                     dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB());
+        } else if ("BS_MAJEMUK".equalsIgnoreCase(entity.getTipeSoal())) {
+            fullPertanyaan = String.format("%s<br>Tabel Benar/Salah:<br>1. %s<br>2. %s<br>3. %s<br>4. %s",
+                    dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(),
+                    entity.getPilihanC() != null ? entity.getPilihanC() : "-",
+                    entity.getPilihanD() != null ? entity.getPilihanD() : "-");
         } else {
             fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
                     dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(), entity.getPilihanC(), entity.getPilihanD(),
@@ -173,6 +178,11 @@ public class SoalPGService {
         if ("BENAR_SALAH".equalsIgnoreCase(entity.getTipeSoal())) {
             fullPertanyaan = String.format("%s<br>A. %s<br>B. %s (Format Pernyataan Benar/Salah)",
                     dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB());
+        } else if ("BS_MAJEMUK".equalsIgnoreCase(entity.getTipeSoal())) {
+            fullPertanyaan = String.format("%s<br>Tabel Benar/Salah:<br>1. %s<br>2. %s<br>3. %s<br>4. %s",
+                    dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(),
+                    entity.getPilihanC() != null ? entity.getPilihanC() : "-",
+                    entity.getPilihanD() != null ? entity.getPilihanD() : "-");
         } else {
             fullPertanyaan = String.format("%s<br>A. %s<br>B. %s<br>C. %s<br>D. %s<br>E. %s",
                     dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(), entity.getPilihanC(), entity.getPilihanD(),
@@ -224,7 +234,7 @@ public class SoalPGService {
         }
         dto.setTipeSoal(tipe);
 
-        if ("BENAR_SALAH".equalsIgnoreCase(tipe)) {
+        if ("BENAR_SALAH".equalsIgnoreCase(tipe) || "BS_MAJEMUK".equalsIgnoreCase(tipe)) {
             if ("-".equals(dto.getPilihanC())) dto.setPilihanC("");
             if ("-".equals(dto.getPilihanD())) dto.setPilihanD("");
             if ("-".equals(dto.getPilihanE())) dto.setPilihanE("");

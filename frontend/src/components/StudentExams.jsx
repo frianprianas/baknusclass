@@ -543,6 +543,12 @@ const StudentExams = () => {
                         qType: 'pg',
                         tipeSoal: q.tipeSoal,
                         pertanyaan: q.pertanyaan,
+                        pilihanA: q.pilihanA,
+                        pilihanB: q.pilihanB,
+                        pilihanC: q.pilihanC,
+                        pilihanD: q.pilihanD,
+                        pilihanE: q.pilihanE,
+                        kunciJawaban: q.kunciJawaban,
                         bobot: q.bobotNilai || 2,
                         jawabanSiswa: ans.jawaban || ans.jawabanDipilih || 'Tidak ada jawaban',
                         skorGuru: ans.skor !== null && ans.skor !== undefined ? ans.skor : 0,
@@ -1040,11 +1046,11 @@ const StudentExams = () => {
                                         <div>Soal Nomor <strong>{currentIndex + 1}</strong></div>
                                         <span className={`cbt-badge-type ${
                                             q?.qType === 'pg'
-                                                ? (q.tipeSoal === 'BENAR_SALAH' ? 'badge-tf' : q.tipeSoal === 'PG_KOMPLEKS' ? 'badge-complex' : 'badge-pg')
+                                                ? (q.tipeSoal === 'BENAR_SALAH' ? 'badge-tf' : q.tipeSoal === 'BS_MAJEMUK' ? 'badge-bs-majemuk' : q.tipeSoal === 'PG_KOMPLEKS' ? 'badge-complex' : 'badge-pg')
                                                 : 'badge-essay'
                                         }`}>
                                             {q?.qType === 'pg'
-                                                ? (q.tipeSoal === 'BENAR_SALAH' ? '⚖️ Benar / Salah (1 Opsi)' : q.tipeSoal === 'PG_KOMPLEKS' ? '☑️ PG Kompleks (Multi Jawaban Benar)' : '🔘 Pilihan Ganda (1 Jawaban Benar)')
+                                                ? (q.tipeSoal === 'BENAR_SALAH' ? '⚖️ Benar / Salah (1 Opsi)' : q.tipeSoal === 'BS_MAJEMUK' ? '📊 Tabel Benar / Salah (Poin per Butir)' : q.tipeSoal === 'PG_KOMPLEKS' ? '☑️ PG Kompleks (Multi Jawaban Benar)' : '🔘 Pilihan Ganda (1 Jawaban Benar)')
                                                 : '📝 Soal Essay / Uraian'}
                                         </span>
                                     </div>
@@ -1084,12 +1090,13 @@ const StudentExams = () => {
                                     {/* Banner Keterangan Format & Petunjuk Soal untuk Siswa */}
                                     <div className={`cbt-soal-instruction-banner ${
                                         q?.qType === 'pg'
-                                            ? (q.tipeSoal === 'BENAR_SALAH' ? 'banner-tf' : q.tipeSoal === 'PG_KOMPLEKS' ? 'banner-kompleks' : 'banner-pg')
+                                            ? (q.tipeSoal === 'BENAR_SALAH' ? 'banner-tf' : q.tipeSoal === 'BS_MAJEMUK' ? 'banner-bs-majemuk' : q.tipeSoal === 'PG_KOMPLEKS' ? 'banner-kompleks' : 'banner-pg')
                                             : 'banner-essay'
                                     }`}>
                                         <div className="csi-icon">
                                             {q?.qType === 'pg' ? (
                                                 q.tipeSoal === 'BENAR_SALAH' ? '⚖️' :
+                                                q.tipeSoal === 'BS_MAJEMUK' ? '📊' :
                                                 q.tipeSoal === 'PG_KOMPLEKS' ? '☑️' : '🔘'
                                             ) : '📝'}
                                         </div>
@@ -1098,24 +1105,29 @@ const StudentExams = () => {
                                                 {q?.qType === 'pg' ? (
                                                     q.tipeSoal === 'BENAR_SALAH'
                                                         ? 'Soal Pernyataan: Benar atau Salah'
-                                                        : q.tipeSoal === 'PG_KOMPLEKS'
-                                                            ? 'Soal Pilihan Ganda Kompleks (Bisa 2 atau Lebih Jawaban Benar)'
-                                                            : 'Soal Pilihan Ganda (1 Jawaban Benar)'
+                                                        : q.tipeSoal === 'BS_MAJEMUK'
+                                                            ? 'Soal Tabel Pernyataan: Benar atau Salah (Poin per Butir)'
+                                                            : q.tipeSoal === 'PG_KOMPLEKS'
+                                                                ? 'Soal Pilihan Ganda Kompleks (Bisa 2 atau Lebih Jawaban Benar)'
+                                                                : 'Soal Pilihan Ganda (1 Jawaban Benar)'
                                                 ) : 'Soal Essay / Uraian Terbuka'}
                                             </div>
                                             <div className="csi-desc">
                                                 {q?.qType === 'pg' ? (
                                                     q.tipeSoal === 'BENAR_SALAH'
                                                         ? 'Tentukan apakah pernyataan pada soal ini Benar atau Salah. Pilih salah satu tombol di bawah.'
-                                                        : q.tipeSoal === 'PG_KOMPLEKS'
-                                                            ? 'Soal ini memiliki lebih dari 1 pilihan jawaban yang benar (misal: 2 pilihan benar atau lebih). Centang semua pilihan yang kamu anggap benar!'
-                                                            : 'Pilihlah salah satu jawaban yang paling tepat dari pilihan A sampai E di bawah.'
+                                                        : q.tipeSoal === 'BS_MAJEMUK'
+                                                            ? 'Tentukan Benar atau Salah pada setiap butir pernyataan di dalam tabel. Setiap jawaban yang tepat mendapatkan poin mandiri.'
+                                                            : q.tipeSoal === 'PG_KOMPLEKS'
+                                                                ? 'Soal ini memiliki lebih dari 1 pilihan jawaban yang benar (misal: 2 pilihan benar atau lebih). Centang semua pilihan yang kamu anggap benar!'
+                                                                : 'Pilihlah salah satu jawaban yang paling tepat dari pilihan A sampai E di bawah.'
                                                 ) : 'Tuliskan uraian atau penjelasan lengkap jawaban Anda pada kolom jawaban di bawah ini.'}
                                             </div>
                                         </div>
                                         <div className="csi-chip">
                                             {q?.qType === 'pg' ? (
                                                 q.tipeSoal === 'BENAR_SALAH' ? '1 Opsi Benar/Salah' :
+                                                q.tipeSoal === 'BS_MAJEMUK' ? 'Nilai per Butir' :
                                                 q.tipeSoal === 'PG_KOMPLEKS' ? 'Bisa >1 Jawaban' : 'Pilih 1 Jawaban'
                                             ) : 'Teks Terbuka'}
                                         </div>
@@ -1217,6 +1229,104 @@ const StudentExams = () => {
                                                                 </div>
                                                             )}
                                                         </div>
+                                                    </div>
+                                                ) : q.tipeSoal === 'BS_MAJEMUK' ? (
+                                                    /* TIPE KHUSUS: TABEL BENAR / SALAH (BS MAJEMUK DENGAN POIN PER BUTIR) */
+                                                    <div className="cbt-bs-majemuk-container">
+                                                        <div className="bs-majemuk-table-wrap">
+                                                            <table className="cbt-matrix-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th style={{ width: '50px', textAlign: 'center' }}>No</th>
+                                                                        <th>Pernyataan</th>
+                                                                        <th style={{ width: '130px', textAlign: 'center' }}>Benar</th>
+                                                                        <th style={{ width: '130px', textAlign: 'center' }}>Salah</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {['A', 'B', 'C', 'D', 'E'].map((opt, idx) => {
+                                                                        const stmtText = q[`pilihan${opt}`];
+                                                                        if (!stmtText || stmtText === '-') return null;
+
+                                                                        const rawAns = answers[q.id] || '';
+                                                                        const chosenList = rawAns.split(',');
+                                                                        const currentChoice = (chosenList[idx] || '').trim().toUpperCase();
+
+                                                                        return (
+                                                                            <tr key={opt} className={`matrix-row ${currentChoice ? 'row-answered' : ''}`}>
+                                                                                <td className="matrix-cell-num">{idx + 1}</td>
+                                                                                <td className="matrix-cell-text" dangerouslySetInnerHTML={{ __html: stmtText }}></td>
+                                                                                <td className="matrix-cell-choice">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={`btn-matrix-choice choice-true ${currentChoice === 'B' ? 'selected' : ''}`}
+                                                                                        onClick={() => {
+                                                                                            const totalOpts = ['A', 'B', 'C', 'D', 'E'].filter(o => q[`pilihan${o}`] && q[`pilihan${o}`] !== '-').length;
+                                                                                            const arr = chosenList.slice(0, totalOpts);
+                                                                                            while (arr.length < totalOpts) arr.push('');
+                                                                                            arr[idx] = 'B';
+                                                                                            const newAns = arr.join(',');
+                                                                                            answersRef.current[q.id] = newAns;
+                                                                                            setAnswers(prev => ({ ...prev, [q.id]: newAns }));
+                                                                                            saveAnswerPG(q.id, newAns, raguState[q.id]);
+                                                                                        }}
+                                                                                    >
+                                                                                        <CheckCircle2 size={16} />
+                                                                                        <span>BENAR</span>
+                                                                                    </button>
+                                                                                </td>
+                                                                                <td className="matrix-cell-choice">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={`btn-matrix-choice choice-false ${currentChoice === 'S' ? 'selected' : ''}`}
+                                                                                        onClick={() => {
+                                                                                            const totalOpts = ['A', 'B', 'C', 'D', 'E'].filter(o => q[`pilihan${o}`] && q[`pilihan${o}`] !== '-').length;
+                                                                                            const arr = chosenList.slice(0, totalOpts);
+                                                                                            while (arr.length < totalOpts) arr.push('');
+                                                                                            arr[idx] = 'S';
+                                                                                            const newAns = arr.join(',');
+                                                                                            answersRef.current[q.id] = newAns;
+                                                                                            setAnswers(prev => ({ ...prev, [q.id]: newAns }));
+                                                                                            saveAnswerPG(q.id, newAns, raguState[q.id]);
+                                                                                        }}
+                                                                                    >
+                                                                                        <XCircle size={16} />
+                                                                                        <span>SALAH</span>
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+
+                                                        {/* Status Bar Pengerjaan Tabel */}
+                                                        {(() => {
+                                                            const totalStmts = ['A', 'B', 'C', 'D', 'E'].filter(o => q[`pilihan${o}`] && q[`pilihan${o}`] !== '-').length;
+                                                            const rawAns = answers[q.id] || '';
+                                                            const chosenList = rawAns.split(',').filter(x => x && x.trim() !== '');
+                                                            const answeredCount = chosenList.length;
+                                                            const isComplete = answeredCount === totalStmts;
+
+                                                            return (
+                                                                <div className="tf-status-bar" style={{ marginTop: '16px' }}>
+                                                                    {isComplete ? (
+                                                                        <div className="tf-status-msg is-true">
+                                                                            <CheckCircle2 size={16} /> Seluruh {totalStmts} butir pernyataan telah Anda jawab (Tersimpan otomatis)
+                                                                        </div>
+                                                                    ) : answeredCount > 0 ? (
+                                                                        <div className="tf-status-msg" style={{ color: '#0284c7', background: '#eff6ff' }}>
+                                                                            <Clock size={16} /> Terjawab {answeredCount} dari {totalStmts} butir. Masih ada {totalStmts - answeredCount} butir belum dipilih.
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="tf-status-msg is-empty">
+                                                                            <AlertCircle size={16} /> Silakan tentukan Benar atau Salah pada setiap baris pernyataan di atas.
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 ) : q.tipeSoal === 'PG_KOMPLEKS' ? (
                                                     /* TIPE 2: PILIHAN GANDA KOMPLEKS (BISA >1 JAWABAN BENAR DENGAN CHECKBOXES) */
@@ -1976,6 +2086,39 @@ const StudentExams = () => {
                     }
 
                     /* Checkbox styling */
+                    
+                    /* BS Majemuk Matrix Table Styles */
+                    .banner-bs-majemuk { background: #f0fdf4; border: 1.5px solid #86efac; color: #15803d; }
+                    .banner-bs-majemuk .csi-icon { background: #dcfce7; color: #166534; }
+                    .banner-bs-majemuk .csi-title { color: #15803d; }
+                    .banner-bs-majemuk .csi-chip { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+                    .badge-bs-majemuk { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+
+                    .cbt-bs-majemuk-container { margin-top: 18px; }
+                    .bs-majemuk-table-wrap { overflow-x: auto; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+                    .cbt-matrix-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+                    .cbt-matrix-table th { background: #f8fafc; padding: 14px 18px; color: #475569; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.03em; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; }
+                    .cbt-matrix-table td { padding: 16px 18px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+                    .matrix-row.row-answered { background: #fcfcfd; }
+                    .matrix-row:hover { background: #f8fafc; }
+                    .matrix-cell-num { text-align: center; font-weight: 800; color: #64748b; font-size: 0.9rem; }
+                    .matrix-cell-text { color: #1e293b; line-height: 1.6; }
+                    .matrix-cell-choice { text-align: center; padding: 12px !important; }
+                    .btn-matrix-choice { width: 100%; max-width: 120px; padding: 10px 14px; border-radius: 12px; font-size: 0.82rem; font-weight: 800; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+                    .btn-matrix-choice:hover { background: #f1f5f9; transform: translateY(-1px); }
+                    .btn-matrix-choice.choice-true.selected { background: #ecfdf5; border-color: #10b981; color: #059669; box-shadow: 0 4px 10px rgba(16,185,129,0.25); }
+                    .btn-matrix-choice.choice-false.selected { background: #fff1f2; border-color: #f43f5e; color: #e11d48; box-shadow: 0 4px 10px rgba(244,63,94,0.25); }
+
+                    [data-theme="dark"] .bs-majemuk-table-wrap { background: #1e293b; border-color: #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+                    [data-theme="dark"] .cbt-matrix-table th { background: #0f172a; border-color: #334155; color: #94a3b8; }
+                    [data-theme="dark"] .cbt-matrix-table td { border-color: #334155; }
+                    [data-theme="dark"] .matrix-row.row-answered { background: rgba(30,41,59,0.7); }
+                    [data-theme="dark"] .matrix-row:hover { background: #33415520; }
+                    [data-theme="dark"] .matrix-cell-num { color: #94a3b8; }
+                    [data-theme="dark"] .matrix-cell-text { color: #f8fafc; }
+                    [data-theme="dark"] .btn-matrix-choice { background: #0f172a; border-color: #475569; color: #cbd5e1; }
+                    [data-theme="dark"] .btn-matrix-choice:hover { background: #334155; color: #f8fafc; }
+
                     .cbt-opt-row.complex-row {
                         border: 2px solid #e2e8f0;
                         border-radius: 16px;
@@ -2759,10 +2902,54 @@ const StudentExams = () => {
                                         </div>
                                         <div className="transcript-q-text" dangerouslySetInnerHTML={{ __html: item.pertanyaan }}></div>
 
-                                        <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
-                                            <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Jawaban Anda</p>
-                                            <p className="transcript-ans-text" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{item.jawabanSiswa}</p>
-                                        </div>
+                                        {item.tipeSoal === 'BS_MAJEMUK' ? (
+                                            <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '12px' }}>Evaluasi Tabel Benar / Salah</p>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                                                    <thead>
+                                                        <tr style={{ borderBottom: '1.5px solid #e2e8f0', color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                                                            <th style={{ padding: '8px', textAlign: 'left' }}>No</th>
+                                                            <th style={{ padding: '8px', textAlign: 'left' }}>Pernyataan</th>
+                                                            <th style={{ padding: '8px', textAlign: 'center' }}>Pilihan Anda</th>
+                                                            <th style={{ padding: '8px', textAlign: 'center' }}>Kunci</th>
+                                                            <th style={{ padding: '8px', textAlign: 'center' }}>Hasil</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {['A', 'B', 'C', 'D', 'E'].map((opt, sIdx) => {
+                                                            const sText = item[`pilihan${opt}`];
+                                                            if (!sText || sText === '-') return null;
+                                                            const studentP = (item.jawabanSiswa || '').split(',')[sIdx] || '-';
+                                                            const keyP = (item.kunciJawaban || '').split(',')[sIdx] || 'B';
+                                                            const isMatch = studentP.toUpperCase().startsWith(keyP.toUpperCase());
+
+                                                            return (
+                                                                <tr key={opt} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                    <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{sIdx + 1}</td>
+                                                                    <td style={{ padding: '10px 8px' }} dangerouslySetInnerHTML={{ __html: sText }}></td>
+                                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                                        <span style={{ fontWeight: 800, color: studentP.startsWith('B') ? '#059669' : studentP.startsWith('S') ? '#e11d48' : '#94a3b8' }}>
+                                                                            {studentP.startsWith('B') ? 'BENAR' : studentP.startsWith('S') ? 'SALAH' : '-'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 800, color: '#3b82f6' }}>
+                                                                        {keyP.startsWith('B') ? 'BENAR' : 'SALAH'}
+                                                                    </td>
+                                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                                        {isMatch ? <span style={{ color: '#10b981', fontWeight: 800 }}>✓ Tepat</span> : <span style={{ color: '#ef4444', fontWeight: 800 }}>✗ Keliru</span>}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Jawaban Anda</p>
+                                                <p className="transcript-ans-text" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{item.jawabanSiswa}</p>
+                                            </div>
+                                        )}
 
                                         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
                                             <div className="transcript-score-box" style={{ padding: '20px 48px', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: '200px' }}>
