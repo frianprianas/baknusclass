@@ -260,8 +260,8 @@ public class JawabanPGService {
                 (!looksLikeBS && (rawKunci.contains(",") || rawJawaban.contains(","))));
 
         if (looksLikeBSMajemuk) {
-            String[] keyParts = rawKunci.split("[,;\s]+");
-            String[] ansParts = rawJawaban.split("[,;\s]+");
+            String[] keyParts = rawKunci.split(",", -1);
+            String[] ansParts = rawJawaban.split(",", -1);
 
             int totalItems = keyParts.length;
             if (totalItems == 0) {

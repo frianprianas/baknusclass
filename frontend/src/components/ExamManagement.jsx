@@ -1326,88 +1326,157 @@ const ExamManagement = () => {
                                                 </div>
                                             ) : questionFormPG.tipeSoal === 'BS_MAJEMUK' ? (
                                                 <div className="bs-majemuk-form-container">
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                                                        <div>
-                                                            <label className="section-label" style={{ margin: 0 }}>Daftar Butir Pernyataan & Kunci [Benar / Salah]</label>
-                                                            <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                                                                Tentukan pernyataan dan pilih kunci (B/S) untuk tiap butir. Skor siswa dihitung otomatis per butir yang tepat.
-                                                            </p>
-                                                        </div>
-                                                        <span className="opt-paste-badge">💡 Tekan Ctrl+V untuk tempel gambar bila butuh ilustrasi</span>
-                                                    </div>
+                                                    {(() => {
+                                                        const hasStmt5 = questionFormPG.pilihanE && questionFormPG.pilihanE !== '-';
+                                                        const totalStatements = hasStmt5 ? 5 : 4;
+                                                        const totalBobot = Number(questionFormPG.bobotNilai) || 2;
+                                                        const ptsPerItem = (totalBobot / totalStatements).toFixed(2).replace(/\.00$/, '');
+                                                        
+                                                        // Parse clean normalized keys
+                                                        const rawKeyArr = (questionFormPG.kunciJawaban || '').split(',').map(k => k.trim().toUpperCase());
+                                                        const currentKeys = ['A', 'B', 'C', 'D', 'E'].map((_, i) => {
+                                                            const k = rawKeyArr[i];
+                                                            return (k === 'S' || k === 'B') ? k : (i === 2 ? 'S' : 'B');
+                                                        });
 
-                                                    <div className="bs-majemuk-table-editor">
-                                                        {['A', 'B', 'C', 'D', 'E'].map((opt, idx) => {
-                                                            const keys = (questionFormPG.kunciJawaban || 'B,B,S,B').split(',');
-                                                            const currentKey = keys[idx] || 'B';
-                                                            const isVisible = idx < 4 || (questionFormPG.pilihanE && questionFormPG.pilihanE !== '-');
+                                                        const setRowKey = (rowIdx, val) => {
+                                                            const nextKeys = [...currentKeys];
+                                                            nextKeys[rowIdx] = val;
+                                                            const finalKj = nextKeys.slice(0, totalStatements).join(',');
+                                                            setQuestionFormPG(prev => ({ ...prev, kunciJawaban: finalKj }));
+                                                        };
 
-                                                            if (!isVisible && idx >= 4) {
-                                                                return (
-                                                                    <div key={opt} style={{ textAlign: 'center', padding: '8px 0' }}>
+                                                        const setAllKeys = (val) => {
+                                                            const nextKeys = Array(totalStatements).fill(val).join(',');
+                                                            setQuestionFormPG(prev => ({ ...prev, kunciJawaban: nextKeys }));
+                                                        };
+
+                                                        return (
+                                                            <>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                                                                    <div>
+                                                                        <label className="section-label" style={{ margin: 0 }}>Daftar Butir Pernyataan & Kunci [Benar / Salah]</label>
+                                                                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>
+                                                                            Siswa menentukan status tiap butir. Sistem menilai secara <strong>proporsional per butir</strong>.
+                                                                        </p>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: 'Pernyataan 5' })}
-                                                                            style={{ background: '#eff6ff', border: '1.5px dashed #3b82f6', color: '#1d4ed8', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                                                                            onClick={() => setAllKeys('B')}
+                                                                            style={{ padding: '6px 12px', background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                            title="Jadikan semua butir berkunci BENAR"
                                                                         >
-                                                                            + Tambah Pernyataan Ke-5
+                                                                            ✓ Set Semua BENAR
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setAllKeys('S')}
+                                                                            style={{ padding: '6px 12px', background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                                                                            title="Jadikan semua butir berkunci SALAH"
+                                                                        >
+                                                                            ✗ Set Semua SALAH
                                                                         </button>
                                                                     </div>
-                                                                );
-                                                            }
-
-                                                            return (
-                                                                <div key={opt} className="bs-statement-row">
-                                                                    <div className="bs-stmt-num">{idx + 1}</div>
-                                                                    <div className="bs-stmt-input-wrap">
-                                                                        <textarea
-                                                                            className="bs-stmt-textarea"
-                                                                            rows="2"
-                                                                            placeholder={`Tulis pernyataan ke-${idx + 1} di sini...`}
-                                                                            value={questionFormPG[`pilihan${opt}`] === '-' ? '' : (questionFormPG[`pilihan${opt}`] || '')}
-                                                                            onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="bs-stmt-key-toggle">
-                                                                        <button
-                                                                            type="button"
-                                                                            className={`btn-bs-toggle btn-toggle-b ${currentKey === 'B' ? 'active-b' : ''}`}
-                                                                            onClick={() => {
-                                                                                const updatedKeys = [...keys];
-                                                                                while (updatedKeys.length <= idx) updatedKeys.push('B');
-                                                                                updatedKeys[idx] = 'B';
-                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: updatedKeys.join(',') });
-                                                                            }}
-                                                                        >
-                                                                            <CheckCircle2 size={14} /> BENAR (B)
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            className={`btn-bs-toggle btn-toggle-s ${currentKey === 'S' ? 'active-s' : ''}`}
-                                                                            onClick={() => {
-                                                                                const updatedKeys = [...keys];
-                                                                                while (updatedKeys.length <= idx) updatedKeys.push('B');
-                                                                                updatedKeys[idx] = 'S';
-                                                                                setQuestionFormPG({ ...questionFormPG, kunciJawaban: updatedKeys.join(',') });
-                                                                            }}
-                                                                        >
-                                                                            <X size={14} /> SALAH (S)
-                                                                        </button>
-                                                                    </div>
-                                                                    {idx === 4 && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: '-' })}
-                                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                                                                            title="Hapus Pernyataan ke-5"
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                    )}
                                                                 </div>
-                                                            );
-                                                        })}
-                                                    </div>
+
+                                                                {/* Rincian Penskoran Proporsional Card */}
+                                                                <div className="bs-scoring-detail-card" style={{ background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                                                                            <div>
+                                                                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0369a1' }}>
+                                                                                    Rincian Penilaian Per Butir: <span style={{ color: '#0284c7' }}>{ptsPerItem} Poin</span> / butir pernyataan yang benar
+                                                                                </div>
+                                                                                <div style={{ fontSize: '0.8rem', color: '#0284c7', marginTop: '2px' }}>
+                                                                                    Total Bobot Soal: <strong>{totalBobot} Poin</strong> &bull; Terdiri dari <strong>{totalStatements} Butir Pernyataan</strong>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                                            {Array.from({ length: totalStatements }, (_, i) => {
+                                                                                const cocokCount = totalStatements - i;
+                                                                                const pts = ((cocokCount / totalStatements) * totalBobot).toFixed(1).replace(/\.0$/, '');
+                                                                                return (
+                                                                                    <span key={i} style={{ background: cocokCount === totalStatements ? '#dcfce7' : '#e0f2fe', color: cocokCount === totalStatements ? '#15803d' : '#0369a1', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800 }}>
+                                                                                        {cocokCount} Cocok: {pts} Pts
+                                                                                    </span>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="bs-majemuk-table-editor">
+                                                                    {['A', 'B', 'C', 'D', 'E'].map((opt, idx) => {
+                                                                        const isVisible = idx < 4 || hasStmt5;
+
+                                                                        if (!isVisible && idx >= 4) {
+                                                                            return (
+                                                                                <div key={opt} style={{ textAlign: 'center', padding: '10px 0' }}>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: 'Pernyataan 5' })}
+                                                                                        style={{ background: '#eff6ff', border: '1.5px dashed #3b82f6', color: '#1d4ed8', padding: '8px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}
+                                                                                    >
+                                                                                        + Tambah Pernyataan Ke-5 (Opsional)
+                                                                                    </button>
+                                                                                </div>
+                                                                            );
+                                                                        }
+
+                                                                        const rowKey = currentKeys[idx];
+
+                                                                        return (
+                                                                            <div key={opt} className="bs-statement-row">
+                                                                                <div className="bs-stmt-num">{idx + 1}</div>
+                                                                                <div className="bs-stmt-input-wrap">
+                                                                                    <textarea
+                                                                                        className="bs-stmt-textarea"
+                                                                                        rows="2"
+                                                                                        placeholder={`Tulis teks butir pernyataan ke-${idx + 1} di sini...`}
+                                                                                        value={questionFormPG[`pilihan${opt}`] === '-' ? '' : (questionFormPG[`pilihan${opt}`] || '')}
+                                                                                        onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
+                                                                                        required={idx < 2}
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="bs-stmt-point-badge" title="Nilai didapatkan siswa jika menjawab butir ini dengan tepat">
+                                                                                    +{ptsPerItem} Poin
+                                                                                </div>
+                                                                                <div className="bs-stmt-key-toggle">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={`btn-bs-toggle btn-toggle-b ${rowKey === 'B' ? 'active-b' : ''}`}
+                                                                                        onClick={() => setRowKey(idx, 'B')}
+                                                                                    >
+                                                                                        <CheckCircle2 size={15} /> <span>BENAR (B)</span>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className={`btn-bs-toggle btn-toggle-s ${rowKey === 'S' ? 'active-s' : ''}`}
+                                                                                        onClick={() => setRowKey(idx, 'S')}
+                                                                                    >
+                                                                                        <X size={15} /> <span>SALAH (S)</span>
+                                                                                    </button>
+                                                                                </div>
+                                                                                {idx === 4 && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: '-' })}
+                                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px' }}
+                                                                                        title="Hapus Pernyataan ke-5"
+                                                                                    >
+                                                                                        <Trash2 size={18} />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             ) : (
                                                 <div>
@@ -2913,6 +2982,181 @@ const ExamManagement = () => {
                         transition: transform 0.2s;
                     }
                     .opt-text img:hover { transform: scale(1.02); }
+
+                    /* ==================== BS_MAJEMUK TABLE EDITOR STYLES ==================== */
+                    .bs-majemuk-form-container {
+                        background: #f8fafc;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 16px;
+                        padding: 20px;
+                        margin-bottom: 24px;
+                    }
+                    .bs-majemuk-table-editor {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                    }
+                    .bs-statement-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        background: white;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 14px;
+                        padding: 12px 16px;
+                        transition: all 0.2s ease;
+                    }
+                    .bs-statement-row:focus-within {
+                        border-color: #3b82f6;
+                        box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.12);
+                    }
+                    .bs-stmt-num {
+                        width: 36px;
+                        height: 36px;
+                        min-width: 36px;
+                        border-radius: 10px;
+                        background: #e0e7ff;
+                        color: #4338ca;
+                        font-weight: 800;
+                        font-size: 0.95rem;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .bs-stmt-input-wrap {
+                        flex: 1;
+                        min-width: 0;
+                    }
+                    .bs-stmt-textarea {
+                        width: 100%;
+                        box-sizing: border-box;
+                        border: 1.5px solid #e2e8f0;
+                        border-radius: 10px;
+                        padding: 10px 14px;
+                        font-size: 0.95rem;
+                        font-family: inherit;
+                        color: #1e293b;
+                        background: #f8fafc;
+                        resize: vertical;
+                        min-height: 48px;
+                        transition: all 0.2s;
+                        outline: none;
+                    }
+                    .bs-stmt-textarea:focus {
+                        border-color: #3b82f6;
+                        background: #ffffff;
+                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                    }
+                    .bs-stmt-point-badge {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        font-size: 0.78rem;
+                        font-weight: 800;
+                        color: #0369a1;
+                        background: #e0f2fe;
+                        padding: 6px 10px;
+                        border-radius: 8px;
+                        white-space: nowrap;
+                        border: 1px solid #bae6fd;
+                    }
+                    .bs-stmt-key-toggle {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        white-space: nowrap;
+                    }
+                    .btn-bs-toggle {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 9px 15px;
+                        border-radius: 10px;
+                        font-size: 0.82rem;
+                        font-weight: 800;
+                        cursor: pointer;
+                        border: 2px solid #e2e8f0;
+                        background: #f8fafc;
+                        color: #64748b;
+                        transition: all 0.2s ease;
+                    }
+                    .btn-bs-toggle:hover {
+                        border-color: #cbd5e1;
+                        transform: translateY(-1px);
+                    }
+                    .btn-bs-toggle.btn-toggle-b.active-b {
+                        background: #16a34a !important;
+                        border-color: #15803d !important;
+                        color: #ffffff !important;
+                        box-shadow: 0 3px 8px rgba(22, 163, 74, 0.3) !important;
+                    }
+                    .btn-bs-toggle.btn-toggle-s.active-s {
+                        background: #dc2626 !important;
+                        border-color: #b91c1c !important;
+                        color: #ffffff !important;
+                        box-shadow: 0 3px 8px rgba(220, 38, 38, 0.3) !important;
+                    }
+
+                    /* Preview table styles */
+                    .bs-majemuk-preview-table-wrap {
+                        margin: 14px 0;
+                        overflow-x: auto;
+                        border-radius: 12px;
+                        border: 1px solid #e2e8f0;
+                    }
+                    .bs-majemuk-preview-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 0.9rem;
+                        background: white;
+                    }
+                    .bs-majemuk-preview-table th {
+                        background: #f1f5f9;
+                        color: #475569;
+                        font-size: 0.8rem;
+                        font-weight: 800;
+                        padding: 10px 14px;
+                        border-bottom: 2px solid #e2e8f0;
+                        text-transform: uppercase;
+                    }
+                    .bs-majemuk-preview-table td {
+                        padding: 12px 14px;
+                        border-bottom: 1px solid #e2e8f0;
+                        color: #1e293b;
+                    }
+                    .badge-bs-key {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 4px 10px;
+                        border-radius: 6px;
+                        font-size: 0.78rem;
+                        font-weight: 800;
+                    }
+                    .badge-bs-key.is-b {
+                        background: #dcfce7;
+                        color: #15803d;
+                        border: 1px solid #86efac;
+                    }
+                    .badge-bs-key.is-s {
+                        background: #fee2e2;
+                        color: #b91c1c;
+                        border: 1px solid #fca5a5;
+                    }
+
+                    /* Dark Mode styles */
+                    [data-theme="dark"] .bs-majemuk-form-container { background: #0f172a; border-color: #334155; }
+                    [data-theme="dark"] .bs-statement-row { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .bs-stmt-num { background: #1e3a8a; color: #93c5fd; }
+                    [data-theme="dark"] .bs-stmt-textarea { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .bs-stmt-textarea:focus { border-color: #3b82f6; background: #1e293b; }
+                    [data-theme="dark"] .bs-stmt-point-badge { background: #0c4a6e; color: #7dd3fc; border-color: #0369a1; }
+                    [data-theme="dark"] .btn-bs-toggle { background: #0f172a; border-color: #334155; color: #94a3b8; }
+                    [data-theme="dark"] .bs-scoring-detail-card { background: #082f49 !important; border-color: #0369a1 !important; color: #e0f2fe !important; }
+                    [data-theme="dark"] .bs-majemuk-preview-table-wrap { border-color: #334155; }
+                    [data-theme="dark"] .bs-majemuk-preview-table { background: #1e293b; }
+                    [data-theme="dark"] .bs-majemuk-preview-table th { background: #0f172a; border-bottom-color: #334155; color: #94a3b8; }
+                    [data-theme="dark"] .bs-majemuk-preview-table td { border-bottom-color: #334155; color: #f8fafc; }
                 `}</style>
 
                 </div>

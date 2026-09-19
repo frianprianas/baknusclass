@@ -1125,50 +1125,87 @@ const ExamScoring = () => {
 
                                                         {/* Option preview list */}
                                                         {q.tipeSoal === 'BS_MAJEMUK' ? (
-                                                            <div style={{ margin: '14px 0', overflowX: 'auto' }}>
-                                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', background: '#f8fafc', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                                                                    <thead>
-                                                                        <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-                                                                            <th style={{ padding: '10px 14px', textAlign: 'left', width: '40px' }}>No</th>
-                                                                            <th style={{ padding: '10px 14px', textAlign: 'left' }}>Butir Pernyataan</th>
-                                                                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '130px' }}>Pilihan Siswa</th>
-                                                                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '130px' }}>Kunci Guru</th>
-                                                                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '110px' }}>Hasil</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {['A', 'B', 'C', 'D', 'E'].map((opt, sIdx) => {
-                                                                            const sText = q['pilihan' + opt];
-                                                                            if (!sText || sText === '-') return null;
-                                                                            const studentP = (studentChoice || '').split(',')[sIdx] || '-';
-                                                                            const keyP = (keyAnswer || '').split(',')[sIdx] || 'B';
-                                                                            const isMatch = studentP.toUpperCase().startsWith(keyP.toUpperCase());
+                                                            (() => {
+                                                                const validStatements = ['A', 'B', 'C', 'D', 'E'].filter(opt => q['pilihan' + opt] && q['pilihan' + opt] !== '-');
+                                                                const totalStmt = validStatements.length || 4;
+                                                                const maxBobot = q.bobotNilai || 2;
+                                                                const ptsPerItem = (maxBobot / totalStmt).toFixed(2).replace(/\.00$/, '');
+                                                                const studentTokens = (studentChoice || '').split(',');
+                                                                const keyTokens = (keyAnswer || '').split(',');
+                                                                let cocokCount = 0;
 
-                                                                            return (
-                                                                                <tr key={opt} style={{ borderBottom: '1px solid #e2e8f0', background: 'white' }}>
-                                                                                    <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#64748b' }}>{sIdx + 1}</td>
-                                                                                    <td style={{ padding: '12px 14px' }} dangerouslySetInnerHTML={{ __html: sText }}></td>
-                                                                                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                                                                        <span style={{ fontWeight: 800, color: studentP.startsWith('B') ? '#059669' : studentP.startsWith('S') ? '#e11d48' : '#94a3b8' }}>
-                                                                                            {studentP.startsWith('B') ? 'BENAR (B)' : studentP.startsWith('S') ? 'SALAH (S)' : '-'}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 800, color: '#3b82f6' }}>
-                                                                                        {keyP.startsWith('B') ? 'BENAR (B)' : 'SALAH (S)'}
-                                                                                    </td>
-                                                                                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                                                                        {isMatch ? (
-                                                                                            <span style={{ color: '#10b981', fontWeight: 800 }}>✓ Cocok</span>
-                                                                                        ) : (
-                                                                                            <span style={{ color: '#ef4444', fontWeight: 800 }}>✗ Keliru</span>
-                                                                                        )}
-                                                                                    </td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
+                                                                validStatements.forEach((opt, sIdx) => {
+                                                                    const sP = (studentTokens[sIdx] || '').trim().toUpperCase();
+                                                                    const kP = (keyTokens[sIdx] || 'B').trim().toUpperCase();
+                                                                    if (sP && kP && sP.startsWith(kP.charAt(0))) cocokCount++;
+                                                                });
+
+                                                                const earnedPts = ((cocokCount / totalStmt) * maxBobot).toFixed(2).replace(/\.00$/, '');
+
+                                                                return (
+                                                                    <div style={{ margin: '14px 0' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#e0f2fe', borderRadius: '10px', marginBottom: '10px', fontSize: '0.85rem', flexWrap: 'wrap', gap: '8px' }}>
+                                                                            <span style={{ color: '#0369a1', fontWeight: 800 }}>
+                                                                                🎯 Hasil Evaluasi Per Butir: <span style={{ color: '#0284c7' }}>{cocokCount} dari {totalStmt} Butir Cocok</span>
+                                                                            </span>
+                                                                            <span style={{ background: '#0284c7', color: 'white', padding: '3px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '0.8rem' }}>
+                                                                                Nilai: {earnedPts} / {maxBobot} Poin ({ptsPerItem} Pts/Butir)
+                                                                            </span>
+                                                                        </div>
+                                                                        <div style={{ overflowX: 'auto' }}>
+                                                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', background: '#f8fafc', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                                                                <thead>
+                                                                                    <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+                                                                                        <th style={{ padding: '10px 14px', textAlign: 'left', width: '40px' }}>No</th>
+                                                                                        <th style={{ padding: '10px 14px', textAlign: 'left' }}>Butir Pernyataan</th>
+                                                                                        <th style={{ padding: '10px 14px', textAlign: 'center', width: '120px' }}>Pilihan Siswa</th>
+                                                                                        <th style={{ padding: '10px 14px', textAlign: 'center', width: '120px' }}>Kunci Guru</th>
+                                                                                        <th style={{ padding: '10px 14px', textAlign: 'center', width: '100px' }}>Hasil</th>
+                                                                                        <th style={{ padding: '10px 14px', textAlign: 'center', width: '110px' }}>Poin Diperoleh</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody>
+                                                                                    {validStatements.map((opt, sIdx) => {
+                                                                                        const sText = q['pilihan' + opt];
+                                                                                        const studentP = (studentTokens[sIdx] || '').trim().toUpperCase();
+                                                                                        const keyP = (keyTokens[sIdx] || 'B').trim().toUpperCase();
+                                                                                        const isMatch = studentP && keyP && studentP.startsWith(keyP.charAt(0));
+
+                                                                                        return (
+                                                                                            <tr key={opt} style={{ borderBottom: '1px solid #e2e8f0', background: 'white' }}>
+                                                                                                <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#64748b' }}>{sIdx + 1}</td>
+                                                                                                <td style={{ padding: '12px 14px' }} dangerouslySetInnerHTML={{ __html: sText }}></td>
+                                                                                                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                                                                    <span style={{ fontWeight: 800, color: studentP.startsWith('B') ? '#059669' : studentP.startsWith('S') ? '#e11d48' : '#94a3b8' }}>
+                                                                                                        {studentP.startsWith('B') ? 'BENAR (B)' : studentP.startsWith('S') ? 'SALAH (S)' : '- (Kosong)'}
+                                                                                                    </span>
+                                                                                                </td>
+                                                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 800, color: '#3b82f6' }}>
+                                                                                                    {keyP.startsWith('B') ? 'BENAR (B)' : 'SALAH (S)'}
+                                                                                                </td>
+                                                                                                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                                                                    {isMatch ? (
+                                                                                                        <span style={{ color: '#10b981', fontWeight: 800 }}>✓ Cocok</span>
+                                                                                                    ) : (
+                                                                                                        <span style={{ color: '#ef4444', fontWeight: 800 }}>✗ Keliru</span>
+                                                                                                    )}
+                                                                                                </td>
+                                                                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 800 }}>
+                                                                                                    {isMatch ? (
+                                                                                                        <span style={{ color: '#16a34a', background: '#dcfce7', padding: '3px 8px', borderRadius: '6px', fontSize: '0.8rem' }}>+{ptsPerItem} Pts</span>
+                                                                                                    ) : (
+                                                                                                        <span style={{ color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', fontSize: '0.8rem' }}>0 Pts</span>
+                                                                                                    )}
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        );
+                                                                                    })}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()
                                                         ) : (
                                                         <div className="pg-options-preview" style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0' }}>
                                                             {options.map(opt => {

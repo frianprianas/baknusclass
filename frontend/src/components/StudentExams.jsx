@@ -2903,47 +2903,79 @@ const StudentExams = () => {
                                         <div className="transcript-q-text" dangerouslySetInnerHTML={{ __html: item.pertanyaan }}></div>
 
                                         {item.tipeSoal === 'BS_MAJEMUK' ? (
-                                            <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
-                                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '12px' }}>Evaluasi Tabel Benar / Salah</p>
-                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-                                                    <thead>
-                                                        <tr style={{ borderBottom: '1.5px solid #e2e8f0', color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase' }}>
-                                                            <th style={{ padding: '8px', textAlign: 'left' }}>No</th>
-                                                            <th style={{ padding: '8px', textAlign: 'left' }}>Pernyataan</th>
-                                                            <th style={{ padding: '8px', textAlign: 'center' }}>Pilihan Anda</th>
-                                                            <th style={{ padding: '8px', textAlign: 'center' }}>Kunci</th>
-                                                            <th style={{ padding: '8px', textAlign: 'center' }}>Hasil</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {['A', 'B', 'C', 'D', 'E'].map((opt, sIdx) => {
-                                                            const sText = item[`pilihan${opt}`];
-                                                            if (!sText || sText === '-') return null;
-                                                            const studentP = (item.jawabanSiswa || '').split(',')[sIdx] || '-';
-                                                            const keyP = (item.kunciJawaban || '').split(',')[sIdx] || 'B';
-                                                            const isMatch = studentP.toUpperCase().startsWith(keyP.toUpperCase());
+                                            (() => {
+                                                const validStatements = ['A', 'B', 'C', 'D', 'E'].filter(opt => item['pilihan' + opt] && item['pilihan' + opt] !== '-');
+                                                const totalStmt = validStatements.length || 4;
+                                                const maxBobot = item.bobot || 2;
+                                                const ptsPerItem = (maxBobot / totalStmt).toFixed(2).replace(/\.00$/, '');
+                                                const studentTokens = (item.jawabanSiswa || '').split(',');
+                                                const keyTokens = (item.kunciJawaban || '').split(',');
+                                                let matchCount = 0;
 
-                                                            return (
-                                                                <tr key={opt} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                                    <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{sIdx + 1}</td>
-                                                                    <td style={{ padding: '10px 8px' }} dangerouslySetInnerHTML={{ __html: sText }}></td>
-                                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                                        <span style={{ fontWeight: 800, color: studentP.startsWith('B') ? '#059669' : studentP.startsWith('S') ? '#e11d48' : '#94a3b8' }}>
-                                                                            {studentP.startsWith('B') ? 'BENAR' : studentP.startsWith('S') ? 'SALAH' : '-'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 800, color: '#3b82f6' }}>
-                                                                        {keyP.startsWith('B') ? 'BENAR' : 'SALAH'}
-                                                                    </td>
-                                                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                                                        {isMatch ? <span style={{ color: '#10b981', fontWeight: 800 }}>✓ Tepat</span> : <span style={{ color: '#ef4444', fontWeight: 800 }}>✗ Keliru</span>}
-                                                                    </td>
+                                                validStatements.forEach((opt, sIdx) => {
+                                                    const sP = (studentTokens[sIdx] || '').trim().toUpperCase();
+                                                    const kP = (keyTokens[sIdx] || 'B').trim().toUpperCase();
+                                                    if (sP && kP && sP.startsWith(kP.charAt(0))) matchCount++;
+                                                });
+
+                                                const studentEarned = ((matchCount / totalStmt) * maxBobot).toFixed(2).replace(/\.00$/, '');
+
+                                                return (
+                                                    <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                                            <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', margin: 0 }}>Evaluasi Tabel Benar / Salah (Poin per Butir)</p>
+                                                            <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800 }}>
+                                                                Hasil Anda: {studentEarned} / {maxBobot} Poin ({matchCount}/{totalStmt} Butir Cocok)
+                                                            </span>
+                                                        </div>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                                                            <thead>
+                                                                <tr style={{ borderBottom: '1.5px solid #e2e8f0', color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                                                                    <th style={{ padding: '8px', textAlign: 'left', width: '40px' }}>No</th>
+                                                                    <th style={{ padding: '8px', textAlign: 'left' }}>Pernyataan</th>
+                                                                    <th style={{ padding: '8px', textAlign: 'center', width: '120px' }}>Pilihan Anda</th>
+                                                                    <th style={{ padding: '8px', textAlign: 'center', width: '120px' }}>Kunci</th>
+                                                                    <th style={{ padding: '8px', textAlign: 'center', width: '90px' }}>Hasil</th>
+                                                                    <th style={{ padding: '8px', textAlign: 'center', width: '110px' }}>Poin Diperoleh</th>
                                                                 </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                            </thead>
+                                                            <tbody>
+                                                                {validStatements.map((opt, sIdx) => {
+                                                                    const sText = item['pilihan' + opt];
+                                                                    const studentP = (studentTokens[sIdx] || '').trim().toUpperCase();
+                                                                    const keyP = (keyTokens[sIdx] || 'B').trim().toUpperCase();
+                                                                    const isMatch = studentP && keyP && studentP.startsWith(keyP.charAt(0));
+
+                                                                    return (
+                                                                        <tr key={opt} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                            <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{sIdx + 1}</td>
+                                                                            <td style={{ padding: '10px 8px' }} dangerouslySetInnerHTML={{ __html: sText }}></td>
+                                                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                                                <span style={{ fontWeight: 800, color: studentP.startsWith('B') ? '#059669' : studentP.startsWith('S') ? '#e11d48' : '#94a3b8' }}>
+                                                                                    {studentP.startsWith('B') ? 'BENAR (B)' : studentP.startsWith('S') ? 'SALAH (S)' : '-'}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 800, color: '#3b82f6' }}>
+                                                                                {keyP.startsWith('B') ? 'BENAR (B)' : 'SALAH (S)'}
+                                                                            </td>
+                                                                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                                                                {isMatch ? <span style={{ color: '#10b981', fontWeight: 800 }}>✓ Tepat</span> : <span style={{ color: '#ef4444', fontWeight: 800 }}>✗ Keliru</span>}
+                                                                            </td>
+                                                                            <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 800 }}>
+                                                                                {isMatch ? (
+                                                                                    <span style={{ color: '#16a34a', background: '#dcfce7', padding: '3px 8px', borderRadius: '6px', fontSize: '0.8rem' }}>+{ptsPerItem} Pts</span>
+                                                                                ) : (
+                                                                                    <span style={{ color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', fontSize: '0.8rem' }}>0 Pts</span>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                );
+                                            })()
                                         ) : (
                                             <div className="transcript-ans-box" style={{ padding: '20px', borderRadius: '12px', marginBottom: '16px' }}>
                                                 <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '8px' }}>Jawaban Anda</p>
