@@ -25,7 +25,8 @@ public class EventUjianService {
     private final com.baknusbelajar.api.repository.SiswaUjianStatusRepository siswaUjianStatusRepository;
 
     public List<com.baknusbelajar.api.dto.exam.EventUjianDTO> getAllEvent() {
-        return eventUjianRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
+        return eventUjianRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id"))
+                .stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
     public com.baknusbelajar.api.dto.exam.EventUjianDTO getEventById(Long id) {

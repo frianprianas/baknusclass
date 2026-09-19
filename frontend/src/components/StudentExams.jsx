@@ -276,11 +276,15 @@ const StudentExams = () => {
                 (e.namaEvent && e.namaEvent.toLowerCase().includes('latihan'))
             );
 
-            const allEvents = hasLatihan ? dbEvents : [DEFAULT_PRACTICE_EVENT, ...dbEvents];
+            // Urutkan event yang paling baru dibuat (ID terbesar) di urutan paling awal
+            dbEvents.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+
+            // Munculkan event yang terakhir dibuat di paling awal, dan latihan default di akhir
+            const allEvents = hasLatihan ? dbEvents : [...dbEvents, DEFAULT_PRACTICE_EVENT];
             setEvents(allEvents);
 
             if (allEvents.length > 0) {
-                // Select practice event or active event
+                // Pilih event yang paling baru dibuat dan aktif, atau event pertama
                 const active = allEvents.find(e => e.statusAktif) || allEvents[0];
                 handleSelectEvent(active);
             }
@@ -2608,7 +2612,7 @@ const StudentExams = () => {
                                     )}
                                 </div>
                                 <h3>{ex.namaMapel}</h3>
-                                <p className="teacher">{ex.namaGuru}</p>
+                                <p className="teacher"><strong>Nama Guru:</strong> {ex.namaGuru || '-'}</p>
 
                                 <div className="exam-times">
                                     <div className="time-item">
@@ -2775,6 +2779,168 @@ const StudentExams = () => {
             )}
 
             <style>{`
+                /* Practice / Simulation Banner Modern Design */
+                .practice-banner-card {
+                    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #e0e7ff 100%);
+                    border: 1.5px solid #bfdbfe;
+                    border-radius: 20px;
+                    padding: 24px 28px;
+                    margin-bottom: 28px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 24px;
+                    box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.12), 0 4px 6px -2px rgba(59, 130, 246, 0.05);
+                    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                    position: relative;
+                    overflow: hidden;
+                }
+                .practice-banner-card::before {
+                    content: '';
+                    position: absolute;
+                    top: -50%;
+                    right: -10%;
+                    width: 300px;
+                    height: 300px;
+                    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+                    border-radius: 50%;
+                    pointer-events: none;
+                }
+                .practice-banner-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 14px 30px -5px rgba(59, 130, 246, 0.2);
+                    border-color: #93c5fd;
+                }
+                .practice-banner-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 20px;
+                    flex: 1;
+                    position: relative;
+                    z-index: 1;
+                }
+                .practice-icon-circle {
+                    width: 56px;
+                    height: 56px;
+                    border-radius: 16px;
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                    box-shadow: 0 8px 16px -4px rgba(37, 99, 235, 0.4);
+                }
+                .practice-text-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+                .practice-tag {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: rgba(37, 99, 235, 0.1);
+                    color: #1d4ed8;
+                    padding: 4px 10px;
+                    border-radius: 20px;
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    letter-spacing: 0.04em;
+                    width: fit-content;
+                }
+                .practice-title {
+                    margin: 0;
+                    font-size: 1.25rem;
+                    font-weight: 800;
+                    color: #1e3a8a;
+                    letter-spacing: -0.01em;
+                }
+                .practice-desc {
+                    margin: 0;
+                    font-size: 0.875rem;
+                    color: #475569;
+                    line-height: 1.5;
+                }
+                .practice-desc strong {
+                    color: #1e293b;
+                }
+                .practice-start-btn {
+                    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                    color: white;
+                    border: none;
+                    padding: 14px 24px;
+                    border-radius: 14px;
+                    font-size: 0.95rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.4);
+                    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                    position: relative;
+                    z-index: 1;
+                }
+                .practice-start-btn:hover {
+                    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+                    transform: translateY(-2px);
+                    box-shadow: 0 12px 24px -4px rgba(37, 99, 235, 0.5);
+                }
+                .practice-start-btn:active {
+                    transform: translateY(0);
+                }
+
+                @media (max-width: 768px) {
+                    .practice-banner-card {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        padding: 20px;
+                        gap: 18px;
+                    }
+                    .practice-start-btn {
+                        width: 100%;
+                        justify-content: center;
+                    }
+                }
+
+                /* Dark Mode for Practice Banner */
+                [data-theme="dark"] .practice-banner-card {
+                    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                    border-color: #334155;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+                }
+                [data-theme="dark"] .practice-banner-card:hover {
+                    border-color: #3b82f6;
+                }
+                [data-theme="dark"] .practice-title {
+                    color: #f8fafc;
+                }
+                [data-theme="dark"] .practice-desc {
+                    color: #94a3b8;
+                }
+                [data-theme="dark"] .practice-desc strong {
+                    color: #f1f5f9;
+                }
+                [data-theme="dark"] .practice-tag {
+                    background: rgba(59, 130, 246, 0.2);
+                    color: #93c5fd;
+                }
+                [data-theme="dark"] .practice-start-btn {
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    box-shadow: 0 8px 20px -4px rgba(59, 130, 246, 0.4);
+                }
+
+                .teacher strong {
+                    color: #475569;
+                    font-weight: 700;
+                }
+                [data-theme="dark"] .teacher strong {
+                    color: #cbd5e1;
+                }
+
                 .student-home { padding: 32px; }
                 @media (max-width: 768px) {
                     .student-home { padding: 16px; }

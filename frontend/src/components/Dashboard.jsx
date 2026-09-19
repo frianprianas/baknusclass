@@ -323,7 +323,7 @@ const Dashboard = () => {
                       <h3 title={m.namaMapel}>{m.namaMapel}</h3>
                       <div className="mapel-guru-info">
                         <span className="guru-label">Guru Pengampu:</span>
-                        <p className="guru-name">👨‍🏫 {m.namaGuru || 'Guru Bidang Studi'}</p>
+                        <p className="guru-name">👨‍🏫 <strong>Nama Guru:</strong> {m.namaGuru || 'Guru Bidang Studi'}</p>
                       </div>
                     </div>
 
