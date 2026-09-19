@@ -36,7 +36,7 @@ import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
 const QuillEditor = ({ value, onChange, placeholder, isSimple }) => {
-    const editorRef = useRef(null);
+    const containerRef = useRef(null);
     const quillRef = useRef(null);
     const isInternalChange = useRef(false);
     const onChangeRef = useRef(onChange);
@@ -46,81 +46,102 @@ const QuillEditor = ({ value, onChange, placeholder, isSimple }) => {
     }, [onChange]);
 
     useEffect(() => {
-        if (!quillRef.current && editorRef.current) {
-            quillRef.current = new Quill(editorRef.current, {
-                theme: 'snow',
-                placeholder: placeholder || 'Ketik di sini...',
-                modules: {
-                    toolbar: isSimple ? [
-                        ['bold', 'italic', 'underline'],
+        if (!containerRef.current) return;
+
+        // Clear out container completely to eliminate any duplicate toolbars or stale instances
+        containerRef.current.innerHTML = '';
+        const editorDiv = document.createElement('div');
+        containerRef.current.appendChild(editorDiv);
+
+        const quill = new Quill(editorDiv, {
+            theme: 'snow',
+            placeholder: placeholder || 'Ketik di sini...',
+            modules: {
+                toolbar: isSimple ? [
+                    ['bold', 'italic', 'underline'],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    ['link'],
+                    ['clean']
+                ] : {
+                    container: [
+                        [{ 'header': [1, 2, false] }],
+                        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
                         [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                        ['link'],
+                        ['link', 'image', 'video'],
                         ['clean']
-                    ] : {
-                        container: [
-                            [{ 'header': [1, 2, false] }],
-                            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                            ['link', 'image', 'video'],
-                            ['clean']
-                        ]
-                    }
+                    ]
                 }
-            });
-
-            // Handle image upload compression inside Quill toolbar
-            if (!isSimple && quillRef.current.getModule('toolbar')) {
-                const toolbar = quillRef.current.getModule('toolbar');
-                toolbar.addHandler('image', () => {
-                    const input = document.createElement('input');
-                    input.setAttribute('type', 'file');
-                    input.setAttribute('accept', 'image/*');
-                    input.click();
-                    input.onchange = async () => {
-                        const file = input.files[0];
-                        if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (e) => {
-                                const img = new window.Image();
-                                img.onload = () => {
-                                    const canvas = document.createElement('canvas');
-                                    let width = img.width;
-                                    let height = img.height;
-                                    const maxDim = 1200;
-                                    if (width > maxDim || height > maxDim) {
-                                        if (width > height) {
-                                            height = Math.round((height * maxDim) / width);
-                                            width = maxDim;
-                                        } else {
-                                            width = Math.round((width * maxDim) / height);
-                                            height = maxDim;
-                                        }
-                                    }
-                                    canvas.width = width;
-                                    canvas.height = height;
-                                    const ctx = canvas.getContext('2d');
-                                    ctx.drawImage(img, 0, 0, width, height);
-                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                                    
-                                    const range = quillRef.current.getSelection(true);
-                                    quillRef.current.insertEmbed(range ? range.index : 0, 'image', compressedDataUrl);
-                                    quillRef.current.setSelection((range ? range.index : 0) + 1);
-                                };
-                                img.src = e.target.result;
-                            };
-                            reader.readAsDataURL(file);
-                        }
-                    };
-                });
             }
+        });
+        quillRef.current = quill;
 
-            quillRef.current.on('text-change', () => {
-                isInternalChange.current = true;
-                const content = quillRef.current.root.innerHTML;
-                if (onChangeRef.current) onChangeRef.current(content);
-                setTimeout(() => { isInternalChange.current = false; }, 100);
+        if (value) {
+            if (quill.clipboard.dangerouslyPasteHTML) {
+                quill.clipboard.dangerouslyPasteHTML(value);
+            } else {
+                quill.root.innerHTML = value;
+            }
+        }
+
+        // Handle image upload compression inside Quill toolbar
+        if (!isSimple && quill.getModule('toolbar')) {
+            const toolbar = quill.getModule('toolbar');
+            toolbar.addHandler('image', () => {
+                const input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', 'image/*');
+                input.click();
+                input.onchange = async () => {
+                    const file = input.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = new window.Image();
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                let width = img.width;
+                                let height = img.height;
+                                const maxDim = 1200;
+                                if (width > maxDim || height > maxDim) {
+                                    if (width > height) {
+                                        height = Math.round((height * maxDim) / width);
+                                        width = maxDim;
+                                    } else {
+                                        width = Math.round((width * maxDim) / height);
+                                        height = maxDim;
+                                    }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                                
+                                const range = quill.getSelection(true);
+                                quill.insertEmbed(range ? range.index : 0, 'image', compressedDataUrl);
+                                quill.setSelection((range ? range.index : 0) + 1);
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
             });
         }
+
+        quill.on('text-change', () => {
+            isInternalChange.current = true;
+            const content = quill.root.innerHTML;
+            if (onChangeRef.current) onChangeRef.current(content);
+            setTimeout(() => { isInternalChange.current = false; }, 100);
+        });
+
+        return () => {
+            quillRef.current = null;
+            if (containerRef.current) {
+                containerRef.current.innerHTML = '';
+            }
+        };
     }, [placeholder, isSimple]);
 
     useEffect(() => {
@@ -140,7 +161,7 @@ const QuillEditor = ({ value, onChange, placeholder, isSimple }) => {
         }
     }, [value]);
 
-    return <div ref={editorRef} />;
+    return <div ref={containerRef} style={{ width: '100%' }} />;
 };
 
 
@@ -838,20 +859,21 @@ const ExamManagement = () => {
                 }
             } else {
                 const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
-                // Auto-detect PG_KOMPLEKS if multiple keys or complex text
+                // Respect user selected tipeSoal; only set PG_KOMPLEKS if teacher actually selected multiple keys
                 const kj = (body.kunciJawaban || '').trim();
-                const pert = (body.pertanyaan || '').toLowerCase();
                 const isMultiKey = kj.includes(',') || kj.includes(';') || kj.length > 1;
-                const hasComplexHint = pert.includes('lebih dari') || pert.includes('kompleks') ||
-                        pert.includes('pilih 2') || pert.includes('pilihan 2') || pert.includes('pilihlah 2') ||
-                        pert.includes('pilih 3') || pert.includes('pilihlah 3') ||
-                        pert.includes('pilih dua') || pert.includes('pilihlah dua') ||
-                        pert.includes('pilih tiga') || pert.includes('pilihlah tiga') ||
-                        pert.includes('jawaban benar lebih') || pert.includes('bisa lebih') ||
-                        pert.includes('centang') || pert.includes('checkbox') || pert.includes('multi');
 
-                if (body.tipeSoal !== 'BENAR_SALAH' && body.tipeSoal !== 'BS_MAJEMUK' && (isMultiKey || hasComplexHint)) {
-                    body.tipeSoal = 'PG_KOMPLEKS';
+                if (body.tipeSoal === 'PG_KOMPLEKS') {
+                    // Stays PG_KOMPLEKS
+                } else if (body.tipeSoal === 'BENAR_SALAH' || body.tipeSoal === 'BS_MAJEMUK') {
+                    // Stays Benar/Salah or BS_MAJEMUK
+                } else {
+                    // If teacher chose PG_BIASA (1 Kunci)
+                    if (isMultiKey) {
+                        body.tipeSoal = 'PG_KOMPLEKS';
+                    } else {
+                        body.tipeSoal = 'PG_BIASA';
+                    }
                 }
                 // Pastikan pilihan C, D, E tidak null/kosong agar tidak terkena constraint ORA-01400 pada Oracle
                 if (body.tipeSoal === 'BENAR_SALAH' || (body.pilihanA === 'Benar' && body.pilihanB === 'Salah')) {
@@ -1413,8 +1435,8 @@ const ExamManagement = () => {
                                                                 <span style={{ color: '#ef4444', fontSize: '0.8rem', fontStyle: 'italic' }}>Belum ada kunci dipilih</span>
                                                             )}
                                                         </div>
-                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px', background: (questionFormPG.kunciJawaban || '').includes(',') || (questionFormPG.kunciJawaban || '').trim().length > 1 ? '#dcfce7' : '#f1f5f9', color: (questionFormPG.kunciJawaban || '').includes(',') || (questionFormPG.kunciJawaban || '').trim().length > 1 ? '#15803d' : '#64748b' }}>
-                                                            {(questionFormPG.kunciJawaban || '').includes(',') || (questionFormPG.kunciJawaban || '').trim().length > 1 ? '✓ Mode PG Kompleks (Multi Kunci)' : 'Mode PG Biasa (1 Kunci)'}
+                                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px', background: questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '#e0e7ff' : '#f1f5f9', color: questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '#4338ca' : '#475569' }}>
+                                                            {questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '☑️ Mode PG Kompleks (Banyak Kunci)' : '🔘 Mode PG Biasa (1 Kunci Jawaban)'}
                                                         </span>
                                                     </div>
 
@@ -1439,18 +1461,25 @@ const ExamManagement = () => {
                                                                             type="button"
                                                                             className={`opt-check ${isSelected ? 'is-key-selected' : ''}`}
                                                                             onClick={() => {
-                                                                                let newKeys;
-                                                                                if (selectedKeys.includes(opt)) {
-                                                                                    newKeys = selectedKeys.filter(k => k !== opt);
+                                                                                if (questionFormPG.tipeSoal === 'PG_KOMPLEKS') {
+                                                                                    let newKeys;
+                                                                                    if (selectedKeys.includes(opt)) {
+                                                                                        newKeys = selectedKeys.filter(k => k !== opt);
+                                                                                    } else {
+                                                                                        newKeys = [...selectedKeys, opt].sort();
+                                                                                    }
+                                                                                    setQuestionFormPG({
+                                                                                        ...questionFormPG,
+                                                                                        kunciJawaban: newKeys.join(',') || opt
+                                                                                    });
                                                                                 } else {
-                                                                                    newKeys = [...selectedKeys, opt].sort();
+                                                                                    // Mode PG Biasa (1 Kunci): langsung jadikan satu-satunya kunci tanpa berubah jadi PG Kompleks
+                                                                                    setQuestionFormPG({
+                                                                                        ...questionFormPG,
+                                                                                        kunciJawaban: opt,
+                                                                                        tipeSoal: 'PG_BIASA'
+                                                                                    });
                                                                                 }
-                                                                                const finalKunci = newKeys.join(',') || opt;
-                                                                                setQuestionFormPG({
-                                                                                    ...questionFormPG,
-                                                                                    kunciJawaban: finalKunci,
-                                                                                    tipeSoal: newKeys.length > 1 ? 'PG_KOMPLEKS' : questionFormPG.tipeSoal
-                                                                                });
                                                                             }}
                                                                             style={isSelected ? { background: '#4338ca', color: '#fff', borderColor: '#3730a3' } : {}}
                                                                             title={isSelected ? 'Kunci terpilih (klik untuk batalkan)' : 'Klik untuk jadikan sebagai kunci jawaban'}
@@ -2009,13 +2038,12 @@ const ExamManagement = () => {
                     .form-group-v2 { margin-bottom: 28px; }
                     .form-group-v2 label { display: block; font-size: 0.85rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
                     
-                    .editor-container-v2 { border: 2.5px solid #f1f5f9; border-radius: 16px; overflow: hidden; transition: all 0.3s; background: white; }
-                    .editor-container-v2:focus-within { border-color: #3b82f6; box-shadow: 0 4px 15px -5px rgba(59, 130, 246, 0.1); }
-                    .editor-container-v2.quill { border: none; }
-                    .editor-container-v2.ql-toolbar { border: none!important; border-bottom: 2.5px solid #f1f5f9!important; background: #f8fafc; padding: 8px; }
-                    .editor-container-v2.ql-container { border: none!important; font-size: 1.05rem; font-family: 'Inter', sans-serif; min-height: 280px; }
-                    .editor-container-v2.ql-editor { padding: 16px; line-height: 1.5; color: #1e293b; font-weight: 500; }
-                    .editor-container-v2.ql-editor.ql-blank::before { color: #94a3b8; font-style: normal; font-weight: 600; left: 16px; }
+                    .editor-container-v2 { border: 2px solid #cbd5e1; border-radius: 14px; overflow: hidden; transition: all 0.25s ease; background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+                    .editor-container-v2:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+                    .editor-container-v2 .ql-toolbar { border: none !important; border-bottom: 1.5px solid #e2e8f0 !important; background: #f8fafc; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+                    .editor-container-v2 .ql-container { border: none !important; font-size: 1.05rem; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; min-height: 220px; }
+                    .editor-container-v2 .ql-editor { min-height: 220px; padding: 18px 20px; line-height: 1.65; color: #0f172a; font-weight: 500; font-size: 1.05rem; }
+                    .editor-container-v2 .ql-editor.ql-blank::before { color: #94a3b8; font-style: normal; font-weight: 500; left: 20px; right: 20px; }
 
                     .section-label { display: block; font-size: 0.85rem; font-weight: 900; color: #334155; text-transform: uppercase; margin-bottom: 24px; border-top: 2.5px solid #f8fafc; padding-top: 32px; letter-spacing: 2px; }
 
@@ -2779,6 +2807,9 @@ const ExamManagement = () => {
                     [data-theme="dark"] .q-type-btn-v2 .icon-circle { background: #0f172a; color: #94a3b8; }
                     [data-theme="dark"] .form-group-v2 label { color: #94a3b8; }
                     [data-theme="dark"] .editor-container-v2 { background: #0f172a; border-color: #334155; color: #f8fafc; }
+                    [data-theme="dark"] .editor-container-v2 .ql-toolbar { background: #1e293b; border-bottom: 1.5px solid #334155 !important; }
+                    [data-theme="dark"] .editor-container-v2 .ql-editor { color: #f8fafc; }
+                    [data-theme="dark"] .editor-container-v2 .ql-editor.ql-blank::before { color: #64748b; }
                     [data-theme="dark"] .btn-type-toggle { background: #0f172a; border-color: #334155; color: #94a3b8; }
                     [data-theme="dark"] .btn-type-toggle:hover { background: #1e293b; color: #f8fafc; }
                     [data-theme="dark"] .btn-type-toggle.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }

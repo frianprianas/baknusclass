@@ -33,30 +33,19 @@ public class SoalPGService {
             soalList = soalPGRepository.findByUjianMapelId(ujianId);
         }
         return soalList.stream().map(s -> {
-            // Auto-detect and synchronize PG_KOMPLEKS or BENAR_SALAH directly into DB entity
-            String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
-            String pert = s.getPertanyaan() != null ? s.getPertanyaan().toLowerCase() : "";
-            boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
-            boolean hasComplexHint = pert.contains("lebih dari") || pert.contains("kompleks") ||
-                    pert.contains("pilih 2") || pert.contains("pilihan 2") || pert.contains("pilihlah 2") ||
-                    pert.contains("pilih 3") || pert.contains("pilihan 3") || pert.contains("pilihlah 3") ||
-                    pert.contains("pilih dua") || pert.contains("pilihlah dua") ||
-                    pert.contains("pilih tiga") || pert.contains("pilihlah tiga") ||
-                    pert.contains("jawaban benar lebih") || pert.contains("bisa lebih") ||
-                    pert.contains("dapat lebih") || pert.contains("centang") ||
-                    pert.contains("checkbox") || pert.contains("multi");
-
-            if (isMultiKey || hasComplexHint) {
-                if (!"PG_KOMPLEKS".equalsIgnoreCase(s.getTipeSoal())) {
+            // Respect existing tipeSoal. Only fallback if null or empty.
+            if (s.getTipeSoal() == null || s.getTipeSoal().trim().isEmpty()) {
+                String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
+                boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
+                if (isMultiKey) {
                     s.setTipeSoal("PG_KOMPLEKS");
-                    soalPGRepository.save(s);
-                }
-            } else if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
-                       ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB()))) {
-                if (!"BENAR_SALAH".equalsIgnoreCase(s.getTipeSoal())) {
+                } else if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
+                           ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB()))) {
                     s.setTipeSoal("BENAR_SALAH");
-                    soalPGRepository.save(s);
+                } else {
+                    s.setTipeSoal("PG_BIASA");
                 }
+                soalPGRepository.save(s);
             }
 
             SoalPGDTO dto = mapToDTO(s);
@@ -207,26 +196,17 @@ public class SoalPGService {
         dto.setKunciJawaban(s.getKunciJawaban());
         dto.setBobotNilai(s.getBobotNilai());
 
-        // Smart detection of tipeSoal
+        // Preserve explicitly saved tipeSoal without aggressive keyword override
         String tipe = s.getTipeSoal();
         String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
-        String pert = s.getPertanyaan() != null ? s.getPertanyaan().toLowerCase() : "";
         boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
-        boolean hasComplexHint = pert.contains("lebih dari") || pert.contains("kompleks") ||
-                pert.contains("pilih 2") || pert.contains("pilihan 2") || pert.contains("pilihlah 2") ||
-                pert.contains("pilih 3") || pert.contains("pilihan 3") || pert.contains("pilihlah 3") ||
-                pert.contains("pilih dua") || pert.contains("pilihlah dua") ||
-                pert.contains("pilih tiga") || pert.contains("pilihlah tiga") ||
-                pert.contains("jawaban benar lebih") || pert.contains("bisa lebih") ||
-                pert.contains("dapat lebih") || pert.contains("centang") ||
-                pert.contains("checkbox") || pert.contains("multi");
 
-        if (tipe == null || tipe.trim().isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
+        if (tipe == null || tipe.trim().isEmpty()) {
             if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
                 ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB())) &&
                 (s.getPilihanC() == null || "-".equals(s.getPilihanC().trim()) || s.getPilihanC().trim().isEmpty())) {
                 tipe = "BENAR_SALAH";
-            } else if (isMultiKey || hasComplexHint) {
+            } else if (isMultiKey) {
                 tipe = "PG_KOMPLEKS";
             } else {
                 tipe = "PG_BIASA";
