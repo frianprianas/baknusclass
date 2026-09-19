@@ -1429,47 +1429,63 @@ const ExamManagement = () => {
                                                                         const rowKey = currentKeys[idx];
 
                                                                         return (
-                                                                            <div key={opt} className="bs-statement-row">
-                                                                                <div className="bs-stmt-num">{idx + 1}</div>
-                                                                                <div className="bs-stmt-input-wrap">
+                                                                            <div key={opt} className="bs-statement-card">
+                                                                                <div className="bs-stmt-card-header">
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                                        <div className="bs-stmt-num">{idx + 1}</div>
+                                                                                        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>
+                                                                                            Butir Pernyataan #{idx + 1}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                        <div className="bs-stmt-point-badge" title="Nilai didapatkan siswa jika menjawab butir ini dengan tepat">
+                                                                                            +{ptsPerItem} Poin
+                                                                                        </div>
+                                                                                        {idx === 4 && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: '-' })}
+                                                                                                style={{ background: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', cursor: 'pointer', padding: '4px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 700 }}
+                                                                                                title="Hapus Pernyataan ke-5"
+                                                                                            >
+                                                                                                <Trash2 size={14} /> Hapus
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div className="bs-stmt-input-wrap" style={{ marginTop: '12px' }}>
                                                                                     <textarea
                                                                                         className="bs-stmt-textarea"
                                                                                         rows="2"
-                                                                                        placeholder={`Tulis teks butir pernyataan ke-${idx + 1} di sini...`}
+                                                                                        placeholder={`Ketik teks butir pernyataan ke-${idx + 1} secara lengkap di sini...`}
                                                                                         value={questionFormPG[`pilihan${opt}`] === '-' ? '' : (questionFormPG[`pilihan${opt}`] || '')}
                                                                                         onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
                                                                                         required={idx < 2}
                                                                                     />
                                                                                 </div>
-                                                                                <div className="bs-stmt-point-badge" title="Nilai didapatkan siswa jika menjawab butir ini dengan tepat">
-                                                                                    +{ptsPerItem} Poin
+
+                                                                                <div className="bs-stmt-card-footer">
+                                                                                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b' }}>
+                                                                                        Kunci Jawaban Guru:
+                                                                                    </span>
+                                                                                    <div className="bs-stmt-key-toggle">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className={`btn-bs-toggle btn-toggle-b ${rowKey === 'B' ? 'active-b' : ''}`}
+                                                                                            onClick={() => setRowKey(idx, 'B')}
+                                                                                        >
+                                                                                            <CheckCircle2 size={15} /> <span>BENAR (B)</span>
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className={`btn-bs-toggle btn-toggle-s ${rowKey === 'S' ? 'active-s' : ''}`}
+                                                                                            onClick={() => setRowKey(idx, 'S')}
+                                                                                        >
+                                                                                            <X size={15} /> <span>SALAH (S)</span>
+                                                                                        </button>
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="bs-stmt-key-toggle">
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className={`btn-bs-toggle btn-toggle-b ${rowKey === 'B' ? 'active-b' : ''}`}
-                                                                                        onClick={() => setRowKey(idx, 'B')}
-                                                                                    >
-                                                                                        <CheckCircle2 size={15} /> <span>BENAR (B)</span>
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className={`btn-bs-toggle btn-toggle-s ${rowKey === 'S' ? 'active-s' : ''}`}
-                                                                                        onClick={() => setRowKey(idx, 'S')}
-                                                                                    >
-                                                                                        <X size={15} /> <span>SALAH (S)</span>
-                                                                                    </button>
-                                                                                </div>
-                                                                                {idx === 4 && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: '-' })}
-                                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px' }}
-                                                                                        title="Hapus Pernyataan ke-5"
-                                                                                    >
-                                                                                        <Trash2 size={18} />
-                                                                                    </button>
-                                                                                )}
                                                                             </div>
                                                                         );
                                                                     })}
@@ -2086,7 +2102,7 @@ const ExamManagement = () => {
                     .stat-item.warning.value { color: #92400e; }
 
                     /* Questions Layout V2 */
-                    .questions-layout-v2 { display: grid; grid-template-columns: 600px 1fr!important; gap: 40px; align-items: start; }
+                    .questions-layout-v2 { display: grid; grid-template-columns: minmax(620px, 680px) 1fr!important; gap: 36px; align-items: start; }
                     .sticky-form-container { position: sticky; top: 20px; }
                     
                     .card-v2 { background: white; border-radius: 24px; border: 2.5px solid #f1f5f9; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.03); overflow: hidden; }
@@ -2996,56 +3012,73 @@ const ExamManagement = () => {
                         flex-direction: column;
                         gap: 12px;
                     }
-                    .bs-statement-row {
+                    .bs-statement-card {
+                        background: #ffffff;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 16px;
+                        padding: 16px 18px;
+                        transition: all 0.2s ease;
+                        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+                    }
+                    .bs-statement-card:focus-within {
+                        border-color: #3b82f6;
+                        box-shadow: 0 4px 16px -2px rgba(59, 130, 246, 0.15);
+                    }
+                    .bs-stmt-card-header {
                         display: flex;
                         align-items: center;
-                        gap: 14px;
-                        background: white;
-                        border: 2px solid #e2e8f0;
-                        border-radius: 14px;
-                        padding: 12px 16px;
-                        transition: all 0.2s ease;
+                        justify-content: space-between;
+                        gap: 10px;
                     }
-                    .bs-statement-row:focus-within {
-                        border-color: #3b82f6;
-                        box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.12);
+                    .bs-stmt-card-footer {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-top: 14px;
+                        padding-top: 12px;
+                        border-top: 1px dashed #e2e8f0;
+                        flex-wrap: wrap;
+                        gap: 10px;
                     }
                     .bs-stmt-num {
-                        width: 36px;
-                        height: 36px;
-                        min-width: 36px;
+                        width: 32px;
+                        height: 32px;
+                        min-width: 32px;
                         border-radius: 10px;
                         background: #e0e7ff;
                         color: #4338ca;
                         font-weight: 800;
-                        font-size: 0.95rem;
+                        font-size: 0.9rem;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                     }
                     .bs-stmt-input-wrap {
-                        flex: 1;
-                        min-width: 0;
+                        width: 100%;
                     }
                     .bs-stmt-textarea {
-                        width: 100%;
+                        width: 100% !important;
+                        min-width: 100% !important;
+                        max-width: 100% !important;
                         box-sizing: border-box;
-                        border: 1.5px solid #e2e8f0;
-                        border-radius: 10px;
-                        padding: 10px 14px;
+                        border: 1.5px solid #cbd5e1;
+                        border-radius: 12px;
+                        padding: 12px 16px;
                         font-size: 0.95rem;
                         font-family: inherit;
-                        color: #1e293b;
+                        line-height: 1.55;
+                        color: #0f172a;
                         background: #f8fafc;
                         resize: vertical;
-                        min-height: 48px;
+                        min-height: 64px;
                         transition: all 0.2s;
                         outline: none;
+                        display: block;
                     }
                     .bs-stmt-textarea:focus {
                         border-color: #3b82f6;
                         background: #ffffff;
-                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
                     }
                     .bs-stmt-point-badge {
                         display: flex;
@@ -3146,7 +3179,8 @@ const ExamManagement = () => {
 
                     /* Dark Mode styles */
                     [data-theme="dark"] .bs-majemuk-form-container { background: #0f172a; border-color: #334155; }
-                    [data-theme="dark"] .bs-statement-row { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .bs-statement-card { background: #1e293b; border-color: #334155; }
+                    [data-theme="dark"] .bs-stmt-card-footer { border-top-color: #334155; }
                     [data-theme="dark"] .bs-stmt-num { background: #1e3a8a; color: #93c5fd; }
                     [data-theme="dark"] .bs-stmt-textarea { background: #0f172a; border-color: #334155; color: #f8fafc; }
                     [data-theme="dark"] .bs-stmt-textarea:focus { border-color: #3b82f6; background: #1e293b; }
