@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import {
     Calendar,
@@ -3833,14 +3834,71 @@ const ExamManagement = () => {
             </div>
 
             {/* Modal for Event or Exam */}
-            {isModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content animate-slide-up">
-                        <div className="modal-header">
-                            <h3>{editMode ? 'Edit' : 'Tambah'} {activeTab === 'events' ? 'Event Ujian' : 'Jadwal Ujian'}</h3>
-                            <button className="close-btn" onClick={() => setIsModalOpen(false)}><XCircle size={20} /></button>
+            {isModalOpen && createPortal(
+                <div className="modal-overlay" style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 999999,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '24px 16px',
+                    overflowY: 'auto',
+                    boxSizing: 'border-box'
+                }}>
+                    <div className="modal-content animate-slide-up" style={{
+                        borderRadius: '24px',
+                        width: '100%',
+                        maxWidth: '680px',
+                        maxHeight: '90vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        background: '#ffffff',
+                        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+                        position: 'relative',
+                        margin: 'auto',
+                        boxSizing: 'border-box'
+                    }}>
+                        <div className="modal-header" style={{
+                            padding: '20px 28px',
+                            borderBottom: '1.5px solid #f1f5f9',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexShrink: 0,
+                            background: '#ffffff'
+                        }}>
+                            <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>
+                                {editMode ? 'Edit' : 'Tambah'} {activeTab === 'events' ? 'Event Ujian' : 'Jadwal Ujian'}
+                            </h3>
+                            <button type="button" className="close-btn" onClick={() => setIsModalOpen(false)}>
+                                <XCircle size={22} />
+                            </button>
                         </div>
-                        <form onSubmit={activeTab === 'events' ? handleSaveEvent : handleSaveExam}>
+                        <form onSubmit={activeTab === 'events' ? handleSaveEvent : handleSaveExam} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            flex: 1,
+                            minHeight: 0,
+                            overflow: 'hidden',
+                            margin: 0
+                        }}>
+                            <div className="modal-body-scroll custom-scrollbar" style={{
+                                flex: 1,
+                                overflowY: 'auto',
+                                padding: '24px 28px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '16px'
+                            }}>
                             {activeTab === 'events' ? (
                                 <>
                                     <div className="form-group">
@@ -4147,42 +4205,64 @@ const ExamManagement = () => {
                                     </div>
                                 </>
                             )}
-                            <div className="modal-footer">
+                            </div>
+                            <div className="modal-footer" style={{
+                                padding: '16px 28px',
+                                borderTop: '1.5px solid #f1f5f9',
+                                background: '#f8fafc',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px',
+                                flexShrink: 0,
+                                margin: 0
+                            }}>
                                 <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Batal</button>
                                 <button type="submit" className="btn-primary">Simpan Data</button>
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* End of main list return block */}
             <style>{`
                 .modal-overlay {
-                    position: fixed;
-                    top: 0; left: 0;
-                    width: 100%; height: 100%;
-                    background: rgba(15, 23, 42, 0.82);
-                    backdrop-filter: blur(6px);
-                    z-index: 99999;
-                    display: flex;
-                    justify-content: center;
-                    align-items: flex-start;
-                    overflow-y: auto;
+                    position: fixed !important;
+                    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+                    width: 100vw !important; height: 100vh !important;
+                    background: rgba(15, 23, 42, 0.75) !important;
+                    backdrop-filter: blur(8px) !important;
+                    z-index: 999999 !important;
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    padding: 24px 16px !important;
+                    overflow-y: auto !important;
+                    box-sizing: border-box !important;
                 }
                 .modal-content.animate-slide-up {
-                    border-radius: 16px;
+                    border-radius: 24px;
                     width: 100%;
-                    max-width: 750px;
-                    padding: 30px;
-                    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.5);
+                    max-width: 680px;
+                    max-height: 90vh;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
                     background: white;
-                    margin: 85px auto 40px auto;
-                    max-height: calc(100vh - 105px);
-                    overflow-y: auto;
+                    margin: auto !important;
+                    position: relative;
+                    box-sizing: border-box;
                 }
-                .modal-content.animate-slide-up::-webkit-scrollbar { width: 6px; }
-                .modal-content.animate-slide-up::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+                .modal-body-scroll {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 24px 28px;
+                    box-sizing: border-box;
+                }
+                .modal-body-scroll::-webkit-scrollbar { width: 6px; }
+                .modal-body-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar { width: 8px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; border: 2px solid transparent; background-clip: content-box; }
@@ -4336,8 +4416,7 @@ const ExamManagement = () => {
                 .btn-icon-outline { background: white; border: 2px solid #f1f5f9; color: #64748b; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
                 .btn-icon-outline:hover { background: #3b82f6; color: white; border-color: #3b82f6; }
 
-                .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-                .modal-content { background: white; border-radius: 32px; width: 100%; max-width: 550px; padding: 40px; box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.35); }
+                /* Conflicting modal-overlay and modal-content removed */
                 .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
                 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
                 .modal-header h3 { font-size: 1.75rem; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
@@ -4494,9 +4573,19 @@ const ExamManagement = () => {
             [data-theme="dark"] .selection-bar,
             [data-theme="dark"] .table-card,
             [data-theme="dark"] .question-item,
-            [data-theme="dark"] .modal-content {
-                background: #1e293b;
-                border-color: #334155;
+            [data-theme="dark"] .modal-content,
+            [data-theme="dark"] .modal-header,
+            [data-theme="dark"] .modal-body-scroll {
+                background: #1e293b !important;
+                border-color: #334155 !important;
+                color: #f8fafc !important;
+            }
+            [data-theme="dark"] .modal-header h3 {
+                color: #f8fafc !important;
+            }
+            [data-theme="dark"] .modal-footer {
+                background: #0f172a !important;
+                border-top-color: #334155 !important;
             }
 
             [data-theme="dark"] .assignment-badge {
