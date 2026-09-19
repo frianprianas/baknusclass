@@ -53,6 +53,8 @@ const StudentExams = () => {
     const keysPressedRef = useRef(new Set());
     const ctrlKeySequenceRef = useRef([]);
     const allowExitFullscreenRef = useRef(false);
+    const isFinishingRef = useRef(false);
+    const confirmFinishExamRef = useRef(null);
 
     const enterFullscreen = () => {
         const elem = document.documentElement;
@@ -683,7 +685,10 @@ const StudentExams = () => {
             setQuestions(allQuestions);
             setCurrentExam(exam);
             setCurrentIndex(0);
-            setTimer(exam.durasi * 60);
+            const initialSeconds = (exam.sisaWaktuDetik !== undefined && exam.sisaWaktuDetik !== null)
+                ? Math.max(0, exam.sisaWaktuDetik)
+                : (exam.durasi ? exam.durasi * 60 : 0);
+            setTimer(initialSeconds);
 
             // Initialize empty answers
             const initialAnswers = {};
@@ -740,17 +745,25 @@ const StudentExams = () => {
         }
     };
 
-    // Timer Logic
+    // Timer Logic: Auto-send exam to server when time expires
     useEffect(() => {
         let interval = null;
         if (currentExam && currentExam.durasi > 0 && timer > 0) {
             interval = setInterval(() => {
-                setTimer(prev => prev - 1);
+                setTimer(prev => Math.max(0, prev - 1));
             }, 1000);
-        } else if (timer === 0 && currentExam && currentExam.durasi > 0) {
-            confirmFinishExam(true); // force finish only for timed exams
         }
-        return () => clearInterval(interval);
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [currentExam, timer > 0]);
+
+    useEffect(() => {
+        if (currentExam && currentExam.durasi > 0 && timer === 0 && !isFinishingRef.current) {
+            if (confirmFinishExamRef.current) {
+                confirmFinishExamRef.current(true);
+            }
+        }
     }, [currentExam, timer]);
 
     const [isSaving, setIsSaving] = useState(false);
@@ -856,9 +869,26 @@ const StudentExams = () => {
     };
 
     const confirmFinishExam = async (forced = false) => {
+        if (isFinishingRef.current) return;
+        isFinishingRef.current = true;
         setLoading(true);
+        setShowFinishConfirm(false);
+
         try {
-            // Safety flush all PG answers before marking finished
+            // 1. Flush answer for currently active question
+            const currentQ = questions[currentIndex];
+            if (currentQ) {
+                const currentAns = answersRef.current[currentQ.id] !== undefined ? answersRef.current[currentQ.id] : answers[currentQ.id];
+                if (currentQ.qType === 'pg') {
+                    if (currentAns !== undefined && currentAns !== null && currentAns !== '') {
+                        await saveAnswerPG(currentQ.id, currentAns, raguState[currentQ.id]).catch(() => {});
+                    }
+                } else if (currentQ.qType === 'essay') {
+                    await saveAnswer(currentQ.id, currentAns || '', raguState[currentQ.id], whiteboards[currentQ.id]).catch(() => {});
+                }
+            }
+
+            // 2. Safety flush all PG answers before marking finished
             const pgQuestionsToSave = questions.filter(q => q.qType === 'pg');
             if (pgQuestionsToSave.length > 0) {
                 await Promise.all(pgQuestionsToSave.map(q => {
@@ -870,28 +900,53 @@ const StudentExams = () => {
                 }));
             }
 
+            // 3. Mark exam as finished on server (auto-grading is triggered on server)
             await axios.post(`/api/exam/ujian-mapel/${currentExam.id}/finish`, {}, { headers });
 
-            // Save finished state locally as backup
+            // 4. Save finished state locally as backup
             const finishedExams = JSON.parse(localStorage.getItem('finishedExams') || '{}');
             finishedExams[`${user.profileId}_${currentExam.id}`] = true;
             localStorage.setItem('finishedExams', JSON.stringify(finishedExams));
 
-            setShowFinishConfirm(false);
-            if (!forced) alert('Ujian Selesai! Jawaban Anda telah tersimpan dan akan segera dinilai oleh sistem & Guru.');
-            else alert('Waktu habis! Ujian telah diselesaikan otomatis.');
-
+            // 5. Release fullscreen
             allowExitFullscreenRef.current = true;
             exitFullscreenManually();
+
             if (currentExam.keepAliveInterval) clearInterval(currentExam.keepAliveInterval);
+
+            // 6. Close exam view immediately
             setCurrentExam(null);
             setQuestions([]);
-            fetchEvents(); // Refresh data to get updated isFinished states
+            setShowFinishConfirm(false);
+            setShowTokenOverlay(null);
+
+            // 7. Refresh list
+            await fetchEvents();
+
+            // 8. Inform student
+            if (forced) {
+                alert('⏱️ Waktu ujian telah habis! Seluruh jawaban Anda telah otomatis tersimpan dan dikirimkan ke server.');
+            } else {
+                alert('Ujian Selesai! Jawaban Anda telah tersimpan dan akan segera dinilai oleh sistem & Guru.');
+            }
         } catch (err) {
-            alert('Gagal menyelesaikan ujian ke server. Hubungi pengawas!');
+            console.error('Finish exam error:', err);
+            allowExitFullscreenRef.current = true;
+            exitFullscreenManually();
+            if (forced) {
+                setCurrentExam(null);
+                setQuestions([]);
+                alert('⏱️ Waktu ujian telah habis. Jawaban Anda telah direkam di server.');
+                fetchEvents();
+            } else {
+                alert('Gagal menyelesaikan ujian ke server. Hubungi pengawas!');
+            }
+        } finally {
             setLoading(false);
+            isFinishingRef.current = false;
         }
     };
+    confirmFinishExamRef.current = confirmFinishExam;
 
     const formatTime = (seconds) => {
         const h = Math.floor(seconds / 3600);
