@@ -30,6 +30,36 @@ import {
 } from 'lucide-react';
 import Whiteboard from './Whiteboard';
 
+
+// Safe Date Helpers to prevent RangeError: Invalid time value crashes
+const parseDateSafe = (dateVal) => {
+    if (!dateVal) return null;
+    try {
+        if (Array.isArray(dateVal)) {
+            const [y, m, d, h = 0, min = 0, s = 0] = dateVal;
+            const parsed = new Date(y, m - 1, d, h, min, s);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        let d = new Date(dateVal);
+        if (isNaN(d.getTime()) && typeof dateVal === 'string' && dateVal.includes(' ')) {
+            d = new Date(dateVal.replace(' ', 'T'));
+        }
+        return isNaN(d.getTime()) ? null : d;
+    } catch (e) {
+        return null;
+    }
+};
+
+const formatTimeSafe = (dateVal, fallback = '-') => {
+    const d = parseDateSafe(dateVal);
+    if (!d) return fallback;
+    try {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+        return fallback;
+    }
+};
+
 const StudentExams = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -292,9 +322,18 @@ const StudentExams = () => {
             setEvents(allEvents);
 
             if (allEvents.length > 0) {
-                // Pilih event yang paling baru dibuat dan aktif, atau event pertama
-                const active = allEvents.find(e => e.statusAktif) || allEvents[0];
-                handleSelectEvent(active);
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetEventId = urlParams.get('eventId');
+                const targetExamId = urlParams.get('examId');
+
+                let targetEvent = null;
+                if (targetEventId) {
+                    targetEvent = allEvents.find(e => String(e.id) === String(targetEventId));
+                }
+                if (!targetEvent) {
+                    targetEvent = allEvents.find(e => e.statusAktif) || allEvents[0];
+                }
+                handleSelectEvent(targetEvent, targetExamId);
             }
         } catch (err) {
             console.error('Error fetching events:', err);
@@ -304,7 +343,7 @@ const StudentExams = () => {
         }
     };
 
-    const handleSelectEvent = async (event) => {
+    const handleSelectEvent = async (event, autoStartExamId = null) => {
         setSelectedEvent(event);
         setLoading(true);
         setAiSaran(null);
@@ -361,6 +400,13 @@ const StudentExams = () => {
 
             setExams(examList);
             generateAiSaran(examList);
+
+            if (autoStartExamId) {
+                const targetEx = examList.find(e => String(e.id) === String(autoStartExamId));
+                if (targetEx) {
+                    setTimeout(() => handleStartClick(targetEx), 250);
+                }
+            }
         } catch (err) {
             console.error('Error fetching student exams:', err);
             if (isLatihanEvent) {
@@ -767,7 +813,7 @@ const StudentExams = () => {
 
             // Start keep-alive heartbeats
             const keepAliveInterval = setInterval(() => {
-                axios.post(`/api/exam/ujian-mapel/${exam.id}/keep-alive?nisn=${user.username}&nama=${user.name}`, {}, { headers })
+                axios.post(`/api/exam/ujian-mapel/${exam.id}/keep-alive?nisn=${user.username || user.userId || "admin"}&nama=${encodeURIComponent(user.name || user.namaLengkap || "Administrator")}`, {}, { headers })
                     .catch(() => console.log('Keep-alive failed'));
             }, 30000);
 
@@ -998,7 +1044,25 @@ const StudentExams = () => {
 
     if (currentExam) {
         // EXAM TAKING VIEW
-        const q = questions[currentIndex];
+        if (!questions || questions.length === 0) {
+            return (
+                <div className="cbt-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+                    <div style={{ textAlign: 'center', padding: '36px', background: '#ffffff', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', maxWidth: '450px' }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>⏳</div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>Memuat Lembar Soal...</h3>
+                        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '24px' }}>Sedang mempersiapkan lembar ujian untuk Anda. Harap tunggu sebentar.</p>
+                        <button
+                            type="button"
+                            onClick={() => { setCurrentExam(null); exitFullscreenManually(); }}
+                            style={{ padding: '10px 20px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                            Kembali ke Daftar Ujian
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        const q = (questions && questions[currentIndex]) || questions[0] || {};
 
         let fontClass = '';
         if (fontSizeScale === 2) fontClass = 'text-lg';
@@ -1020,7 +1084,7 @@ const StudentExams = () => {
                     <div className="cbt-header-right">
                         <div className="cbt-userinfo">
                             <div className="cbt-user-icon"><User size={16} /></div>
-                            <span>{user.name}</span>
+                            <span>{user.name || user.namaLengkap || user.username || "Administrator"}</span>
                         </div>
                     </div>
                 </header>
@@ -2837,8 +2901,8 @@ const StudentExams = () => {
                                 {(() => {
                                     const isPractice = (Number(ex.durasi) === 0) || ex.isPractice || (selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi')));
                                     const isAdminOrStaff = user && (user.role === 'ADMIN' || user.role === 'TU' || user.role === 'GURU');
-                                    const startTime = ex.waktuMulai ? new Date(ex.waktuMulai) : null;
-                                    const endTime = ex.waktuSelesai ? new Date(ex.waktuSelesai) : null;
+                                    const startTime = parseDateSafe(ex.waktuMulai);
+                                    const endTime = parseDateSafe(ex.waktuSelesai);
                                     const toleranceTime = startTime ? new Date(startTime.getTime() + 30 * 60 * 1000) : null;
                                     const isCurrentlyTaking = ex.sisaWaktuDetik !== undefined && ex.sisaWaktuDetik !== null && ex.sisaWaktuDetik > 0;
 
@@ -2847,23 +2911,23 @@ const StudentExams = () => {
                                         if (startTime && currentTime < startTime) {
                                             lockInfo = {
                                                 type: 'NOT_STARTED',
-                                                btnText: `Belum Dimulai (Buka ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB)`,
+                                                btnText: `Belum Dimulai (Buka ${formatTimeSafe(startTime)} WIB)`,
                                                 btnStyle: { background: '#fef3c7', color: '#b45309', border: '1.5px solid #fde68a', cursor: 'not-allowed' },
-                                                message: `Ujian "${ex.namaMapel}" belum dimulai.\n\nJadwal dibuka pada jam ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB. Silakan menunggu sampai waktu mulai tiba.`
+                                                message: `Ujian "${ex.namaMapel}" belum dimulai.\n\nJadwal dibuka pada jam ${formatTimeSafe(startTime)} WIB. Silakan menunggu sampai waktu mulai tiba.`
                                             };
                                         } else if (startTime && !isCurrentlyTaking && toleranceTime && currentTime > toleranceTime) {
                                             lockInfo = {
                                                 type: 'LATE_LOCKED',
                                                 btnText: 'Terkunci (Terlambat > 30 Menit)',
                                                 btnStyle: { background: '#fee2e2', color: '#b91c1c', border: '1.5px solid #fca5a5', cursor: 'not-allowed' },
-                                                message: `Batas toleransi masuk ujian "${ex.namaMapel}" telah berakhir!\n\nUjian dimulai pukul ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB dan batas maksimal masuk adalah pukul ${toleranceTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB (toleransi 30 menit).\n\nSilakan segera hubungi proktor/pengawas ujian untuk mendapatkan dispensasi.`
+                                                message: `Batas toleransi masuk ujian "${ex.namaMapel}" telah berakhir!\n\nUjian dimulai pukul ${formatTimeSafe(startTime)} WIB dan batas maksimal masuk adalah pukul ${formatTimeSafe(toleranceTime)} WIB (toleransi 30 menit).\n\nSilakan segera hubungi proktor/pengawas ujian untuk mendapatkan dispensasi.`
                                             };
                                         } else if (endTime && currentTime > endTime) {
                                             lockInfo = {
                                                 type: 'EXPIRED',
                                                 btnText: 'Ujian Telah Berakhir',
                                                 btnStyle: { background: '#f1f5f9', color: '#64748b', border: '1.5px solid #cbd5e1', cursor: 'not-allowed' },
-                                                message: `Waktu ujian "${ex.namaMapel}" telah berakhir pada jam ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB.`
+                                                message: `Waktu ujian "${ex.namaMapel}" telah berakhir pada jam ${formatTimeSafe(endTime)} WIB.`
                                             };
                                         }
                                     }
@@ -2873,11 +2937,11 @@ const StudentExams = () => {
                                             <div className="exam-times">
                                                 <div className="time-item">
                                                     <Clock size={14} />
-                                                    <span>Mulai: {new Date(ex.waktuMulai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB</span>
+                                                    <span>Mulai: {formatTimeSafe(ex.waktuMulai)} WIB</span>
                                                 </div>
                                                 <div className="time-item">
                                                     <Clock size={14} />
-                                                    <span>Selesai: {Number(ex.durasi) === 0 ? "Bebas / Fleksibel" : new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' WIB'}</span>
+                                                    <span>Selesai: {Number(ex.durasi) === 0 ? "Bebas / Fleksibel" : formatTimeSafe(ex.waktuSelesai) + ' WIB'}</span>
                                                 </div>
                                             </div>
 
@@ -2897,7 +2961,7 @@ const StudentExams = () => {
                                                 }}>
                                                     <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: lockInfo?.type === 'LATE_LOCKED' ? '#ef4444' : '#22c55e' }}></span>
-                                                        Toleransi masuk: <strong>s/d {toleranceTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB</strong>
+                                                        Toleransi masuk: <strong>s/d {formatTimeSafe(toleranceTime)} WIB</strong>
                                                     </span>
                                                     {isAdminOrStaff && (
                                                         <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb' }}>👑 Pengawas</span>
@@ -2958,14 +3022,14 @@ const StudentExams = () => {
                                 ) : (() => {
                                     const isPractice = (Number(ex.durasi) === 0) || ex.isPractice || (selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi')));
                                     const isAdminOrStaff = user && (user.role === 'ADMIN' || user.role === 'TU' || user.role === 'GURU');
-                                    const startTime = ex.waktuMulai ? new Date(ex.waktuMulai) : null;
-                                    const endTime = ex.waktuSelesai ? new Date(ex.waktuSelesai) : null;
+                                    const startTime = parseDateSafe(ex.waktuMulai);
+                                    const endTime = parseDateSafe(ex.waktuSelesai);
                                     const toleranceTime = startTime ? new Date(startTime.getTime() + 30 * 60 * 1000) : null;
                                     const isCurrentlyTaking = ex.sisaWaktuDetik !== undefined && ex.sisaWaktuDetik !== null && ex.sisaWaktuDetik > 0;
 
                                     if (!isPractice && !isAdminOrStaff) {
                                         if (startTime && currentTime < startTime) {
-                                            const lockMsg = `Ujian "${ex.namaMapel}" belum dimulai.\n\nJadwal dibuka pada jam ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB. Silakan menunggu sampai waktu mulai tiba.`;
+                                            const lockMsg = `Ujian "${ex.namaMapel}" belum dimulai.\n\nJadwal dibuka pada jam ${formatTimeSafe(startTime)} WIB. Silakan menunggu sampai waktu mulai tiba.`;
                                             return (
                                                 <button
                                                     type="button"
@@ -2975,12 +3039,12 @@ const StudentExams = () => {
                                                     title={lockMsg}
                                                 >
                                                     <Lock size={16} />
-                                                    Belum Dimulai ({startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB)
+                                                    Belum Dimulai ({formatTimeSafe(startTime)} WIB)
                                                 </button>
                                             );
                                         }
                                         if (startTime && !isCurrentlyTaking && toleranceTime && currentTime > toleranceTime) {
-                                            const lockMsg = `Batas toleransi masuk ujian "${ex.namaMapel}" telah berakhir!\n\nUjian dimulai pukul ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB dan batas maksimal masuk adalah pukul ${toleranceTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB (toleransi 30 menit).\n\nSilakan segera hubungi proktor/pengawas ujian untuk mendapatkan dispensasi.`;
+                                            const lockMsg = `Batas toleransi masuk ujian "${ex.namaMapel}" telah berakhir!\n\nUjian dimulai pukul ${formatTimeSafe(startTime)} WIB dan batas maksimal masuk adalah pukul ${formatTimeSafe(toleranceTime)} WIB (toleransi 30 menit).\n\nSilakan segera hubungi proktor/pengawas ujian untuk mendapatkan dispensasi.`;
                                             return (
                                                 <button
                                                     type="button"
@@ -2995,7 +3059,7 @@ const StudentExams = () => {
                                             );
                                         }
                                         if (endTime && currentTime > endTime) {
-                                            const lockMsg = `Waktu pelaksanaan ujian "${ex.namaMapel}" telah berakhir pada jam ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB.`;
+                                            const lockMsg = `Waktu pelaksanaan ujian "${ex.namaMapel}" telah berakhir pada jam ${formatTimeSafe(endTime)} WIB.`;
                                             return (
                                                 <button
                                                     type="button"

@@ -4890,7 +4890,7 @@ const ExamManagement = () => {
                                                                 <button
                                                                     className="btn-lengkapi"
                                                                     style={{ background: '#ecfdf5', color: '#059669', border: '1.5px solid #a7f3d0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                                                    onClick={() => window.location.href = '/student-exams'}
+                                                                    onClick={() => window.location.href = `/student-exams?examId=${exam.id}&eventId=${exam.eventId || selectedEventId || ''}`}
                                                                     title="Coba kerjakan ujian ini di antarmuka CBT Siswa (Simulasi Admin)"
                                                                 >
                                                                     <CheckCircle2 size={13} />

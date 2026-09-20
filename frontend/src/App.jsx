@@ -1,3 +1,4 @@
+import ErrorBoundary from './components/ErrorBoundary'
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login'
@@ -23,6 +24,7 @@ function App() {
   }, []);
 
   return (
+    <ErrorBoundary>
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -46,6 +48,7 @@ function App() {
         </Route>
       </Routes>
     </Router>
+    </ErrorBoundary>
   )
 }
 
