@@ -733,29 +733,13 @@ const Dashboard = () => {
           gap: 10px;
         }
         .btn-action-materi {
-          background: #3b82f6;
-          color: white;
-          border: none;
-          padding: 9px 12px;
-          border-radius: 10px;
-          font-size: 0.8rem;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .btn-action-materi:hover { background: #2563eb; }
-        .btn-action-cbt {
           background: white;
-          color: #475569;
-          border: 1.5px solid #cbd5e1;
+          color: #64748b;
+          border: 1.5px solid #e2e8f0;
           padding: 9px 12px;
           border-radius: 10px;
           font-size: 0.8rem;
-          font-weight: 700;
+          font-weight: 600;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -763,7 +747,32 @@ const Dashboard = () => {
           cursor: pointer;
           transition: all 0.2s;
         }
-        .btn-action-cbt:hover { background: #f1f5f9; border-color: #94a3b8; color: #1e293b; }
+        .btn-action-materi:hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+          color: #334155;
+        }
+        .btn-action-cbt {
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+          color: #ffffff;
+          border: 1px solid #1d4ed8;
+          padding: 9px 12px;
+          border-radius: 10px;
+          font-size: 0.82rem;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
+        }
+        .btn-action-cbt:hover {
+          background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+          transform: translateY(-1px);
+          box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+        }
 
         .loading-container-student {
           text-align: center;
@@ -1145,8 +1154,10 @@ const Dashboard = () => {
         [data-theme="dark"] .mapel-card-content h3 { color: #f8fafc; }
         [data-theme="dark"] .mapel-guru-info { background: #1e293b; border-color: #334155; }
         [data-theme="dark"] .guru-name { color: #cbd5e1; }
-        [data-theme="dark"] .btn-action-cbt { background: #1e293b; border-color: #475569; color: #cbd5e1; }
-        [data-theme="dark"] .btn-action-cbt:hover { background: #334155; color: #f8fafc; }
+        [data-theme="dark"] .btn-action-materi { background: #0f172a; border-color: #334155; color: #94a3b8; }
+        [data-theme="dark"] .btn-action-materi:hover { background: #1e293b; color: #f8fafc; border-color: #475569; }
+        [data-theme="dark"] .btn-action-cbt { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border-color: #3b82f6; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); }
+        [data-theme="dark"] .btn-action-cbt:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
         [data-theme="dark"] .empty-mapel-card { background: #0f172a; border-color: #334155; }
         [data-theme="dark"] .empty-mapel-card h3 { color: #f8fafc; }
       `}</style>
