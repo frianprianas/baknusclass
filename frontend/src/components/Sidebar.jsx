@@ -6,6 +6,7 @@ import {
   Home,
   BookOpen,
   Users,
+  UserCheck,
   FileText,
   Layout,
   Settings,
@@ -99,6 +100,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     if (id === 'materi_student') navigate('/student-materi');
     if (id === 'forum') navigate('/forum');
     if (id === 'sync_siswa') navigate('/sync-siswa');
+    if (id === 'cek_akun') navigate('/cek-akun');
   };
 
   const toggleTheme = () => {
@@ -120,6 +122,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: 'master_data', label: 'Data Master', icon: Layout, roles: ['ADMIN', 'TU'] },
     { id: 'users', label: 'Manajemen User', icon: Users, roles: ['ADMIN', 'TU'] },
     { id: 'sync_siswa', label: 'Sinkronisasi Siswa', icon: RefreshCw, roles: ['ADMIN', 'TU'] },
+    { id: 'cek_akun', label: 'Cek Akun Siswa', icon: UserCheck, roles: ['ADMIN', 'TU'] },
     { id: 'security', label: 'Token & Keamanan', icon: ShieldCheck, roles: ['ADMIN', 'TU'] },
     { id: 'settings', label: 'Pengaturan', icon: Settings, roles: ['ADMIN'] },
   ];

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import UserManagement from './components/UserManagement'
+import CekAkun from './components/CekAkun'
 import MasterData from './components/MasterData'
 import ExamManagement from './components/ExamManagement'
 import ExamScoring from './components/ExamScoring'
@@ -41,6 +42,7 @@ function App() {
           <Route path="/student-materi" element={<StudentMaterials />} />
           <Route path="/forum" element={<ForumDiscussion />} />
           <Route path="/sync-siswa" element={<SyncSiswa />} />
+            <Route path="/cek-akun" element={<CekAkun />} />
         </Route>
       </Routes>
     </Router>
