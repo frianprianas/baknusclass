@@ -170,7 +170,13 @@ const Dashboard = () => {
     return colors[idx % colors.length];
   };
 
-  const filteredMapel = studentSubjects.filter(m =>
+  // Saring mata pelajaran: sembunyikan yang tidak memiliki guru pengampu / bernilai default 'Guru Bidang Studi' agar tidak membingungkan siswa
+  const validStudentSubjects = studentSubjects.filter(m => {
+    const rawGuru = (m.namaGuru || '').trim().toLowerCase();
+    return rawGuru !== '' && rawGuru !== '-' && !rawGuru.includes('guru bidang studi');
+  });
+
+  const filteredMapel = validStudentSubjects.filter(m =>
     (m.namaMapel || '').toLowerCase().includes(subjectSearchTerm.toLowerCase()) ||
     (m.namaGuru || '').toLowerCase().includes(subjectSearchTerm.toLowerCase()) ||
     (m.kodeMapel || '').toLowerCase().includes(subjectSearchTerm.toLowerCase())
@@ -236,7 +242,7 @@ const Dashboard = () => {
               </div>
               <div className="stat-info">
                 <p className="stat-label">Mata Pelajaran Terdaftar</p>
-                <h3 className="stat-value">{loadingSubjects ? '...' : studentSubjects.length} Mapel</h3>
+                <h3 className="stat-value">{loadingSubjects ? '...' : validStudentSubjects.length} Mapel</h3>
               </div>
             </div>
 

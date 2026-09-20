@@ -399,6 +399,14 @@ const StudentExams = () => {
                 }
             }
 
+            // Sembunyikan ujian yang tidak mencantumkan guru pengampu untuk akun siswa agar tidak membingungkan
+            if (user && user.role === 'SISWA' && !isLatihanEvent) {
+                examList = examList.filter(ex => {
+                    const rg = (ex.namaGuru || '').trim().toLowerCase();
+                    return rg !== '' && rg !== '-' && !rg.includes('guru bidang studi');
+                });
+            }
+
             setExams(examList);
             generateAiSaran(examList);
 
