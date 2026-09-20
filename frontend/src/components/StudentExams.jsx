@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import {
     BookOpen,
+    Lock,
     Clock,
     Play,
     CheckCircle,
@@ -30,6 +31,12 @@ import {
 import Whiteboard from './Whiteboard';
 
 const StudentExams = () => {
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 15000);
+        return () => clearInterval(timer);
+    }, []);
     const [events, setEvents] = useState([]);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [exams, setExams] = useState([]);
@@ -2827,16 +2834,79 @@ const StudentExams = () => {
                                 <h3>{ex.namaMapel}</h3>
                                 <p className="teacher"><strong>Nama Guru:</strong> {ex.namaGuru || '-'}</p>
 
-                                <div className="exam-times">
-                                    <div className="time-item">
-                                        <Clock size={14} />
-                                        <span>Mulai: {new Date(ex.waktuMulai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                    <div className="time-item">
-                                        <Clock size={14} />
-                                        <span>Selesai: {Number(ex.durasi) === 0 ? "Bebas / Fleksibel" : new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                </div>
+                                {(() => {
+                                    const isPractice = (Number(ex.durasi) === 0) || ex.isPractice || (selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi')));
+                                    const isAdminOrStaff = user && (user.role === 'ADMIN' || user.role === 'TU' || user.role === 'GURU');
+                                    const startTime = ex.waktuMulai ? new Date(ex.waktuMulai) : null;
+                                    const endTime = ex.waktuSelesai ? new Date(ex.waktuSelesai) : null;
+                                    const toleranceTime = startTime ? new Date(startTime.getTime() + 30 * 60 * 1000) : null;
+                                    const isCurrentlyTaking = ex.sisaWaktuDetik !== undefined && ex.sisaWaktuDetik !== null && ex.sisaWaktuDetik > 0;
+
+                                    let lockInfo = null;
+                                    if (!isPractice && !isAdminOrStaff) {
+                                        if (startTime && currentTime < startTime) {
+                                            lockInfo = {
+                                                type: 'NOT_STARTED',
+                                                btnText: `Belum Dimulai (Buka ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB)`,
+                                                btnStyle: { background: '#fef3c7', color: '#b45309', border: '1.5px solid #fde68a', cursor: 'not-allowed' },
+                                                message: `Ujian "${ex.namaMapel}" belum dimulai.\n\nJadwal dibuka pada jam ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB. Silakan menunggu sampai waktu mulai tiba.`
+                                            };
+                                        } else if (startTime && !isCurrentlyTaking && toleranceTime && currentTime > toleranceTime) {
+                                            lockInfo = {
+                                                type: 'LATE_LOCKED',
+                                                btnText: 'Terkunci (Terlambat > 30 Menit)',
+                                                btnStyle: { background: '#fee2e2', color: '#b91c1c', border: '1.5px solid #fca5a5', cursor: 'not-allowed' },
+                                                message: `Batas toleransi masuk ujian "${ex.namaMapel}" telah berakhir!\n\nUjian dimulai pukul ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB dan batas maksimal masuk adalah pukul ${toleranceTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB (toleransi 30 menit).\n\nSilakan segera hubungi proktor/pengawas ujian untuk mendapatkan dispensasi.`
+                                            };
+                                        } else if (endTime && currentTime > endTime) {
+                                            lockInfo = {
+                                                type: 'EXPIRED',
+                                                btnText: 'Ujian Telah Berakhir',
+                                                btnStyle: { background: '#f1f5f9', color: '#64748b', border: '1.5px solid #cbd5e1', cursor: 'not-allowed' },
+                                                message: `Waktu ujian "${ex.namaMapel}" telah berakhir pada jam ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB.`
+                                            };
+                                        }
+                                    }
+
+                                    return (
+                                        <>
+                                            <div className="exam-times">
+                                                <div className="time-item">
+                                                    <Clock size={14} />
+                                                    <span>Mulai: {new Date(ex.waktuMulai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB</span>
+                                                </div>
+                                                <div className="time-item">
+                                                    <Clock size={14} />
+                                                    <span>Selesai: {Number(ex.durasi) === 0 ? "Bebas / Fleksibel" : new Date(ex.waktuSelesai).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' WIB'}</span>
+                                                </div>
+                                            </div>
+
+                                            {!isPractice && startTime && toleranceTime && (
+                                                <div style={{
+                                                    fontSize: '0.73rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    marginTop: '-4px',
+                                                    marginBottom: '10px',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '6px',
+                                                    background: lockInfo?.type === 'LATE_LOCKED' ? '#fef2f2' : '#f0fdf4',
+                                                    border: `1px solid ${lockInfo?.type === 'LATE_LOCKED' ? '#fecaca' : '#bbf7d0'}`,
+                                                    color: lockInfo?.type === 'LATE_LOCKED' ? '#991b1b' : '#166534'
+                                                }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: lockInfo?.type === 'LATE_LOCKED' ? '#ef4444' : '#22c55e' }}></span>
+                                                        Toleransi masuk: <strong>s/d {toleranceTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB</strong>
+                                                    </span>
+                                                    {isAdminOrStaff && (
+                                                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb' }}>👑 Pengawas</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
 
                                 {ex.isFinished ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
@@ -2885,12 +2955,69 @@ const StudentExams = () => {
                                             </button>
                                         )}
                                     </div>
-                                ) : (
-                                    <button className="start-btn" onClick={() => handleStartClick(ex)}>
-                                        <Play size={18} />
-                                        {((selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi'))) || Number(ex.durasi) === 0 || ex.isPractice) ? 'Mulai Ujian Latihan' : 'Ikuti Ujian'}
-                                    </button>
-                                )}
+                                ) : (() => {
+                                    const isPractice = (Number(ex.durasi) === 0) || ex.isPractice || (selectedEvent?.namaEvent && (selectedEvent.namaEvent.toLowerCase().includes('latihan') || selectedEvent.namaEvent.toLowerCase().includes('simulasi')));
+                                    const isAdminOrStaff = user && (user.role === 'ADMIN' || user.role === 'TU' || user.role === 'GURU');
+                                    const startTime = ex.waktuMulai ? new Date(ex.waktuMulai) : null;
+                                    const endTime = ex.waktuSelesai ? new Date(ex.waktuSelesai) : null;
+                                    const toleranceTime = startTime ? new Date(startTime.getTime() + 30 * 60 * 1000) : null;
+                                    const isCurrentlyTaking = ex.sisaWaktuDetik !== undefined && ex.sisaWaktuDetik !== null && ex.sisaWaktuDetik > 0;
+
+                                    if (!isPractice && !isAdminOrStaff) {
+                                        if (startTime && currentTime < startTime) {
+                                            const lockMsg = `Ujian "${ex.namaMapel}" belum dimulai.\n\nJadwal dibuka pada jam ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB. Silakan menunggu sampai waktu mulai tiba.`;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    className="start-btn"
+                                                    style={{ background: '#fef3c7', color: '#b45309', border: '1.5px solid #fde68a', cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: 800 }}
+                                                    onClick={() => alert(lockMsg)}
+                                                    title={lockMsg}
+                                                >
+                                                    <Lock size={16} />
+                                                    Belum Dimulai ({startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB)
+                                                </button>
+                                            );
+                                        }
+                                        if (startTime && !isCurrentlyTaking && toleranceTime && currentTime > toleranceTime) {
+                                            const lockMsg = `Batas toleransi masuk ujian "${ex.namaMapel}" telah berakhir!\n\nUjian dimulai pukul ${startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB dan batas maksimal masuk adalah pukul ${toleranceTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB (toleransi 30 menit).\n\nSilakan segera hubungi proktor/pengawas ujian untuk mendapatkan dispensasi.`;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    className="start-btn"
+                                                    style={{ background: '#fee2e2', color: '#b91c1c', border: '1.5px solid #fca5a5', cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: 800 }}
+                                                    onClick={() => alert(lockMsg)}
+                                                    title={lockMsg}
+                                                >
+                                                    <Lock size={16} />
+                                                    Terkunci (Terlambat > 30 Menit)
+                                                </button>
+                                            );
+                                        }
+                                        if (endTime && currentTime > endTime) {
+                                            const lockMsg = `Waktu pelaksanaan ujian "${ex.namaMapel}" telah berakhir pada jam ${endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} WIB.`;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    className="start-btn"
+                                                    style={{ background: '#f1f5f9', color: '#64748b', border: '1.5px solid #cbd5e1', cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: 800 }}
+                                                    onClick={() => alert(lockMsg)}
+                                                    title={lockMsg}
+                                                >
+                                                    <Lock size={16} />
+                                                    Ujian Telah Berakhir
+                                                </button>
+                                            );
+                                        }
+                                    }
+
+                                    return (
+                                        <button className="start-btn" onClick={() => handleStartClick(ex)}>
+                                            <Play size={18} />
+                                            {isCurrentlyTaking ? 'Lanjutkan Ujian' : (isPractice ? 'Mulai Ujian Latihan' : 'Ikuti Ujian')}
+                                        </button>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>

@@ -6,6 +6,7 @@ services:
     container_name: baknusbelajar-oracle
     restart: unless-stopped
     environment:
+      - TZ=Asia/Jakarta
       - ORACLE_PASSWORD=${DB_PASSWORD}
       - ORACLE_DATABASE=BAKNUSDB
     volumes:
@@ -27,6 +28,7 @@ services:
     ports:
       - "8088:8088"
     environment:
+      - TZ=Asia/Jakarta
       - SPRING_PROFILES_ACTIVE=prod
       # Nama service diganti dari FREEPDB1 menjadi BAKNUSDB agar sesuai
       - DB_URL=jdbc:oracle:thin:@oracle-db:1521/BAKNUSDB

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -346,6 +347,47 @@ public class UjianMapelService {
 
         String submittedToken = token != null ? token.trim() : "";
         boolean isValid = isAdminOrStaff || (!submittedToken.isEmpty() && actualToken.equalsIgnoreCase(submittedToken));
+
+        // Time window & 30-minute late tolerance check for students
+        if (!isAdminOrStaff) {
+            boolean isPractice = (entity.getDurasi() != null && entity.getDurasi() == 0) ||
+                    (entity.getEventUjian() != null && entity.getEventUjian().getNamaEvent() != null &&
+                     (entity.getEventUjian().getNamaEvent().toLowerCase().contains("latihan") ||
+                      entity.getEventUjian().getNamaEvent().toLowerCase().contains("simulasi")));
+
+            if (!isPractice && entity.getWaktuMulai() != null) {
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm");
+
+                // 1. Sebelum waktu mulai
+                if (now.isBefore(entity.getWaktuMulai())) {
+                    throw new RuntimeException("Ujian belum dimulai. Ujian baru dapat diakses pada jam " +
+                            entity.getWaktuMulai().format(dtf) + " WIB.");
+                }
+
+                // Cek apakah siswa sudah pernah mulai pengerjaan sebelumnya
+                var siswa = getOrCreateSiswaForUser(userId);
+                var existingStatus = siswaUjianStatusRepository
+                        .findBySiswaIdAndUjianMapelId(siswa.getId(), ujianId)
+                        .orElse(null);
+                boolean hasStarted = existingStatus != null && existingStatus.getWaktuMulaiSiswa() != null;
+
+                // 2. Jika belum pernah mulai, periksa toleransi 30 menit dari waktuMulai
+                if (!hasStarted) {
+                    java.time.LocalDateTime batasToleransi = entity.getWaktuMulai().plusMinutes(30);
+                    if (now.isAfter(batasToleransi)) {
+                        throw new RuntimeException("Batas toleransi masuk ujian telah berakhir (Maksimal 30 menit setelah ujian dimulai pukul " +
+                                entity.getWaktuMulai().format(dtf) + " WIB). Silakan hubungi proktor/pengawas.");
+                    }
+                }
+
+                // 3. Periksa apakah waktu selesai ujian telah terlewati
+                if (entity.getWaktuSelesai() != null && now.isAfter(entity.getWaktuSelesai())) {
+                    throw new RuntimeException("Waktu pelaksanaan ujian ini telah berakhir (Selesai pada jam " +
+                            entity.getWaktuSelesai().format(dtf) + " WIB).");
+                }
+            }
+        }
 
         if (isValid && userId != null) {
             var siswa = getOrCreateSiswaForUser(userId);

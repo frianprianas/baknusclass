@@ -23,6 +23,10 @@ spring:
       connection-timeout: 20000
       max-lifetime: 1200000
   
+  jackson:
+    time-zone: Asia/Jakarta
+    date-format: yyyy-MM-dd'T'HH:mm:ss
+
   servlet:
     multipart:
       max-file-size: 50MB

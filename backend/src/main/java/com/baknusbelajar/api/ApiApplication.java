@@ -9,6 +9,11 @@ import org.springframework.cache.annotation.EnableCaching;
 @EnableCaching
 public class ApiApplication {
 
+	@jakarta.annotation.PostConstruct
+	public void init() {
+		java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Jakarta"));
+	}
+
 	public static void main(String[] args) {
 		SpringApplication.run(ApiApplication.class, args);
 	}
