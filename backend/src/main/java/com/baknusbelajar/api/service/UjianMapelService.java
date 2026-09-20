@@ -151,7 +151,7 @@ public class UjianMapelService {
         var siswa = getOrCreateSiswaForUser(userId);
 
         List<com.baknusbelajar.api.entity.UjianMapel> rawExams = isAdminOrStaff
-                ? ujianMapelRepository.findByEventId(eventId)
+                ? ujianMapelRepository.findByEventUjianId(eventId)
                 : ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId());
 
         java.util.Map<String, com.baknusbelajar.api.entity.UjianMapel> distinctMap = new java.util.LinkedHashMap<>();

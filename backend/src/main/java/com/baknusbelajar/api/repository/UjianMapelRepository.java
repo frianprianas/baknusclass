@@ -10,6 +10,8 @@ import java.util.List;
 public interface UjianMapelRepository extends JpaRepository<UjianMapel, Long> {
     List<UjianMapel> findByEventUjianId(Long eventId);
 
+    default List<UjianMapel> findByEventId(Long eventId) { return findByEventUjianId(eventId); }
+
     List<UjianMapel> findByGuruId(Long guruId);
 
     long countByGuruIdAndEventUjian_StatusAktifTrue(Long guruId);
