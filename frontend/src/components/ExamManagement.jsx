@@ -168,6 +168,63 @@ const QuillEditor = ({ value, onChange, placeholder, isSimple }) => {
 };
 
 
+
+// Indonesian WIB Date & Time Helper Functions
+const parseWibParts = (val) => {
+    if (!val) {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return { date: `${y}-${m}-${d}`, hour: '07', minute: '30' };
+    }
+    if (val.includes('T')) {
+        const [d, t] = val.split('T');
+        const [h, min] = (t || '00:00').split(':');
+        return {
+            date: d || '',
+            hour: String(h || '00').padStart(2, '0').slice(0, 2),
+            minute: String(min || '00').padStart(2, '0').slice(0, 2)
+        };
+    }
+    return {
+        date: val.slice(0, 10),
+        hour: '07',
+        minute: '30'
+    };
+};
+
+const formatIndonesianDateTime = (dateStr, hourStr, minStr) => {
+    if (!dateStr) return '-';
+    try {
+        const [y, m, d] = dateStr.split('-');
+        const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+        const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const monthNames = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        const dayName = dayNames[dateObj.getDay()] || '';
+        const monthName = monthNames[dateObj.getMonth()] || '';
+        return `${dayName}, ${Number(d)} ${monthName} ${y} pukul ${hourStr || '00'}:${minStr || '00'} WIB`;
+    } catch {
+        return `${dateStr} ${hourStr}:${minStr} WIB`;
+    }
+};
+
+const addMinutesToWib = (dateStr, hourStr, minStr, durMinutes) => {
+    if (!dateStr) return { date: '', hour: '09', minute: '00' };
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const totalMins = Number(hourStr || 0) * 60 + Number(minStr || 0) + Number(durMinutes || 0);
+    const dateObj = new Date(y, m - 1, d, 0, totalMins);
+    const endY = dateObj.getFullYear();
+    const endM = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const endD = String(dateObj.getDate()).padStart(2, '0');
+    const endH = String(dateObj.getHours()).padStart(2, '0');
+    const endMin = String(dateObj.getMinutes()).padStart(2, '0');
+    return { date: `${endY}-${endM}-${endD}`, hour: endH, minute: endMin };
+};
+
 const ExamManagement = () => {
     const [activeTab, setActiveTab] = useState('events'); // 'events' or 'exams'
     const [events, setEvents] = useState([]);
@@ -813,21 +870,28 @@ const ExamManagement = () => {
 
         let startIso = examForm.waktuMulai;
         if (!startIso) {
-            startIso = new Date().toISOString().substring(0, 16);
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            startIso = `${y}-${m}-${d}T07:30`;
         }
 
-        const startDate = new Date(startIso);
+        let finalStart = startIso;
+        if (finalStart.length === 16) finalStart += ':00';
+
         const durasiNum = Number(examForm.durasi) || 0;
-        let endDate;
-        if (examForm.waktuSelesai) {
-            endDate = new Date(examForm.waktuSelesai);
-        } else if (durasiNum > 0) {
-            endDate = new Date(startDate.getTime() + durasiNum * 60 * 1000);
-        } else if (ev && ev.tanggalSelesai) {
-            endDate = new Date(ev.tanggalSelesai + "T23:59:59");
-        } else {
-            endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        let finalEnd = examForm.waktuSelesai;
+        if (!finalEnd && durasiNum > 0) {
+            const sParts = parseWibParts(finalStart);
+            const calculated = addMinutesToWib(sParts.date, sParts.hour, sParts.minute, durasiNum);
+            finalEnd = `${calculated.date}T${calculated.hour}:${calculated.minute}:00`;
+        } else if (!finalEnd && ev && ev.tanggalSelesai) {
+            finalEnd = `${ev.tanggalSelesai}T23:59:59`;
+        } else if (!finalEnd) {
+            finalEnd = finalStart;
         }
+        if (finalEnd.length === 16) finalEnd += ':00';
 
         let sanitizedToken = (examForm.token || '').trim().toUpperCase();
         if (sanitizedToken.length > 20) sanitizedToken = sanitizedToken.substring(0, 20);
@@ -835,18 +899,17 @@ const ExamManagement = () => {
         const payload = {
             ...examForm,
             token: sanitizedToken,
-            waktuMulai: startDate.toISOString(),
+            waktuMulai: finalStart,
             mapelId: Number(examForm.mapelId),
             guruId: Number(examForm.guruId),
-            waktuSelesai: endDate.toISOString(),
+            waktuSelesai: finalEnd,
             durasi: durasiNum
         };
 
         // Validation against Event Range (allow override for latihan, ujicoba, simulasi)
         if (!isLatihan && ev && ev.tanggalMulai && ev.tanggalSelesai) {
-            const evStart = new Date(ev.tanggalMulai + "T00:00");
-            const evEnd = new Date(ev.tanggalSelesai + "T23:59");
-            if (startDate < evStart || startDate > evEnd) {
+            const startDateOnly = finalStart.substring(0, 10);
+            if (startDateOnly < ev.tanggalMulai || startDateOnly > ev.tanggalSelesai) {
                 alert(`Waktu mulai harus berada dalam rentang event: ${ev.tanggalMulai} s/d ${ev.tanggalSelesai}`);
                 return;
             }
@@ -4649,8 +4712,8 @@ const ExamManagement = () => {
                                             eventId: examForm.eventId,
                                             mapelId: myFirstAssignment ? myFirstAssignment.mapelId : (allMapels[0]?.id || ''),
                                             guruId: userRole === 'GURU' ? (user.profileId || '') : (myFirstAssignment?.guruId || ''),
-                                            waktuMulai: isLatihan ? new Date().toISOString().substring(0, 16) : '',
-                                            waktuSelesai: '',
+                                            waktuMulai: isLatihan ? `${new Date().toISOString().substring(0, 10)}T${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}` : `${(ev?.tanggalMulai && ev.tanggalMulai.length >= 10) ? ev.tanggalMulai : new Date().toISOString().substring(0, 10)}T07:30`,
+                                            waktuSelesai: isLatihan ? `${new Date().toISOString().substring(0, 10)}T23:59` : `${(ev?.tanggalMulai && ev.tanggalMulai.length >= 10) ? ev.tanggalMulai : new Date().toISOString().substring(0, 10)}T09:00`,
                                             durasi: isLatihan ? 0 : 90,
                                             token: isLatihan ? 'LATIH' : '',
                                             kelasIds: []
@@ -4849,17 +4912,15 @@ const ExamManagement = () => {
                                                                                 setEditMode(true);
                                                                                 let startStr = '';
                                                                                 if (exam.waktuMulai) {
-                                                                                    const s = new Date(exam.waktuMulai);
-                                                                                    startStr = new Date(s.getTime() - s.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                                                    startStr = exam.waktuMulai.substring(0, 16);
                                                                                 }
                                                                                 let endStr = '';
                                                                                 if (exam.waktuSelesai) {
-                                                                                    const e = new Date(exam.waktuSelesai);
-                                                                                    endStr = new Date(e.getTime() - e.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                                                    endStr = exam.waktuSelesai.substring(0, 16);
                                                                                 } else if (startStr && Number(exam.durasi) > 0) {
-                                                                                    const s = new Date(exam.waktuMulai);
-                                                                                    const end = new Date(s.getTime() + Number(exam.durasi) * 60 * 1000);
-                                                                                    endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
+                                                                                    const sParts = parseWibParts(startStr);
+                                                                                    const calculated = addMinutesToWib(sParts.date, sParts.hour, sParts.minute, Number(exam.durasi));
+                                                                                    endStr = `${calculated.date}T${calculated.hour}:${calculated.minute}`;
                                                                                 }
                                                                                 setExamForm({
                                                                                     ...examForm,
@@ -5166,80 +5227,266 @@ const ExamManagement = () => {
                                         );
                                     })()}
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="form-group">
-                                            <label>Waktu Mulai</label>
-                                            <input
-                                                type="datetime-local"
-                                                value={examForm.waktuMulai || ''}
-                                                onChange={(e) => {
-                                                    const newStart = e.target.value;
-                                                    const dur = Number(examForm.durasi) || 0;
-                                                    let newEnd = examForm.waktuSelesai;
-                                                    if (newStart && dur > 0) {
-                                                        const s = new Date(newStart);
-                                                        const end = new Date(s.getTime() + dur * 60 * 1000);
-                                                        newEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
-                                                    }
-                                                    setExamForm({ ...examForm, waktuMulai: newStart, waktuSelesai: newEnd });
-                                                }}
-                                                required
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Durasi (Menit) <span style={{ fontSize: "0.78rem", color: "#64748b", textTransform: "none", fontWeight: 500 }}>(Isi 0 jika Tanpa Batas Waktu / Latihan)</span></label>
-                                            <input 
-                                                type="number" 
-                                                value={examForm.durasi !== undefined ? examForm.durasi : ''} 
-                                                onChange={(e) => {
-                                                    const dur = Number(e.target.value) || 0;
-                                                    let newEnd = examForm.waktuSelesai;
-                                                    if (examForm.waktuMulai && dur > 0) {
-                                                        const s = new Date(examForm.waktuMulai);
-                                                        const end = new Date(s.getTime() + dur * 60 * 1000);
-                                                        newEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
-                                                    }
-                                                    setExamForm({ ...examForm, durasi: e.target.value, waktuSelesai: newEnd });
-                                                }} 
-                                                required 
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="form-group" style={{ marginTop: '8px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                            <label style={{ margin: 0 }}>Waktu Selesai (Batas Akhir Ujian)</label>
-                                            <button 
-                                                type="button" 
-                                                className="btn-icon-outline" 
-                                                style={{ width: 'auto', padding: '2px 8px', height: '24px', fontSize: '0.75rem', color: '#2563eb', borderColor: '#bfdbfe' }}
-                                                onClick={() => {
-                                                    const now = new Date();
-                                                    const nowStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
-                                                    const dur = Number(examForm.durasi) || 0;
-                                                    let endStr = nowStr;
-                                                    if (dur > 0) {
-                                                        const end = new Date(now.getTime() + dur * 60 * 1000);
-                                                        endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
-                                                    } else {
-                                                        const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                                                        endStr = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
-                                                    }
-                                                    setExamForm({ ...examForm, waktuMulai: nowStr, waktuSelesai: endStr });
-                                                }}
-                                            >
-                                                ⚡ Set Waktu Sekarang (Ujicoba Langsung)
-                                            </button>
-                                        </div>
-                                        <input
-                                            type="datetime-local"
-                                            value={examForm.waktuSelesai || ''}
-                                            onChange={(e) => setExamForm({ ...examForm, waktuSelesai: e.target.value })}
-                                            required
-                                        />
-                                        <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block', marginTop: '2px' }}>
-                                            {Number(examForm.durasi) === 0 ? '♾️ Durasi 0 = Waktu pengerjaan bebas / tanpa batas timer. Batas akhir di atas adalah batas akhir akses ujian.' : 'Otomatis dihitung dari Waktu Mulai + Durasi, tetapi dapat Anda sesuaikan ulang.'}
-                                        </span>
-                                    </div>
+                                    {(() => {
+                                        const startParts = parseWibParts(examForm.waktuMulai);
+                                        const endParts = parseWibParts(examForm.waktuSelesai);
+
+                                        const updateStart = (newDate, newHour, newMin) => {
+                                            const d = newDate !== undefined ? newDate : startParts.date;
+                                            const h = newHour !== undefined ? newHour : startParts.hour;
+                                            const m = newMin !== undefined ? newMin : startParts.minute;
+                                            const newStartIso = `${d}T${h}:${m}`;
+
+                                            const dur = Number(examForm.durasi) || 0;
+                                            let newEndIso = examForm.waktuSelesai;
+                                            if (dur > 0 && d) {
+                                                const calculatedEnd = addMinutesToWib(d, h, m, dur);
+                                                newEndIso = `${calculatedEnd.date}T${calculatedEnd.hour}:${calculatedEnd.minute}`;
+                                            }
+                                            setExamForm({ ...examForm, waktuMulai: newStartIso, waktuSelesai: newEndIso });
+                                        };
+
+                                        const updateEnd = (newDate, newHour, newMin) => {
+                                            const d = newDate !== undefined ? newDate : endParts.date;
+                                            const h = newHour !== undefined ? newHour : endParts.hour;
+                                            const m = newMin !== undefined ? newMin : endParts.minute;
+                                            setExamForm({ ...examForm, waktuSelesai: `${d}T${h}:${m}` });
+                                        };
+
+                                        const handleSetNow = () => {
+                                            const now = new Date();
+                                            const y = now.getFullYear();
+                                            const m = String(now.getMonth() + 1).padStart(2, '0');
+                                            const d = String(now.getDate()).padStart(2, '0');
+                                            const h = String(now.getHours()).padStart(2, '0');
+                                            const min = String(now.getMinutes()).padStart(2, '0');
+                                            updateStart(`${y}-${m}-${d}`, h, min);
+                                        };
+
+                                        const hourOptions = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+                                        const minuteOptions = Array.from(new Set(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55', startParts.minute])).sort();
+                                        const endMinuteOptions = Array.from(new Set(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55', endParts.minute])).sort();
+
+                                        return (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', marginTop: '6px', marginBottom: '8px' }}>
+                                                {/* Waktu Mulai & Durasi */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="form-group" style={{ margin: 0 }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                            <label style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '0.88rem' }}>
+                                                                📅 Waktu Mulai (WIB)
+                                                            </label>
+                                                            <span style={{ fontSize: '0.72rem', background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                                                24 Jam WIB
+                                                            </span>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                                                            <input
+                                                                type="date"
+                                                                value={startParts.date}
+                                                                onChange={(e) => updateStart(e.target.value, undefined, undefined)}
+                                                                style={{ flex: 1.3, padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.88rem' }}
+                                                                required
+                                                            />
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                                                                <select
+                                                                    value={startParts.hour}
+                                                                    onChange={(e) => updateStart(undefined, e.target.value, undefined)}
+                                                                    style={{ flex: 1, padding: '8px 4px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.88rem', fontWeight: 700, textAlign: 'center' }}
+                                                                >
+                                                                    {hourOptions.map(h => (
+                                                                        <option key={h} value={h}>{h}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <span style={{ fontWeight: 800, color: '#64748b' }}>:</span>
+                                                                <select
+                                                                    value={startParts.minute}
+                                                                    onChange={(e) => updateStart(undefined, undefined, e.target.value)}
+                                                                    style={{ flex: 1, padding: '8px 4px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.88rem', fontWeight: 700, textAlign: 'center' }}
+                                                                >
+                                                                    {minuteOptions.map(m => (
+                                                                        <option key={m} value={m}>{m}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb' }}>WIB</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Presets Jam Mulai */}
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                                            {['07:30', '08:00', '09:30', '10:00', '13:00'].map(tp => {
+                                                                const [th, tm] = tp.split(':');
+                                                                const isSelected = startParts.hour === th && startParts.minute === tm;
+                                                                return (
+                                                                    <button
+                                                                        key={tp}
+                                                                        type="button"
+                                                                        onClick={() => updateStart(undefined, th, tm)}
+                                                                        style={{
+                                                                            fontSize: '0.72rem',
+                                                                            padding: '2px 7px',
+                                                                            borderRadius: '6px',
+                                                                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                                                                            background: isSelected ? '#eff6ff' : '#ffffff',
+                                                                            color: isSelected ? '#1d4ed8' : '#475569',
+                                                                            fontWeight: isSelected ? 800 : 500,
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        {tp}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleSetNow}
+                                                                style={{
+                                                                    fontSize: '0.72rem',
+                                                                    padding: '2px 7px',
+                                                                    borderRadius: '6px',
+                                                                    border: '1px solid #bfdbfe',
+                                                                    background: '#eff6ff',
+                                                                    color: '#1d4ed8',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                                title="Set ke jam sekarang"
+                                                            >
+                                                                ⚡ Sekarang
+                                                            </button>
+                                                        </div>
+
+                                                        <div style={{ padding: '6px 10px', background: '#eff6ff', borderRadius: '6px', border: '1px solid #dbeafe', fontSize: '0.74rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <Calendar size={13} className="text-blue-600 shrink-0" />
+                                                            <span><strong>Mulai:</strong> {formatIndonesianDateTime(startParts.date, startParts.hour, startParts.minute)}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Durasi */}
+                                                    <div className="form-group" style={{ margin: 0 }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                            <label style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '0.88rem' }}>
+                                                                ⏱️ Durasi (Menit)
+                                                            </label>
+                                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                                                0 = Bebas / Latihan
+                                                            </span>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="5"
+                                                                value={examForm.durasi !== undefined ? examForm.durasi : ''}
+                                                                onChange={(e) => {
+                                                                    const newDur = Number(e.target.value);
+                                                                    let newEndIso = examForm.waktuSelesai;
+                                                                    if (startParts.date && newDur > 0) {
+                                                                        const calculatedEnd = addMinutesToWib(startParts.date, startParts.hour, startParts.minute, newDur);
+                                                                        newEndIso = `${calculatedEnd.date}T${calculatedEnd.hour}:${calculatedEnd.minute}`;
+                                                                    }
+                                                                    setExamForm({ ...examForm, durasi: e.target.value, waktuSelesai: newEndIso });
+                                                                }}
+                                                                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.9rem', fontWeight: 700 }}
+                                                                placeholder="Contoh: 90"
+                                                                required
+                                                            />
+                                                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Menit</span>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                                            {[60, 90, 120, 0].map(dp => {
+                                                                const isSelected = Number(examForm.durasi) === dp;
+                                                                return (
+                                                                    <button
+                                                                        key={dp}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            let newEndIso = examForm.waktuSelesai;
+                                                                            if (startParts.date && dp > 0) {
+                                                                                const calculatedEnd = addMinutesToWib(startParts.date, startParts.hour, startParts.minute, dp);
+                                                                                newEndIso = `${calculatedEnd.date}T${calculatedEnd.hour}:${calculatedEnd.minute}`;
+                                                                            }
+                                                                            setExamForm({ ...examForm, durasi: dp, waktuSelesai: newEndIso });
+                                                                        }}
+                                                                        style={{
+                                                                            fontSize: '0.72rem',
+                                                                            padding: '2px 7px',
+                                                                            borderRadius: '6px',
+                                                                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                                                                            background: isSelected ? '#eff6ff' : '#ffffff',
+                                                                            color: isSelected ? '#1d4ed8' : '#475569',
+                                                                            fontWeight: isSelected ? 800 : 500,
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        {dp === 0 ? '♾️ Bebas (0)' : `${dp} Mnt`}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        <div style={{ padding: '6px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.74rem', color: '#64748b' }}>
+                                                            {Number(examForm.durasi) === 0
+                                                                ? '♾️ Durasi bebas. Siswa dapat mengerjakan tanpa countdown batas durasi.'
+                                                                : `Durasi pengerjaan: ${examForm.durasi} menit sejak tombol mulai ditekan.`}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Waktu Selesai (Batas Akhir) */}
+                                                <div className="form-group" style={{ margin: 0 }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                        <label style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '0.88rem' }}>
+                                                            🏁 Waktu Selesai (Batas Akhir Akses Ujian - WIB)
+                                                        </label>
+                                                        <span style={{ fontSize: '0.72rem', color: '#059669', background: '#d1fae5', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                                            Otomatis Dihitung
+                                                        </span>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                                                        <input
+                                                            type="date"
+                                                            value={endParts.date}
+                                                            onChange={(e) => updateEnd(e.target.value, undefined, undefined)}
+                                                            style={{ flex: 1.3, padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.88rem' }}
+                                                            required
+                                                        />
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                                                            <select
+                                                                value={endParts.hour}
+                                                                onChange={(e) => updateEnd(undefined, e.target.value, undefined)}
+                                                                style={{ flex: 1, padding: '8px 4px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.88rem', fontWeight: 700, textAlign: 'center' }}
+                                                            >
+                                                                {hourOptions.map(h => (
+                                                                    <option key={h} value={h}>{h}</option>
+                                                                ))}
+                                                            </select>
+                                                            <span style={{ fontWeight: 800, color: '#64748b' }}>:</span>
+                                                            <select
+                                                                value={endParts.minute}
+                                                                onChange={(e) => updateEnd(undefined, undefined, e.target.value)}
+                                                                style={{ flex: 1, padding: '8px 4px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.88rem', fontWeight: 700, textAlign: 'center' }}
+                                                            >
+                                                                {endMinuteOptions.map(m => (
+                                                                    <option key={m} value={m}>{m}</option>
+                                                                ))}
+                                                            </select>
+                                                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669' }}>WIB</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ padding: '6px 10px', background: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0', fontSize: '0.74rem', color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <Clock size={13} className="text-emerald-600 shrink-0" />
+                                                        <span><strong>Batas Selesai:</strong> {formatIndonesianDateTime(endParts.date, endParts.hour, endParts.minute)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="form-group">
                                         <label>Token Ujian</label>
                                         <div className="auto-generate-box">
