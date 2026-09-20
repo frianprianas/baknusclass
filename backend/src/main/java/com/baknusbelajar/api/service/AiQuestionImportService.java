@@ -287,7 +287,7 @@ public class AiQuestionImportService {
                 se.setUjianMapel(ujian);
                 se.setPertanyaan(d.getPertanyaan().trim());
                 se.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "-");
-                se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai().intValue() : 10);
+                se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 10.0);
                 essayList.add(se);
             } else {
                 SoalPG pg = new SoalPG();
