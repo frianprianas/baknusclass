@@ -340,7 +340,7 @@ const StudentExams = () => {
                     uniqueExams.push(ex);
                 }
             }
-            let examList = uniqueExams;
+            let examList = uniqueExams.filter(e => e.statusAktif !== false);
 
             // If it's a Latihan / Simulasi event:
             if (isLatihanEvent) {

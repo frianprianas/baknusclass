@@ -58,6 +58,14 @@ public class UjianMapel {
     @Builder.Default
     private Boolean tampilkanNilai = false;
 
+    @Column(name = "status_aktif")
+    @Builder.Default
+    private Boolean statusAktif = true;
+
+    public Boolean getStatusAktif() {
+        return statusAktif != null ? statusAktif : true;
+    }
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "tb_ujian_mapel_kelas",

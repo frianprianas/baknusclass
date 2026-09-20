@@ -132,6 +132,7 @@ public class UjianMapelService {
         java.util.Set<Long> seenIds = new java.util.HashSet<>();
         for (com.baknusbelajar.api.entity.UjianMapel e : ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId())) {
             if (e == null || e.getId() == null || seenIds.contains(e.getId())) continue;
+            if (Boolean.FALSE.equals(e.getStatusAktif())) continue;
             String sig = (e.getMapel() != null ? e.getMapel().getId() : "m") + "_" +
                          (e.getGuru() != null ? e.getGuru().getId() : "g") + "_" +
                          (e.getWaktuMulai() != null ? e.getWaktuMulai().toString() : e.getId().toString());
@@ -267,6 +268,7 @@ public class UjianMapelService {
         }
         if (dto.getTampilkanNilai() != null)
             entity.setTampilkanNilai(dto.getTampilkanNilai());
+        entity.setStatusAktif(dto.getStatusAktif() != null ? dto.getStatusAktif() : true);
 
         if (dto.getKelasIds() != null && !dto.getKelasIds().isEmpty()) {
             java.util.List<com.baknusbelajar.api.entity.Kelas> kelasList = kelasRepository.findAllById(dto.getKelasIds());
@@ -303,6 +305,9 @@ public class UjianMapelService {
         UjianMapel entity = ujianMapelRepository.findById(ujianId)
                 .orElseThrow(() -> new RuntimeException("Ujian not found"));
 
+        if (Boolean.FALSE.equals(entity.getStatusAktif())) {
+            throw new RuntimeException("Ujian ini sedang ditutup oleh guru/admin.");
+        }
         String actualToken = entity.getToken() != null ? entity.getToken().trim() : "";
         if (actualToken.isEmpty()) {
             actualToken = generateRandomToken();
@@ -354,6 +359,8 @@ public class UjianMapelService {
         entity.setDurasi(dto.getDurasi());
         if (dto.getTampilkanNilai() != null)
             entity.setTampilkanNilai(dto.getTampilkanNilai());
+        if (dto.getStatusAktif() != null)
+            entity.setStatusAktif(dto.getStatusAktif());
             
         if (dto.getToken() != null && !dto.getToken().isEmpty()) {
             entity.setToken(dto.getToken());
@@ -380,6 +387,16 @@ public class UjianMapelService {
         return mapToDTO(ujianMapelRepository.save(entity), true);
     }
 
+    public UjianMapelDTO toggleStatusAktif(Long id) {
+        UjianMapel entity = ujianMapelRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan"));
+        boolean current = entity.getStatusAktif() != null ? entity.getStatusAktif() : true;
+        entity.setStatusAktif(!current);
+        UjianMapel saved = ujianMapelRepository.save(entity);
+        log.info("Toggled statusAktif for ujian {}: {} -> {}", id, current, saved.getStatusAktif());
+        return mapToDTO(saved, true);
+    }
+
     public void deleteUjian(Long id) {
         ujianMapelRepository.deleteById(id);
     }
@@ -391,6 +408,7 @@ public class UjianMapelService {
         dto.setWaktuSelesai(entity.getWaktuSelesai());
         dto.setDurasi(entity.getDurasi());
         dto.setTampilkanNilai(entity.getTampilkanNilai() != null ? entity.getTampilkanNilai() : false);
+        dto.setStatusAktif(entity.getStatusAktif() != null ? entity.getStatusAktif() : true);
         if (includeToken) {
             dto.setToken(entity.getToken());
         }

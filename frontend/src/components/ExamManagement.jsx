@@ -29,6 +29,7 @@ import {
     CloudUpload,
     Image as ImageIcon,
     Eye,
+    EyeOff,
     ZoomIn,
     X,
     Copy
@@ -731,6 +732,26 @@ const ExamManagement = () => {
         }
     };
 
+    const handleToggleExamStatus = async (exam) => {
+        const isCurrentlyOpen = exam.statusAktif !== false;
+        const confirmMsg = isCurrentlyOpen
+            ? `Tutup jadwal ujian "${exam.namaMapel || 'Mapel'}"?\n\nUjian akan disembunyikan dari dashboard dan daftar ujian siswa.`
+            : `Buka jadwal ujian "${exam.namaMapel || 'Mapel'}"?\n\nUjian akan langsung tampil di dashboard siswa dan siap dikerjakan.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        const token = localStorage.getItem('token');
+        try {
+            const res = await axios.put(`/api/exam/ujian-mapel/${exam.id}/toggle-status`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const updated = res.data;
+            setExams(prev => prev.map(e => e.id === exam.id ? { ...e, statusAktif: updated.statusAktif } : e));
+        } catch (err) {
+            console.error('Error toggling exam status:', err);
+            alert(err.response?.data?.message || 'Gagal mengubah status ujian');
+        }
+    };
+
     const handleDeleteExam = async (id) => {
         alert('DEBUG: Clicked Hapus Jadwal Ujian ID ' + id);
         if (!window.confirm('Hapus jadwal ujian ini? Data soal akan tetap ada tetapi tidak lagi terjadwal.')) return;
@@ -866,8 +887,13 @@ const ExamManagement = () => {
 
                 if (body.tipeSoal === 'PG_KOMPLEKS') {
                     // Stays PG_KOMPLEKS
-                } else if (body.tipeSoal === 'BENAR_SALAH' || body.tipeSoal === 'BS_MAJEMUK') {
-                    // Stays Benar/Salah or BS_MAJEMUK
+                } else if (body.tipeSoal === 'BS_MAJEMUK') {
+                    const activeSlots = ['A', 'B', 'C', 'D', 'E'].filter(o => body['pilihan' + o] && body['pilihan' + o] !== '-');
+                    const cCount = Math.max(activeSlots.length, 2);
+                    const kArr = (body.kunciJawaban || '').split(',').map(k => k.trim().toUpperCase());
+                    body.kunciJawaban = kArr.slice(0, cCount).join(',');
+                } else if (body.tipeSoal === 'BENAR_SALAH') {
+                    // Stays Benar/Salah
                 } else {
                     // If teacher chose PG_BIASA (1 Kunci)
                     if (isMultiKey) {
@@ -1328,14 +1354,27 @@ const ExamManagement = () => {
                                             ) : questionFormPG.tipeSoal === 'BS_MAJEMUK' ? (
                                                 <div className="bs-majemuk-form-container">
                                                     {(() => {
-                                                        const hasStmt5 = questionFormPG.pilihanE && questionFormPG.pilihanE !== '-';
-                                                        const totalStatements = hasStmt5 ? 5 : 4;
+                                                        const slots = ['A', 'B', 'C', 'D', 'E'];
+                                                        
+                                                        // Determine statementCount (between 2 and 5)
+                                                        let statementCount = 4;
+                                                        if (questionFormPG.pilihanE && questionFormPG.pilihanE !== '-') {
+                                                            statementCount = 5;
+                                                        } else if (questionFormPG.pilihanD === '-') {
+                                                            statementCount = (questionFormPG.pilihanC === '-') ? 2 : 3;
+                                                        } else if (questionFormPG.pilihanC === '-') {
+                                                            statementCount = 2;
+                                                        } else {
+                                                            statementCount = 4;
+                                                        }
+
+                                                        const totalStatements = statementCount;
                                                         const totalBobot = Number(questionFormPG.bobotNilai) || 2;
                                                         const ptsPerItem = (totalBobot / totalStatements).toFixed(2).replace(/\.00$/, '');
                                                         
                                                         // Parse clean normalized keys
                                                         const rawKeyArr = (questionFormPG.kunciJawaban || '').split(',').map(k => k.trim().toUpperCase());
-                                                        const currentKeys = ['A', 'B', 'C', 'D', 'E'].map((_, i) => {
+                                                        const currentKeys = slots.map((_, i) => {
                                                             const k = rawKeyArr[i];
                                                             return (k === 'S' || k === 'B') ? k : (i === 2 ? 'S' : 'B');
                                                         });
@@ -1352,13 +1391,47 @@ const ExamManagement = () => {
                                                             setQuestionFormPG(prev => ({ ...prev, kunciJawaban: nextKeys }));
                                                         };
 
+                                                        const removeStatement = (idxToRemove) => {
+                                                            if (statementCount <= 2) {
+                                                                alert('Minimal harus ada 2 butir pernyataan untuk Tabel Benar/Salah.');
+                                                                return;
+                                                            }
+                                                            const activeTexts = slots.slice(0, statementCount).map(o => questionFormPG['pilihan' + o]);
+                                                            const activeKeys = currentKeys.slice(0, statementCount);
+
+                                                            activeTexts.splice(idxToRemove, 1);
+                                                            activeKeys.splice(idxToRemove, 1);
+
+                                                            const newForm = { ...questionFormPG };
+                                                            slots.forEach((o, i) => {
+                                                                if (i < activeTexts.length) {
+                                                                    newForm['pilihan' + o] = activeTexts[i] === '-' ? '' : activeTexts[i];
+                                                                } else {
+                                                                    newForm['pilihan' + o] = '-';
+                                                                }
+                                                            });
+                                                            newForm.kunciJawaban = activeKeys.join(',');
+                                                            setQuestionFormPG(newForm);
+                                                        };
+
+                                                        const addStatement = () => {
+                                                            if (statementCount >= 5) return;
+                                                            const nextSlot = slots[statementCount];
+                                                            const nextKeys = [...currentKeys.slice(0, statementCount), 'B'].join(',');
+                                                            setQuestionFormPG(prev => ({
+                                                                ...prev,
+                                                                ['pilihan' + nextSlot]: '',
+                                                                kunciJawaban: nextKeys
+                                                            }));
+                                                        };
+
                                                         return (
                                                             <>
                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                                                                     <div>
                                                                         <label className="section-label" style={{ margin: 0 }}>Daftar Butir Pernyataan & Kunci [Benar / Salah]</label>
                                                                         <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>
-                                                                            Siswa menentukan status tiap butir. Sistem menilai secara <strong>proporsional per butir</strong>.
+                                                                            Siswa menentukan status tiap butir. Sistem menilai secara <strong>proporsional per butir</strong>. (Jumlah saat ini: <strong>{totalStatements} Butir</strong>)
                                                                         </p>
                                                                     </div>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -1410,24 +1483,9 @@ const ExamManagement = () => {
                                                                 </div>
 
                                                                 <div className="bs-majemuk-table-editor">
-                                                                    {['A', 'B', 'C', 'D', 'E'].map((opt, idx) => {
-                                                                        const isVisible = idx < 4 || hasStmt5;
-
-                                                                        if (!isVisible && idx >= 4) {
-                                                                            return (
-                                                                                <div key={opt} style={{ textAlign: 'center', padding: '10px 0' }}>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: 'Pernyataan 5' })}
-                                                                                        style={{ background: '#eff6ff', border: '1.5px dashed #3b82f6', color: '#1d4ed8', padding: '8px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}
-                                                                                    >
-                                                                                        + Tambah Pernyataan Ke-5 (Opsional)
-                                                                                    </button>
-                                                                                </div>
-                                                                            );
-                                                                        }
-
+                                                                    {slots.slice(0, totalStatements).map((opt, idx) => {
                                                                         const rowKey = currentKeys[idx];
+                                                                        const canDelete = totalStatements > 2;
 
                                                                         return (
                                                                             <div key={opt} className="bs-statement-card">
@@ -1442,12 +1500,12 @@ const ExamManagement = () => {
                                                                                         <div className="bs-stmt-point-badge" title="Nilai didapatkan siswa jika menjawab butir ini dengan tepat">
                                                                                             +{ptsPerItem} Poin
                                                                                         </div>
-                                                                                        {idx === 4 && (
+                                                                                        {canDelete && (
                                                                                             <button
                                                                                                 type="button"
-                                                                                                onClick={() => setQuestionFormPG({ ...questionFormPG, pilihanE: '-' })}
+                                                                                                onClick={() => removeStatement(idx)}
                                                                                                 style={{ background: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', cursor: 'pointer', padding: '4px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 700 }}
-                                                                                                title="Hapus Pernyataan ke-5"
+                                                                                                title={`Hapus Pernyataan #${idx + 1}`}
                                                                                             >
                                                                                                 <Trash2 size={14} /> Hapus
                                                                                             </button>
@@ -1490,6 +1548,18 @@ const ExamManagement = () => {
                                                                             </div>
                                                                         );
                                                                     })}
+
+                                                                    {totalStatements < 5 && (
+                                                                        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={addStatement}
+                                                                                style={{ background: '#eff6ff', border: '1.5px dashed #3b82f6', color: '#1d4ed8', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                                            >
+                                                                                <Plus size={16} /> + Tambah Pernyataan Ke-{totalStatements + 1} (Maks 5 Butir)
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </>
                                                         );
@@ -3715,6 +3785,39 @@ const ExamManagement = () => {
                                                         <td>
                                                             <div className="mapel-cell">
                                                                 <span className="nama-mapel">{exam.namaMapel}</span>
+                                                                <div style={{ marginTop: '4px' }}>
+                                                                    {exam.statusAktif !== false ? (
+                                                                        <span style={{
+                                                                            fontSize: '0.72rem',
+                                                                            background: '#ecfdf5',
+                                                                            color: '#059669',
+                                                                            border: '1px solid #a7f3d0',
+                                                                            padding: '2px 8px',
+                                                                            borderRadius: '6px',
+                                                                            fontWeight: 800,
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px'
+                                                                        }}>
+                                                                            <Eye size={12} /> Buka (Aktif)
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span style={{
+                                                                            fontSize: '0.72rem',
+                                                                            background: '#fef2f2',
+                                                                            color: '#dc2626',
+                                                                            border: '1px solid #fecaca',
+                                                                            padding: '2px 8px',
+                                                                            borderRadius: '6px',
+                                                                            fontWeight: 800,
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px'
+                                                                        }}>
+                                                                            <EyeOff size={12} /> Tutup (Nonaktif)
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </td>
                                                         <td>{exam.namaGuru}</td>
@@ -3774,6 +3877,19 @@ const ExamManagement = () => {
                                                                 </button>
                                                                 {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && exam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId)) && (
                                                                     <>
+                                                                        <button
+                                                                            className="btn-icon-outline"
+                                                                            onClick={() => handleToggleExamStatus(exam)}
+                                                                            title={exam.statusAktif !== false ? 'Ujian sedang Terbuka (Tampil untuk Siswa) — Klik untuk Tutup Ujian' : 'Ujian sedang Ditutup (Disembunyikan dari Siswa) — Klik untuk Buka Ujian'}
+                                                                            style={{
+                                                                                color: exam.statusAktif !== false ? '#059669' : '#dc2626',
+                                                                                borderColor: exam.statusAktif !== false ? '#a7f3d0' : '#fecaca',
+                                                                                background: exam.statusAktif !== false ? '#ecfdf5' : '#fef2f2',
+                                                                                transition: 'all 0.2s'
+                                                                            }}
+                                                                        >
+                                                                            {exam.statusAktif !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+                                                                        </button>
                                                                         <button
                                                                             className="btn-icon-outline"
                                                                             onClick={() => {

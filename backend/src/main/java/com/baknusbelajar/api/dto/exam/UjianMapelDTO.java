@@ -25,4 +25,5 @@ public class UjianMapelDTO {
     
     private String jenisUjian;
     private Long pembuatGuruId;
+    private Boolean statusAktif;
 }

@@ -85,6 +85,14 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.toggleTampilkanNilai(id));
     }
 
+    @PutMapping("/{id}/toggle-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<UjianMapelDTO> toggleStatus(@PathVariable Long id) {
+        log.info("[UjianMapel] Toggle Status attempt for id={} by user: {}", id,
+                SecurityContextHolder.getContext().getAuthentication().getName());
+        return ResponseEntity.ok(ujianMapelService.toggleStatusAktif(id));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
