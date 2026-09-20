@@ -264,6 +264,7 @@ const ExamManagement = () => {
     // Sub-view for entering questions
     const [viewingQuestions, setViewingQuestions] = useState(null); // Will hold exam object
     const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+    const [copyTargetExam, setCopyTargetExam] = useState(null);
     const [selectedSourceExamId, setSelectedSourceExamId] = useState('');
     // AI Word Import & Draft States
     const [isWordImportModalOpen, setIsWordImportModalOpen] = useState(false);
@@ -1170,18 +1171,24 @@ const ExamManagement = () => {
     };
 
     const handleCopyQuestions = async () => {
-        if (!selectedSourceExamId || !viewingQuestions) return;
-        if (!window.confirm('Apakah Anda yakin ingin menyalin seluruh soal dan kunci jawaban dari ujian terpilih ke ujian ini?')) return;
+        const target = copyTargetExam || viewingQuestions;
+        if (!selectedSourceExamId || !target) return;
+        if (!window.confirm(`Apakah Anda yakin ingin menyalin seluruh soal dan kunci jawaban ke ujian "${target.namaMapel}"?`)) return;
         setIsCopying(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`/api/exam/ujian-mapel/${viewingQuestions.id}/copy-from/${selectedSourceExamId}`, {}, {
+            const res = await axios.post(`/api/exam/ujian-mapel/${target.id}/copy-from/${selectedSourceExamId}`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             alert(res.data.message || 'Berhasil menyalin seluruh soal dan kunci jawaban!');
             setIsCopyModalOpen(false);
             setSelectedSourceExamId('');
-            await handleManageQuestions(viewingQuestions);
+            setCopyTargetExam(null);
+            if (viewingQuestions) {
+                await handleManageQuestions(viewingQuestions);
+            } else if (typeof fetchExams === 'function') {
+                await fetchExams();
+            }
         } catch (err) {
             alert(err.response?.data?.message || 'Gagal menyalin soal');
         } finally {
@@ -4280,9 +4287,15 @@ const ExamManagement = () => {
                                     </div>
                                     <div>
                                         <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Salin Soal dari Ujian Lain</h3>
-                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
-                                            Target: <strong>{viewingQuestions.namaMapel}</strong> ({new Date(viewingQuestions.waktuMulai).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})
-                                        </p>
+                                        {(() => {
+                                            const target = copyTargetExam || viewingQuestions;
+                                            if (!target) return null;
+                                            return (
+                                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                                                    Target: <strong>{target.namaMapel}</strong> ({target.waktuMulai ? new Date(target.waktuMulai).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'})
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 <button type="button" onClick={() => setIsCopyModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
@@ -4302,7 +4315,7 @@ const ExamManagement = () => {
                                     >
                                         <option value="">-- Pilih Ujian Sumber --</option>
                                         {exams
-                                            .filter(e => e.id !== viewingQuestions.id)
+                                            .filter(e => e.id !== (copyTargetExam?.id || viewingQuestions?.id))
                                             .map(e => (
                                                 <option key={e.id} value={e.id}>
                                                     {e.namaMapel} • {e.namaEvent || 'Event'} ({new Date(e.waktuMulai).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})
@@ -4860,6 +4873,19 @@ const ExamManagement = () => {
                                                                 >
                                                                     <Sparkles size={13} />
                                                                     Import Word (AI)
+                                                                </button>
+                                                                <button
+                                                                    className="btn-lengkapi"
+                                                                    style={{ background: '#ecfdf5', color: '#059669', border: '1.5px solid #a7f3d0', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                                                    onClick={() => {
+                                                                        setCopyTargetExam(exam);
+                                                                        setSelectedSourceExamId('');
+                                                                        setIsCopyModalOpen(true);
+                                                                    }}
+                                                                    title="Salin / Transfer seluruh soal dari ujian lain ke ujian ini"
+                                                                >
+                                                                    <Copy size={13} />
+                                                                    Salin Soal
                                                                 </button>
                                                                 <button
                                                                     className="btn-lengkapi"
