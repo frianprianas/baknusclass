@@ -8,29 +8,46 @@ import com.baknusbelajar.api.repository.SoalEssayRepository;
 import com.baknusbelajar.api.repository.SoalPGRepository;
 import com.baknusbelajar.api.repository.UjianMapelRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiQuestionImportService {
 
-    private final GeminiService geminiService;
     private final UjianMapelRepository ujianMapelRepository;
     private final SoalPGRepository soalPGRepository;
     private final SoalEssayRepository soalEssayRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${aivene.api.key:isk-osSJSB8LQ4ytRuRkKMX1B3Vj1dUoJBubnpcpTR0m}")
+    private String aiveneApiKey;
+
+    @Value("${aivene.model:gemini-2.5-flash}")
+    private String aiveneModel;
+
+    @Value("${aivene.api.url:https://api.aivene.com/v1/chat/completions}")
+    private String aiveneApiUrl;
 
     public String extractTextFromDocx(InputStream inputStream) {
         StringBuilder sb = new StringBuilder();
@@ -79,14 +96,78 @@ public class AiQuestionImportService {
         }
 
         String prompt = buildAiExtractionPrompt(documentText);
-        log.info("Sending document text to Gemini AI (Length: {} chars)", documentText.length());
+        log.info("[Aivene AI] Extracting questions from document text (Length: {} chars)", documentText.length());
 
-        String aiResponse = geminiService.callGemini(prompt).block();
+        String aiResponse = callAiveneChatCompletions(prompt);
         if (aiResponse == null || aiResponse.trim().isEmpty()) {
-            throw new RuntimeException("AI tidak memberikan respon ekstraksi.");
+            throw new RuntimeException("AI Aivene tidak memberikan respon ekstraksi.");
         }
 
         return parseAiResponseToDrafts(aiResponse);
+    }
+
+    private String callAiveneChatCompletions(String prompt) {
+        String activeKey = (aiveneApiKey != null && !aiveneApiKey.trim().isEmpty())
+                ? aiveneApiKey.trim()
+                : "isk-osSJSB8LQ4ytRuRkKMX1B3Vj1dUoJBubnpcpTR0m";
+        String activeModel = (aiveneModel != null && !aiveneModel.trim().isEmpty())
+                ? aiveneModel.trim()
+                : "gemini-2.5-flash";
+        String apiUrl = (aiveneApiUrl != null && !aiveneApiUrl.trim().isEmpty())
+                ? aiveneApiUrl.trim()
+                : "https://api.aivene.com/v1/chat/completions";
+
+        log.info("[Aivene AI] Connecting to {} with model: {} and key: {}...", apiUrl, activeModel,
+                activeKey.length() > 8 ? activeKey.substring(0, 7) + "..." : "***");
+
+        try {
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .build();
+
+            Map<String, Object> requestPayload = Map.of(
+                    "model", activeModel,
+                    "messages", List.of(
+                            Map.of("role", "user", "content", prompt)
+                    )
+            );
+
+            String requestBodyJson = objectMapper.writeValueAsString(requestPayload);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(apiUrl))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + activeKey)
+                    .timeout(Duration.ofMinutes(3))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson, StandardCharsets.UTF_8))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+            if (response.statusCode() != 200) {
+                log.error("[Aivene AI] HTTP Error {}: {}", response.statusCode(), response.body());
+                throw new RuntimeException("Aivene API returned HTTP " + response.statusCode() + ": " + response.body());
+            }
+
+            JsonNode rootNode = objectMapper.readTree(response.body());
+            JsonNode choices = rootNode.path("choices");
+            if (!choices.isArray() || choices.isEmpty()) {
+                log.error("[Aivene AI] No choices in response: {}", response.body());
+                throw new RuntimeException("Respon Aivene tidak memuat pilihan jawaban (choices kosong).");
+            }
+
+            String content = choices.get(0).path("message").path("content").asText();
+            if (content == null || content.trim().isEmpty()) {
+                throw new RuntimeException("AI Aivene memberikan konten jawaban kosong.");
+            }
+
+            log.info("[Aivene AI] Extraction response received successfully ({} chars)", content.length());
+            return content.trim();
+
+        } catch (Exception e) {
+            log.error("[Aivene AI] Communication error: ", e);
+            throw new RuntimeException("Gagal menghubungi layanan AI Aivene: " + e.getMessage(), e);
+        }
     }
 
     private String buildAiExtractionPrompt(String documentText) {
@@ -206,26 +287,23 @@ public class AiQuestionImportService {
                 se.setUjianMapel(ujian);
                 se.setPertanyaan(d.getPertanyaan().trim());
                 se.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "-");
-                se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 2.0);
+                se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai().intValue() : 10);
                 essayList.add(se);
             } else {
                 SoalPG pg = new SoalPG();
                 pg.setUjianMapel(ujian);
                 pg.setPertanyaan(d.getPertanyaan().trim());
-
+                String tipe = (d.getTipeSoal() != null && !d.getTipeSoal().trim().isEmpty()) ? d.getTipeSoal().trim().toUpperCase() : "PG_BIASA";
                 String pilA = (d.getPilihanA() != null && !d.getPilihanA().trim().isEmpty()) ? d.getPilihanA().trim() : "-";
                 String pilB = (d.getPilihanB() != null && !d.getPilihanB().trim().isEmpty()) ? d.getPilihanB().trim() : "-";
                 String pilC = (d.getPilihanC() != null && !d.getPilihanC().trim().isEmpty()) ? d.getPilihanC().trim() : "-";
                 String pilD = (d.getPilihanD() != null && !d.getPilihanD().trim().isEmpty()) ? d.getPilihanD().trim() : "-";
                 String pilE = (d.getPilihanE() != null && !d.getPilihanE().trim().isEmpty()) ? d.getPilihanE().trim() : "-";
-
-                String tipe = (d.getTipeSoal() != null && !d.getTipeSoal().trim().isEmpty()) ? d.getTipeSoal().trim().toUpperCase() : "PG_BIASA";
-
                 if ("BENAR_SALAH".equalsIgnoreCase(tipe)) {
                     if (pilA.equals("-")) pilA = "Benar";
                     if (pilB.equals("-")) pilB = "Salah";
                 }
-
+                pg.setTipeSoal(tipe);
                 pg.setPilihanA(pilA);
                 pg.setPilihanB(pilB);
                 pg.setPilihanC(pilC);
@@ -233,7 +311,6 @@ public class AiQuestionImportService {
                 pg.setPilihanE(pilE);
                 pg.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "A");
                 pg.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 2.0);
-                pg.setTipeSoal(tipe);
                 pgList.add(pg);
             }
             count++;
@@ -246,7 +323,8 @@ public class AiQuestionImportService {
             soalEssayRepository.saveAll(essayList);
         }
 
-        log.info("Batch saved {} questions ({} PG, {} Essay) for UjianMapel {}", count, pgList.size(), essayList.size(), ujianId);
+        log.info("Successfully batch saved {} questions ({} PG, {} Essay) for ujianId={}",
+                count, pgList.size(), essayList.size(), ujianId);
         return count;
     }
 }

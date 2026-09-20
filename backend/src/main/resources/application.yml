@@ -56,7 +56,7 @@ mailcow:
 
 gemini:
   keys: ${GEMINI_KEYS:REDACTED}
-  model: gemini-1.5-flash-latest
+  model: gemini-1.5-flash
 
 
 # Fallback AI provider (used when Gemini quota is exceeded)
@@ -75,3 +75,8 @@ logging:
   level:
     org.springframework.security: INFO
     com.baknusbelajar.api.service: DEBUG
+aivene:
+  api:
+    key: ${AIVENE_API_KEY:isk-osSJSB8LQ4ytRuRkKMX1B3Vj1dUoJBubnpcpTR0m}
+    url: ${AIVENE_API_URL:https://api.aivene.com/v1/chat/completions}
+  model: ${AIVENE_MODEL:gemini-2.5-flash}
