@@ -22,6 +22,7 @@ import java.util.List;
 public class UjianMapelController {
 
     private final UjianMapelService ujianMapelService;
+    private final com.baknusbelajar.api.service.AiQuestionImportService aiQuestionImportService;
     private final com.baknusbelajar.api.service.ExamStatusService examStatusService;
 
     @GetMapping("/event/{eventId}")
@@ -223,4 +224,46 @@ public class UjianMapelController {
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(ujianMapelService.getPesertaUjian(ujianId, kelasId, status));
     }
+
+    @PostMapping(value = "/ai-extract-word", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> extractQuestionsFromWord(
+            @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "rawText", required = false) String rawText) {
+        log.info("[AI Import] Extract request received. File: {}, RawText length: {}",
+                file != null ? file.getOriginalFilename() : "none",
+                rawText != null ? rawText.length() : 0);
+        try {
+            var drafts = aiQuestionImportService.extractQuestions(file, rawText);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "drafts", drafts,
+                    "total", drafts != null ? drafts.size() : 0
+            ));
+        } catch (Exception e) {
+            log.error("[AI Import] Extraction failed: ", e);
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/save-batch-questions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> saveBatchQuestions(
+            @PathVariable Long id,
+            @RequestBody java.util.List<com.baknusbelajar.api.dto.exam.DraftSoalDTO> draftList) {
+        log.info("[AI Import] Batch save request for ujian id={}, count={}", id, draftList != null ? draftList.size() : 0);
+        try {
+            int savedCount = aiQuestionImportService.saveBatchQuestions(id, draftList);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "count", savedCount,
+                    "savedCount", savedCount,
+                    "message", "Berhasil menyimpan " + savedCount + " butir soal ke ujian!"
+            ));
+        } catch (Exception e) {
+            log.error("[AI Import] Batch save failed: ", e);
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+        }
+    }
+
 }

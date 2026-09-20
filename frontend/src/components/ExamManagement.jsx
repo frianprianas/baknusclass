@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import {
+    Sparkles,
     Calendar,
     BookOpen,
     Plus,
@@ -207,6 +208,154 @@ const ExamManagement = () => {
     const [viewingQuestions, setViewingQuestions] = useState(null); // Will hold exam object
     const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
     const [selectedSourceExamId, setSelectedSourceExamId] = useState('');
+    // AI Word Import & Draft States
+    const [isWordImportModalOpen, setIsWordImportModalOpen] = useState(false);
+    const [wordImportTargetExam, setWordImportTargetExam] = useState(null);
+    const [wordImportStep, setWordImportStep] = useState('input'); // 'input' | 'review'
+    const [wordImportTab, setWordImportTab] = useState('file'); // 'file' | 'text'
+    const [wordImportFile, setWordImportFile] = useState(null);
+    const [wordImportRawText, setWordImportRawText] = useState('');
+    const [isExtractingAi, setIsExtractingAi] = useState(false);
+    const [isSavingBatch, setIsSavingBatch] = useState(false);
+    const [draftQuestions, setDraftQuestions] = useState([]);
+
+    const handleOpenWordImportModal = (exam) => {
+        setWordImportTargetExam(exam);
+        setWordImportStep('input');
+        setWordImportTab('file');
+        setWordImportFile(null);
+        setWordImportRawText('');
+        setDraftQuestions([]);
+        setIsWordImportModalOpen(true);
+    };
+
+    const handleExtractWordAi = async () => {
+        if (!wordImportTargetExam) return;
+        if (wordImportTab === 'file' && !wordImportFile) {
+            alert('Silakan pilih file Word (.docx) terlebih dahulu.');
+            return;
+        }
+        if (wordImportTab === 'text' && (!wordImportRawText || !wordImportRawText.trim())) {
+            alert('Silakan masukkan atau tempel teks naskah soal terlebih dahulu.');
+            return;
+        }
+
+        setIsExtractingAi(true);
+        try {
+            const formData = new FormData();
+            if (wordImportTab === 'file' && wordImportFile) {
+                formData.append('file', wordImportFile);
+            } else if (wordImportTab === 'text') {
+                formData.append('rawText', wordImportRawText);
+            }
+
+            const res = await axios.post('/api/exam/ujian-mapel/ai-extract-word', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            const extractedList = Array.isArray(res.data) 
+                ? res.data 
+                : (res.data && Array.isArray(res.data.drafts) ? res.data.drafts : null);
+
+            if (extractedList) {
+                if (extractedList.length === 0) {
+                    alert('AI tidak menemukan butir soal dalam dokumen. Pastikan dokumen berisi naskah soal berformat nomor dan opsi.');
+                } else {
+                    setDraftQuestions(extractedList);
+                    setWordImportStep('review');
+                }
+            } else {
+                alert('Gagal mengekstrak soal: ' + (res.data?.message || 'Format respon tidak dikenali'));
+            }
+        } catch (err) {
+            console.error('Error extracting Word AI:', err);
+            alert('Gagal mengekstrak soal: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsExtractingAi(false);
+        }
+    };
+
+    const handleUpdateDraft = (index, field, value) => {
+        setDraftQuestions(prev => {
+            const copy = [...prev];
+            copy[index] = { ...copy[index], [field]: value };
+            return copy;
+        });
+    };
+
+    const handleDeleteDraft = (index) => {
+        if (window.confirm(`Hapus draf soal nomor ${index + 1}?`)) {
+            setDraftQuestions(prev => {
+                const next = prev.filter((_, i) => i !== index);
+                return next.map((item, i) => ({ ...item, nomor: i + 1 }));
+            });
+        }
+    };
+
+    const handleAddDraft = () => {
+        setDraftQuestions(prev => [
+            ...prev,
+            {
+                nomor: prev.length + 1,
+                tipeSoal: 'PG_BIASA',
+                pertanyaan: '',
+                pilihanA: '',
+                pilihanB: '',
+                pilihanC: '',
+                pilihanD: '',
+                pilihanE: '',
+                kunciJawaban: 'A',
+                bobotNilai: 2.0
+            }
+        ]);
+    };
+
+    const handleSaveBatchDraftQuestions = async () => {
+        if (!wordImportTargetExam) return;
+        if (!draftQuestions || draftQuestions.length === 0) {
+            alert('Tidak ada draf soal untuk disimpan.');
+            return;
+        }
+
+        const emptyItems = draftQuestions.filter(d => !d.pertanyaan || !d.pertanyaan.trim());
+        if (emptyItems.length > 0) {
+            if (!window.confirm(`Ada ${emptyItems.length} butir soal dengan pertanyaan kosong yang akan dilewati. Lanjutkan simpan?`)) {
+                return;
+            }
+        }
+
+        setIsSavingBatch(true);
+        try {
+            const res = await axios.post(`/api/exam/ujian-mapel/${wordImportTargetExam.id}/save-batch-questions`, draftQuestions, {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (res.data && res.data.success) {
+                alert(`Berhasil menyimpan ${res.data.savedCount} soal ke dalam ujian "${wordImportTargetExam.namaMapel}"!`);
+                setIsWordImportModalOpen(false);
+                setDraftQuestions([]);
+                setWordImportFile(null);
+                setWordImportRawText('');
+                setWordImportStep('input');
+
+                if (viewingQuestions && viewingQuestions.id === wordImportTargetExam.id) {
+                    await handleManageQuestions(viewingQuestions);
+                }
+            } else {
+                alert('Gagal menyimpan soal: ' + (res.data?.message || 'Terjadi kesalahan'));
+            }
+        } catch (err) {
+            console.error('Error saving batch draft questions:', err);
+            alert('Gagal menyimpan soal: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsSavingBatch(false);
+        }
+    };
     const [isCopying, setIsCopying] = useState(false);
     const [qType, setQType] = useState('essay'); // 'essay' or 'pg'
     const [questions, setQuestions] = useState([]);
@@ -1045,6 +1194,767 @@ const ExamManagement = () => {
         };
     };
 
+    
+    const renderWordImportModal = () => {
+        if (!isWordImportModalOpen) return null;
+
+        return createPortal(
+            <div className="modal-overlay" style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100vw',
+                height: '100vh',
+                background: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(8px)',
+                zIndex: 999999,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '24px 16px',
+                overflowY: 'auto',
+                boxSizing: 'border-box'
+            }}>
+                <div className="modal-content animate-slide-up" style={{
+                    borderRadius: '24px',
+                    width: '100%',
+                    maxWidth: wordImportStep === 'review' ? '1100px' : '650px',
+                    maxHeight: '92vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: '#ffffff',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                    overflow: 'hidden',
+                    transition: 'max-width 0.3s ease'
+                }}>
+                    {/* Modal Header */}
+                    <div style={{
+                        padding: '20px 28px',
+                        borderBottom: '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#faf5ff'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '12px',
+                                background: '#7c3aed',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)'
+                            }}>
+                                <Sparkles size={22} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e1b4b' }}>
+                                    {wordImportStep === 'review' ? 'Review & Sunting Draf Soal' : 'Import Soal dari Word / Teks (AI)'}
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>
+                                    Ujian: <strong style={{ color: '#4c1d95' }}>{wordImportTargetExam?.namaMapel}</strong>
+                                    {wordImportTargetExam?.namaEvent && ` • ${wordImportTargetExam.namaEvent}`}
+                                    {wordImportTargetExam?.namaGuru && ` • ${wordImportTargetExam.namaGuru}`}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (wordImportStep === 'review') {
+                                    if (window.confirm('Keluar dari draf soal? Perubahan draf yang belum di-ACC akan hilang.')) {
+                                        setIsWordImportModalOpen(false);
+                                    }
+                                } else {
+                                    setIsWordImportModalOpen(false);
+                                }
+                            }}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#94a3b8',
+                                padding: '4px',
+                                borderRadius: '8px',
+                                display: 'flex'
+                            }}
+                        >
+                            <XCircle size={24} />
+                        </button>
+                    </div>
+
+                    {/* Step 1: Input & File Selection */}
+                    {wordImportStep === 'input' && (
+                        <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
+                            {/* Tab Switcher */}
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setWordImportTab('file')}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px 16px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        background: wordImportTab === 'file' ? '#ffffff' : 'transparent',
+                                        color: wordImportTab === 'file' ? '#7c3aed' : '#64748b',
+                                        boxShadow: wordImportTab === 'file' ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <FileText size={16} />
+                                    Unggah File Word (.docx)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setWordImportTab('text')}
+                                    style={{
+                                        flex: 1,
+                                        padding: '10px 16px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px',
+                                        background: wordImportTab === 'text' ? '#ffffff' : 'transparent',
+                                        color: wordImportTab === 'text' ? '#7c3aed' : '#64748b',
+                                        boxShadow: wordImportTab === 'text' ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <Edit3 size={16} />
+                                    Tempel / Salin Teks Soal
+                                </button>
+                            </div>
+
+                            {wordImportTab === 'file' ? (
+                                <div>
+                                    <div
+                                        style={{
+                                            border: '2px dashed #c4b5fd',
+                                            borderRadius: '16px',
+                                            padding: '36px 20px',
+                                            textAlign: 'center',
+                                            background: wordImportFile ? '#f5f3ff' : '#faf5ff',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onClick={() => document.getElementById('docxFileInput')?.click()}
+                                    >
+                                        <input
+                                            id="docxFileInput"
+                                            type="file"
+                                            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files[0]) {
+                                                    setWordImportFile(e.target.files[0]);
+                                                }
+                                            }}
+                                        />
+                                        <CloudUpload size={48} color="#7c3aed" style={{ margin: '0 auto 12px' }} />
+                                        {wordImportFile ? (
+                                            <div>
+                                                <p style={{ margin: 0, fontWeight: 800, color: '#4c1d95', fontSize: '1rem' }}>
+                                                    {wordImportFile.name}
+                                                </p>
+                                                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                                                    {(wordImportFile.size / 1024).toFixed(1)} KB — Klik untuk mengganti file
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <p style={{ margin: 0, fontWeight: 700, color: '#4c1d95', fontSize: '0.95rem' }}>
+                                                    Klik untuk memilih file naskah Word (.docx)
+                                                </p>
+                                                <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: '#8b5cf6' }}>
+                                                    Mendukung paragraf soal berformat nomor, opsi A-E, kunci tebal/lampiran, dan tabel benar-salah
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                                        Tempel Naskah Soal Disini:
+                                    </label>
+                                    <textarea
+                                        rows={10}
+                                        value={wordImportRawText}
+                                        onChange={(e) => setWordImportRawText(e.target.value)}
+                                        placeholder="Contoh:&#10;1. Ibu kota negara Indonesia adalah...&#10;A. Surabaya&#10;B. Bandung&#10;C. Jakarta&#10;D. Semarang&#10;E. Medan&#10;Kunci: C&#10;&#10;2. Manakah pernyataan berikut yang benar? (Benar/Salah)..."
+                                        style={{
+                                            width: '100%',
+                                            padding: '14px',
+                                            borderRadius: '12px',
+                                            border: '2px solid #e2e8f0',
+                                            fontSize: '0.9rem',
+                                            fontFamily: 'monospace',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Helpful Tips Card */}
+                            <div style={{
+                                marginTop: '20px',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '12px',
+                                padding: '14px 18px',
+                                display: 'flex',
+                                gap: '12px',
+                                alignItems: 'flex-start'
+                            }}>
+                                <Info size={20} color="#6366f1" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
+                                    <strong style={{ color: '#1e293b' }}>Alur Kerja Draf Soal (Aman & Terkontrol):</strong>
+                                    <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+                                        <li>File Word Anda akan dibaca dan distrukturkan oleh AI menjadi <strong>Draf Soal</strong> terlebih dahulu.</li>
+                                        <li>Soal <strong>TIDAK langsung masuk</strong> ke database ujian.</li>
+                                        <li>Anda dapat meneliti, menyunting kunci, opsi, butir pernyataan benar-salah, atau menghapus soal yang tidak diinginkan di layar review sebelum menekan tombol ACC.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Footer Buttons */}
+                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsWordImportModalOpen(false)}
+                                    style={{
+                                        padding: '10px 20px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid #cbd5e1',
+                                        background: '#ffffff',
+                                        color: '#64748b',
+                                        fontWeight: 700,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExtractWordAi}
+                                    disabled={isExtractingAi || (wordImportTab === 'file' && !wordImportFile) || (wordImportTab === 'text' && !wordImportRawText.trim())}
+                                    style={{
+                                        padding: '10px 24px',
+                                        borderRadius: '10px',
+                                        border: 'none',
+                                        background: isExtractingAi || (wordImportTab === 'file' && !wordImportFile) || (wordImportTab === 'text' && !wordImportRawText.trim())
+                                            ? '#cbd5e1'
+                                            : 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                                        color: '#ffffff',
+                                        fontWeight: 800,
+                                        cursor: isExtractingAi ? 'wait' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)'
+                                    }}
+                                >
+                                    {isExtractingAi ? (
+                                        <>
+                                            <RefreshCw size={16} className="animate-spin" />
+                                            Sedang Menganalisis Naskah dengan AI...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={16} />
+                                            Mulai Ekstrak ke Draf Soal
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Review Draf Soal */}
+                    {wordImportStep === 'review' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                            {/* Toolbar */}
+                            <div style={{
+                                padding: '12px 28px',
+                                background: '#f8fafc',
+                                borderBottom: '1px solid #e2e8f0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '10px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <span style={{
+                                        background: '#ecfdf5',
+                                        color: '#059669',
+                                        border: '1px solid #a7f3d0',
+                                        padding: '4px 12px',
+                                        borderRadius: '20px',
+                                        fontWeight: 800,
+                                        fontSize: '0.85rem'
+                                    }}>
+                                        {draftQuestions.length} Butir Soal Terdeteksi
+                                    </span>
+                                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                        Total Bobot: <strong>{draftQuestions.reduce((acc, q) => acc + (Number(q.bobotNilai) || 0), 0).toFixed(1)}</strong>
+                                    </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setWordImportStep('input')}
+                                        style={{
+                                            padding: '6px 14px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #cbd5e1',
+                                            background: '#ffffff',
+                                            color: '#475569',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        ← Kembali ke Unggah
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddDraft}
+                                        style={{
+                                            padding: '6px 14px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #7c3aed',
+                                            background: '#f5f3ff',
+                                            color: '#7c3aed',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        <Plus size={14} /> Tambah Soal
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Draft List Container */}
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px', background: '#f1f5f9' }} className="custom-scrollbar">
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {draftQuestions.map((draft, idx) => (
+                                        <div
+                                            key={idx}
+                                            style={{
+                                                background: '#ffffff',
+                                                borderRadius: '16px',
+                                                border: '1.5px solid #e2e8f0',
+                                                padding: '18px 20px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+                                            }}
+                                        >
+                                            {/* Card Top Row */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', gap: '12px', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <span style={{
+                                                        background: '#1e293b',
+                                                        color: '#ffffff',
+                                                        width: '28px',
+                                                        height: '28px',
+                                                        borderRadius: '8px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontWeight: 800,
+                                                        fontSize: '0.85rem'
+                                                    }}>
+                                                        {idx + 1}
+                                                    </span>
+                                                    <select
+                                                        value={draft.tipeSoal || 'PG_BIASA'}
+                                                        onChange={(e) => handleUpdateDraft(idx, 'tipeSoal', e.target.value)}
+                                                        style={{
+                                                            padding: '6px 12px',
+                                                            borderRadius: '8px',
+                                                            border: '1.5px solid #cbd5e1',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem',
+                                                            background: '#ffffff',
+                                                            color: '#1e293b'
+                                                        }}
+                                                    >
+                                                        <option value="PG_BIASA">Pilihan Ganda (1 Kunci)</option>
+                                                        <option value="PG_KOMPLEKS">Pilihan Ganda Kompleks (Multi Kunci)</option>
+                                                        <option value="BENAR_SALAH">Benar / Salah (Tunggal)</option>
+                                                        <option value="BS_MAJEMUK">Tabel Benar / Salah (Majemuk)</option>
+                                                        <option value="ESSAY">Essay / Uraian</option>
+                                                    </select>
+                                                </div>
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Bobot:</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.5"
+                                                            value={draft.bobotNilai !== undefined ? draft.bobotNilai : 2}
+                                                            onChange={(e) => handleUpdateDraft(idx, 'bobotNilai', parseFloat(e.target.value) || 0)}
+                                                            style={{
+                                                                width: '60px',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid #cbd5e1',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 700,
+                                                                textAlign: 'center'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteDraft(idx)}
+                                                        style={{
+                                                            background: '#fee2e2',
+                                                            color: '#ef4444',
+                                                            border: 'none',
+                                                            padding: '6px 10px',
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 700
+                                                        }}
+                                                        title="Hapus butir soal ini"
+                                                    >
+                                                        <Trash2 size={13} /> Hapus
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Pertanyaan input */}
+                                            <div style={{ marginBottom: '14px' }}>
+                                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '4px' }}>
+                                                    TEKS PERTANYAAN / STIMULUS:
+                                                </label>
+                                                <textarea
+                                                    rows={3}
+                                                    value={draft.pertanyaan || ''}
+                                                    onChange={(e) => handleUpdateDraft(idx, 'pertanyaan', e.target.value)}
+                                                    placeholder="Masukkan teks soal..."
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '10px 12px',
+                                                        borderRadius: '8px',
+                                                        border: '1.5px solid #e2e8f0',
+                                                        fontSize: '0.85rem',
+                                                        fontFamily: 'inherit',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                />
+                                            </div>
+
+                                            {/* Option inputs based on type */}
+                                            {(draft.tipeSoal === 'PG_BIASA' || draft.tipeSoal === 'PG_KOMPLEKS') && (
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '6px' }}>
+                                                        PILIHAN JAWABAN & KUNCI:
+                                                    </label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                                                        {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                            const fieldName = `pilihan${opt}`;
+                                                            const isChecked = draft.tipeSoal === 'PG_KOMPLEKS'
+                                                                ? (draft.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).includes(opt)
+                                                                : (draft.kunciJawaban || '').trim().toUpperCase() === opt;
+
+                                                            return (
+                                                                <div
+                                                                    key={opt}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '8px',
+                                                                        padding: '6px 10px',
+                                                                        borderRadius: '8px',
+                                                                        border: `1.5px solid ${isChecked ? '#10b981' : '#e2e8f0'}`,
+                                                                        background: isChecked ? '#f0fdf4' : '#ffffff'
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type={draft.tipeSoal === 'PG_KOMPLEKS' ? 'checkbox' : 'radio'}
+                                                                        name={`kunci_${idx}`}
+                                                                        checked={isChecked}
+                                                                        onChange={() => {
+                                                                            if (draft.tipeSoal === 'PG_KOMPLEKS') {
+                                                                                let currentKeys = (draft.kunciJawaban || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                                                                                if (currentKeys.includes(opt)) {
+                                                                                    currentKeys = currentKeys.filter(k => k !== opt);
+                                                                                } else {
+                                                                                    currentKeys.push(opt);
+                                                                                    currentKeys.sort();
+                                                                                }
+                                                                                handleUpdateDraft(idx, 'kunciJawaban', currentKeys.join(','));
+                                                                            } else {
+                                                                                handleUpdateDraft(idx, 'kunciJawaban', opt);
+                                                                            }
+                                                                        }}
+                                                                        title="Jadikan Kunci Jawaban"
+                                                                        style={{ cursor: 'pointer' }}
+                                                                    />
+                                                                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: isChecked ? '#059669' : '#64748b' }}>{opt}.</span>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={draft[fieldName] === '-' ? '' : (draft[fieldName] || '')}
+                                                                        onChange={(e) => handleUpdateDraft(idx, fieldName, e.target.value)}
+                                                                        placeholder={`Opsi ${opt}...`}
+                                                                        style={{
+                                                                            flex: 1,
+                                                                            border: 'none',
+                                                                            outline: 'none',
+                                                                            background: 'transparent',
+                                                                            fontSize: '0.82rem'
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700 }}>
+                                                        Kunci Terpilih: {draft.kunciJawaban || '-'}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {draft.tipeSoal === 'BENAR_SALAH' && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155' }}>Kunci Jawaban:</span>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: '#059669' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`bs_${idx}`}
+                                                            checked={(draft.kunciJawaban || '').trim().toUpperCase() === 'B' || (draft.kunciJawaban || '').trim().toUpperCase() === 'BENAR'}
+                                                            onChange={() => handleUpdateDraft(idx, 'kunciJawaban', 'B')}
+                                                        />
+                                                        Benar (B)
+                                                    </label>
+                                                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: '#dc2626' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`bs_${idx}`}
+                                                            checked={(draft.kunciJawaban || '').trim().toUpperCase() === 'S' || (draft.kunciJawaban || '').trim().toUpperCase() === 'SALAH'}
+                                                            onChange={() => handleUpdateDraft(idx, 'kunciJawaban', 'S')}
+                                                        />
+                                                        Salah (S)
+                                                    </label>
+                                                </div>
+                                            )}
+
+                                            {draft.tipeSoal === 'BS_MAJEMUK' && (() => {
+                                                const keys = (draft.kunciJawaban || 'B,S,B,B').split(',').map(s => s.trim().toUpperCase());
+                                                const stmts = [
+                                                    { label: 'Pernyataan 1', field: 'pilihanA', keyIdx: 0 },
+                                                    { label: 'Pernyataan 2', field: 'pilihanB', keyIdx: 1 },
+                                                    { label: 'Pernyataan 3', field: 'pilihanC', keyIdx: 2 },
+                                                    { label: 'Pernyataan 4', field: 'pilihanD', keyIdx: 3 },
+                                                    { label: 'Pernyataan 5 (Opsional)', field: 'pilihanE', keyIdx: 4 },
+                                                ];
+
+                                                const updateBsKey = (keyIndex, val) => {
+                                                    const updatedKeys = [...keys];
+                                                    while (updatedKeys.length <= keyIndex) updatedKeys.push('B');
+                                                    updatedKeys[keyIndex] = val;
+                                                    handleUpdateDraft(idx, 'kunciJawaban', updatedKeys.join(','));
+                                                };
+
+                                                return (
+                                                    <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '10px' }}>
+                                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '8px' }}>
+                                                            TABEL BUTIR PERNYATAAN & KUNCI (BENAR / SALAH):
+                                                        </label>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {stmts.map((st) => {
+                                                                const curKey = keys[st.keyIdx] || 'B';
+                                                                const val = draft[st.field] === '-' ? '' : (draft[st.field] || '');
+                                                                return (
+                                                                    <div key={st.field} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={val}
+                                                                            onChange={(e) => handleUpdateDraft(idx, st.field, e.target.value)}
+                                                                            placeholder={`Teks butir ${st.label}...`}
+                                                                            style={{
+                                                                                flex: 1,
+                                                                                padding: '6px 10px',
+                                                                                borderRadius: '6px',
+                                                                                border: '1px solid #cbd5e1',
+                                                                                fontSize: '0.8rem'
+                                                                            }}
+                                                                        />
+                                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => updateBsKey(st.keyIdx, 'B')}
+                                                                                style={{
+                                                                                    padding: '4px 10px',
+                                                                                    borderRadius: '6px',
+                                                                                    border: `1px solid ${curKey === 'B' ? '#10b981' : '#cbd5e1'}`,
+                                                                                    background: curKey === 'B' ? '#10b981' : '#ffffff',
+                                                                                    color: curKey === 'B' ? '#ffffff' : '#64748b',
+                                                                                    fontWeight: 700,
+                                                                                    fontSize: '0.75rem',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                Benar
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => updateBsKey(st.keyIdx, 'S')}
+                                                                                style={{
+                                                                                    padding: '4px 10px',
+                                                                                    borderRadius: '6px',
+                                                                                    border: `1px solid ${curKey === 'S' ? '#ef4444' : '#cbd5e1'}`,
+                                                                                    background: curKey === 'S' ? '#ef4444' : '#ffffff',
+                                                                                    color: curKey === 'S' ? '#ffffff' : '#64748b',
+                                                                                    fontWeight: 700,
+                                                                                    fontSize: '0.75rem',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                Salah
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {draft.tipeSoal === 'ESSAY' && (
+                                                <div>
+                                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '4px' }}>
+                                                        PEDOMAN PENSKORAN / KUNCI JAWABAN ESSAY:
+                                                    </label>
+                                                    <textarea
+                                                        rows={2}
+                                                        value={draft.kunciJawaban === '-' ? '' : (draft.kunciJawaban || '')}
+                                                        onChange={(e) => handleUpdateDraft(idx, 'kunciJawaban', e.target.value)}
+                                                        placeholder="Masukkan pedoman jawaban atau kata kunci..."
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '8px 12px',
+                                                            borderRadius: '8px',
+                                                            border: '1.5px solid #e2e8f0',
+                                                            fontSize: '0.82rem',
+                                                            fontFamily: 'inherit',
+                                                            boxSizing: 'border-box'
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Review Footer */}
+                            <div style={{
+                                padding: '16px 28px',
+                                borderTop: '1px solid #e2e8f0',
+                                background: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '12px'
+                            }}>
+                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                    Pastikan seluruh nomor & kunci jawaban sudah sesuai sebelum menekan ACC.
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (window.confirm('Keluar dari draf soal? Perubahan draf yang belum di-ACC akan hilang.')) {
+                                                setIsWordImportModalOpen(false);
+                                            }
+                                        }}
+                                        style={{
+                                            padding: '10px 20px',
+                                            borderRadius: '10px',
+                                            border: '1.5px solid #cbd5e1',
+                                            background: '#ffffff',
+                                            color: '#64748b',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Batal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveBatchDraftQuestions}
+                                        disabled={isSavingBatch || draftQuestions.length === 0}
+                                        style={{
+                                            padding: '10px 26px',
+                                            borderRadius: '10px',
+                                            border: 'none',
+                                            background: isSavingBatch || draftQuestions.length === 0
+                                                ? '#94a3b8'
+                                                : 'linear-gradient(135deg, #059669, #10b981)',
+                                            color: '#ffffff',
+                                            fontWeight: 800,
+                                            cursor: isSavingBatch ? 'wait' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                                        }}
+                                    >
+                                        {isSavingBatch ? (
+                                            <>
+                                                <RefreshCw size={18} className="animate-spin" />
+                                                Menyimpan Soal ke Database...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 size={18} />
+                                                ACC & Simpan Semua ke Soal Ujian
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
+
     if (viewingQuestions) {
         return (
             <>
@@ -1090,6 +2000,29 @@ const ExamManagement = () => {
                             >
                                 <Copy size={16} />
                                 <span>Salin Soal dari Ujian Lain</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleOpenWordImportModal(viewingQuestions)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 18px',
+                                    borderRadius: '12px',
+                                    background: '#f5f3ff',
+                                    color: '#7c3aed',
+                                    border: '1.5px solid #ddd6fe',
+                                    fontWeight: 800,
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(124, 58, 237, 0.1)',
+                                    transition: 'all 0.2s'
+                                }}
+                                title="Import Soal dari File Word (.docx) atau Teks dengan AI"
+                            >
+                                <Sparkles size={16} />
+                                <span>Import Word (AI)</span>
                             </button>
                             <div className="stat-item">
                                 <label>Total Soal</label>
@@ -3565,6 +4498,7 @@ const ExamManagement = () => {
                         </div>
                     </div>
                 )}
+                {renderWordImportModal()}
             </>
         );
     }
@@ -3854,6 +4788,15 @@ const ExamManagement = () => {
                                                                     onClick={() => handleManageQuestions(exam)}
                                                                 >
                                                                     Input Soal
+                                                                </button>
+                                                                <button
+                                                                    className="btn-lengkapi"
+                                                                    style={{ background: '#f5f3ff', color: '#7c3aed', border: '1.5px solid #ddd6fe', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                                                    onClick={() => handleOpenWordImportModal(exam)}
+                                                                    title="Import Soal dari Word (.docx) atau Teks dengan AI"
+                                                                >
+                                                                    <Sparkles size={13} />
+                                                                    Import Word (AI)
                                                                 </button>
                                                                 <button
                                                                     className="btn-lengkapi"
@@ -4340,6 +5283,8 @@ const ExamManagement = () => {
                 </div>,
                 document.body
             )}
+
+            {renderWordImportModal()}
 
             {/* End of main list return block */}
             <style>{`
