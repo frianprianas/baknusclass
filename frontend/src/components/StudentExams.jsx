@@ -16,6 +16,7 @@ import {
     Send,
     Edit3,
     Shield,
+    ShieldCheck,
     LayoutGrid,
     X,
     User,
