@@ -109,6 +109,7 @@ const StudentExams = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
+    const effectiveSiswaId = user.profileId || user.userId || user.id;
 
     let userEmail = user.email;
     if (!userEmail && token) {
@@ -384,7 +385,7 @@ const StudentExams = () => {
                         const qs = qResp.data;
 
                         // Fetch student answers for this exam
-                        const aResp = await axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers });
+                        const aResp = await axios.get(`/api/exam/jawaban/siswa/${effectiveSiswaId}`, { headers });
                         const userAnswers = aResp.data.filter(a => qs.some(q => q.id === a.soalId));
 
                         // Strip HTML tags for cleaner AI context
@@ -504,13 +505,36 @@ const StudentExams = () => {
         setWhiteboards({});
     };
 
+        const handleResetAdminTrial = async (exam) => {
+        if (!window.confirm(`Hapus seluruh data hasil uji coba Anda untuk ujian "${exam.namaMapel}"?\n\nJawaban, skor, dan status pengerjaan Anda akan dihapus bersih dari database sehingga ujian dapat diuji coba ulang dari nomor 1.`)) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { Authorization: `Bearer ${token}` };
+            await axios.post(`/api/exam/ujian-mapel/${exam.id}/reset-siswa/${effectiveSiswaId}`, {}, { headers });
+            alert(`Berhasil! Data hasil uji coba Anda pada ujian "${exam.namaMapel}" telah dibersihkan dari database.`);
+            if (selectedEvent) {
+                handleSelectEvent(selectedEvent);
+            }
+        } catch (err) {
+            console.error('Failed to reset admin trial:', err);
+            alert('Gagal mereset hasil uji coba: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
     const handleStartClick = (exam) => {
         if (exam.isPractice || exam.id === 'practice_default_simulasi') {
             handleStartPractice();
             return;
         }
 
-        setTokenInput('');
+        if (user.role === 'ADMIN' && exam.token) {
+            setTokenInput(exam.token);
+        } else {
+            setTokenInput('');
+        }
         setShowTokenOverlay(exam);
     };
 
@@ -524,8 +548,8 @@ const StudentExams = () => {
             const [qResp, pgResp, aResp, pgAResp] = await Promise.all([
                 axios.get(`/api/exam/soal-essay/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
                 axios.get(`/api/exam/soal-pg/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] })),
-                axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers }).catch(() => ({ data: [] })),
-                axios.get(`/api/exam/jawaban-pg/siswa/${user.profileId}/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
+                axios.get(`/api/exam/jawaban/siswa/${effectiveSiswaId}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban-pg/siswa/${effectiveSiswaId}/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
             ]);
 
             const pgQs = (pgResp.data || []).map(q => ({ ...q, qType: 'pg' }));
@@ -709,8 +733,8 @@ const StudentExams = () => {
 
             // Fetch existing answers for both Essay and PG
             const [essayAnswersResp, pgAnswersResp] = await Promise.all([
-                axios.get(`/api/exam/jawaban/siswa/${user.profileId}`, { headers }).catch(() => ({ data: [] })),
-                axios.get(`/api/exam/jawaban-pg/siswa/${user.profileId}/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
+                axios.get(`/api/exam/jawaban/siswa/${effectiveSiswaId}`, { headers }).catch(() => ({ data: [] })),
+                axios.get(`/api/exam/jawaban-pg/siswa/${effectiveSiswaId}/ujian/${exam.id}`, { headers }).catch(() => ({ data: [] }))
             ]);
 
             const existingAnswers = {};
@@ -828,12 +852,12 @@ const StudentExams = () => {
     };
 
     const saveAnswer = async (soalId, text, isRagu = false, wbData = null) => {
-        if (!user.profileId) return;
+        if (!effectiveSiswaId) return;
         setIsSaving(true);
         try {
             const payload = {
                 soalId,
-                siswaId: user.profileId,
+                siswaId: effectiveSiswaId,
                 teksJawaban: text || '',
                 raguRagu: isRagu,
                 whiteboardData: wbData || whiteboards[soalId] || null
@@ -2665,6 +2689,52 @@ const StudentExams = () => {
                 <p>Silakan pilih jadwal ujian yang sedang berlangsung.</p>
             </div>
 
+            {user.role === 'ADMIN' && (
+                <div style={{
+                    background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+                    color: '#ffffff',
+                    padding: '16px 24px',
+                    borderRadius: '16px',
+                    marginBottom: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 8px 24px -6px rgba(49, 46, 129, 0.4)',
+                    border: '1px solid #4338ca',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{
+                            background: '#4338ca',
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(67, 56, 202, 0.4)'
+                        }}>
+                            <ShieldCheck size={24} color="#a5b4fc" />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#e0e7ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>👑 Mode Uji Coba Administrator</span>
+                                <span style={{ background: '#3730a3', color: '#c7d2fe', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                                    Semua Ujian Terbuka
+                                </span>
+                            </div>
+                            <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#c7d2fe' }}>
+                                Anda sedang menguji sistem ujian sebagai <strong>{user.name || user.namaLengkap || 'Administrator'}</strong>. Seluruh jawaban tersimpan nyata ke database dan dapat dihapus/direset kembali kapan saja.
+                            </p>
+                        </div>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#93c5fd', background: 'rgba(255,255,255,0.08)', padding: '6px 14px', borderRadius: '8px', fontWeight: 700 }}>
+                        Akses Penuh Uji Coba CBT
+                    </div>
+                </div>
+            )}
+
             {/* Banner Ujian Latihan Default - Selalu Terlihat */}
             <div className="practice-banner-card">
                 <div className="practice-banner-left">
@@ -2769,7 +2839,8 @@ const StudentExams = () => {
                                 </div>
 
                                 {ex.isFinished ? (
-                                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                                        <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                                         {ex.tampilkanNilai && (
                                             <button className="start-btn" style={{ flex: 1, background: '#ecfdf5', color: '#10b981', borderColor: '#10b981' }} onClick={() => handleViewTranscript(ex)}>
                                                 <Award size={18} />
@@ -2788,6 +2859,30 @@ const StudentExams = () => {
                                                     Selesai Dikerjakan
                                                 </button>
                                             )
+                                        )}
+                                        </div>
+                                        {user.role === 'ADMIN' && (
+                                            <button
+                                                type="button"
+                                                className="start-btn"
+                                                style={{
+                                                    background: '#fef2f2',
+                                                    color: '#dc2626',
+                                                    border: '1.5px solid #fecaca',
+                                                    fontWeight: 800,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '6px',
+                                                    fontSize: '0.8rem',
+                                                    padding: '8px'
+                                                }}
+                                                onClick={() => handleResetAdminTrial(ex)}
+                                                title="Hapus jawaban & skor uji coba Admin agar ujian ini bersih kembali di database"
+                                            >
+                                                <RotateCcw size={15} />
+                                                Hapus / Reset Hasil Uji Coba Saya
+                                            </button>
                                         )}
                                     </div>
                                 ) : (

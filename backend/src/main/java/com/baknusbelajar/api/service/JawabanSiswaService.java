@@ -39,14 +39,38 @@ public class JawabanSiswaService {
     private final UjianMapelRepository ujianMapelRepository;
     private final BaknusDriveService baknusDriveService;
     private final AppSettingService appSettingService;
+    private final com.baknusbelajar.api.repository.UserRepository userRepository;
 
     public List<JawabanSiswaDTO> getJawabanBySoal(Long soalId) {
         return jawabanSiswaRepository.findBySoalEssayId(soalId).stream()
                 .map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    private com.baknusbelajar.api.entity.Siswa createSimulationSiswa(Long userId) {
+        return siswaRepository.findByUserId(userId).orElseGet(() -> {
+            var user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+            com.baknusbelajar.api.entity.Siswa newSiswa = new com.baknusbelajar.api.entity.Siswa();
+            newSiswa.setUser(user);
+            newSiswa.setNisn("ADMIN-" + user.getId());
+            String name = user.getNamaLengkap() != null && !user.getNamaLengkap().trim().isEmpty()
+                    ? user.getNamaLengkap().trim()
+                    : user.getUsername();
+            if (!name.toLowerCase().contains("admin")) {
+                name += " (Admin)";
+            }
+            newSiswa.setNamaLengkap(name);
+            return siswaRepository.save(newSiswa);
+        });
+    }
+
     public List<JawabanSiswaDTO> getJawabanBySiswa(Long siswaId) {
-        return jawabanSiswaRepository.findBySiswaId(siswaId).stream()
+        Long resolvedSiswaId = siswaId;
+        var sOpt = siswaRepository.findById(siswaId).or(() -> siswaRepository.findByUserId(siswaId));
+        if (sOpt.isPresent()) {
+            resolvedSiswaId = sOpt.get().getId();
+        }
+        return jawabanSiswaRepository.findBySiswaId(resolvedSiswaId).stream()
                 .map(this::mapToDTO).collect(Collectors.toList());
     }
 
@@ -72,10 +96,20 @@ public class JawabanSiswaService {
     public JawabanSiswaDTO submitJawaban(JawabanSiswaDTO dto) {
         SoalEssay soal = soalEssayRepository.findById(dto.getSoalId())
                 .orElseThrow(() -> new RuntimeException("Soal not found"));
-        Siswa siswa = siswaRepository.findById(dto.getSiswaId())
-                .orElseThrow(() -> new RuntimeException("Siswa not found"));
+        Siswa siswa = null;
+        if (dto.getSiswaId() != null) {
+            siswa = siswaRepository.findById(dto.getSiswaId())
+                    .or(() -> siswaRepository.findByUserId(dto.getSiswaId()))
+                    .orElse(null);
+            if (siswa == null) {
+                siswa = createSimulationSiswa(dto.getSiswaId());
+            }
+        }
+        if (siswa == null) {
+            throw new RuntimeException("Siswa tidak ditemukan untuk pengerjaan soal Essay");
+        }
 
-        JawabanSiswa entity = jawabanSiswaRepository.findBySiswaIdAndSoalEssayId(dto.getSiswaId(), dto.getSoalId())
+        JawabanSiswa entity = jawabanSiswaRepository.findBySiswaIdAndSoalEssayId(siswa.getId(), dto.getSoalId())
                 .orElse(new JawabanSiswa());
 
         entity.setSoalEssay(soal);

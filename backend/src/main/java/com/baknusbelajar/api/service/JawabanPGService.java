@@ -25,13 +25,38 @@ public class JawabanPGService {
     private final SoalPGRepository soalPGRepository;
     private final SiswaRepository siswaRepository;
     private final SiswaUjianStatusRepository siswaUjianStatusRepository;
+    private final com.baknusbelajar.api.repository.UserRepository userRepository;
+
+    private com.baknusbelajar.api.entity.Siswa createSimulationSiswa(Long userId) {
+        return siswaRepository.findByUserId(userId).orElseGet(() -> {
+            var user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+            com.baknusbelajar.api.entity.Siswa newSiswa = new com.baknusbelajar.api.entity.Siswa();
+            newSiswa.setUser(user);
+            newSiswa.setNisn("ADMIN-" + user.getId());
+            String name = user.getNamaLengkap() != null && !user.getNamaLengkap().trim().isEmpty()
+                    ? user.getNamaLengkap().trim()
+                    : user.getUsername();
+            if (!name.toLowerCase().contains("admin")) {
+                name += " (Admin)";
+            }
+            newSiswa.setNamaLengkap(name);
+            return siswaRepository.save(newSiswa);
+        });
+    }
 
     public List<JawabanPGDTO> getJawabanBySiswaAndUjian(Long siswaId, Long ujianId) {
-        List<JawabanPGDTO> list = jawabanPGRepository.findBySiswaIdAndSoalPG_UjianMapel_Id(siswaId, ujianId).stream()
+        Long resolvedSiswaId = siswaId;
+        var sOpt = siswaRepository.findById(siswaId).or(() -> siswaRepository.findByUserId(siswaId));
+        if (sOpt.isPresent()) {
+            resolvedSiswaId = sOpt.get().getId();
+        }
+
+        List<JawabanPGDTO> list = jawabanPGRepository.findBySiswaIdAndSoalPG_UjianMapel_Id(resolvedSiswaId, ujianId).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
 
-        siswaUjianStatusRepository.findBySiswaIdAndUjianMapelId(siswaId, ujianId).ifPresent(status -> {
+        siswaUjianStatusRepository.findBySiswaIdAndUjianMapelId(resolvedSiswaId, ujianId).ifPresent(status -> {
             list.forEach(dto -> {
                 dto.setWaktuMulaiUjian(status.getWaktuMulaiSiswa());
                 dto.setWaktuSelesaiUjian(status.getWaktuSelesai());
@@ -72,15 +97,23 @@ public class JawabanPGService {
         SoalPG soal = soalPGRepository.findById(targetSoalId)
                 .orElseThrow(() -> new RuntimeException("Soal PG not found (ID: " + targetSoalId + ")"));
 
-        // Resolusi Siswa otomatis & aman:
+        // Resolusi Siswa otomatis & aman (Mendukung siswa nyata maupun simulasi Admin):
         Siswa siswa = null;
         if (authentication != null && authentication.getPrincipal() instanceof com.baknusbelajar.api.security.CustomUserDetails userDetails) {
-            siswa = siswaRepository.findByUserId(userDetails.getId()).orElse(null);
+            siswa = siswaRepository.findByUserId(userDetails.getId())
+                    .or(() -> siswaRepository.findById(userDetails.getId()))
+                    .orElse(null);
+            if (siswa == null) {
+                siswa = createSimulationSiswa(userDetails.getId());
+            }
         }
         if (siswa == null && dto.getSiswaId() != null) {
             siswa = siswaRepository.findById(dto.getSiswaId())
                     .or(() -> siswaRepository.findByUserId(dto.getSiswaId()))
                     .orElse(null);
+            if (siswa == null) {
+                siswa = createSimulationSiswa(dto.getSiswaId());
+            }
         }
         if (siswa == null) {
             throw new RuntimeException("Siswa tidak ditemukan untuk pengerjaan soal PG ID: " + targetSoalId);

@@ -37,7 +37,7 @@ public class JawabanSiswaController {
     }
 
     @PostMapping("/submit")
-    @PreAuthorize("hasRole('SISWA')")
+    @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'TU', 'GURU')")
     public ResponseEntity<JawabanSiswaDTO> submitJawaban(@RequestBody JawabanSiswaDTO dto) {
         JawabanSiswaDTO response = jawabanSiswaService.submitJawaban(dto);
         // AI Scoring removed from auto-trigger to save token/quota.

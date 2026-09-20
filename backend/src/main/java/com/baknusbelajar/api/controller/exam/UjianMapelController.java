@@ -32,7 +32,7 @@ public class UjianMapelController {
     }
 
     @GetMapping("/siswa")
-    @PreAuthorize("hasRole('SISWA')")
+    @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'TU', 'GURU')")
     public ResponseEntity<List<UjianMapelDTO>> getForStudent(@RequestParam Long eventId,
             Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
@@ -104,7 +104,7 @@ public class UjianMapelController {
     }
 
     @PostMapping("/{id}/validate-token")
-    @PreAuthorize("hasAnyRole('SISWA')")
+    @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'TU', 'GURU')")
     public ResponseEntity<?> validateToken(@PathVariable Long id, @RequestParam String ujianToken,
             @RequestParam(required = false) String deviceId,
             Authentication authentication) {
@@ -126,7 +126,7 @@ public class UjianMapelController {
     }
 
     @PostMapping("/{id}/keep-alive")
-    @PreAuthorize("hasRole('SISWA')")
+    @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'TU', 'GURU')")
     public ResponseEntity<Void> keepAlive(@PathVariable Long id, @RequestParam String nisn, @RequestParam String nama,
             @RequestParam(required = false) Long ruangId) {
         examStatusService.markAsActive(id, nisn, nama, ruangId);
@@ -141,7 +141,7 @@ public class UjianMapelController {
     }
 
     @PostMapping("/{id}/finish")
-    @PreAuthorize("hasRole('SISWA')")
+    @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'TU', 'GURU')")
     public ResponseEntity<Void> finishUjian(@PathVariable Long id, Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         ujianMapelService.markUjianAsFinished(id, userDetails.getId());

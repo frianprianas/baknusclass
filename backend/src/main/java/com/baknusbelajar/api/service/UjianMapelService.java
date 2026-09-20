@@ -43,6 +43,7 @@ public class UjianMapelService {
     private final com.baknusbelajar.api.repository.SoalPGRepository soalPGRepository;
     private final com.baknusbelajar.api.repository.JawabanPGRepository jawabanPGRepository;
     private final ExamStatusService examStatusService;
+    private final com.baknusbelajar.api.repository.UserRepository userRepository;
 
     public List<com.baknusbelajar.api.dto.exam.ExamMonitoringDTO> getExamMonitoring(Long ujianId,
             java.util.Set<String> onlineStudents) {
@@ -124,15 +125,40 @@ public class UjianMapelService {
                 .collect(Collectors.toList());
     }
 
+    public com.baknusbelajar.api.entity.Siswa getOrCreateSiswaForUser(Long userId) {
+        return siswaRepository.findByUserId(userId).orElseGet(() -> {
+            var user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+            com.baknusbelajar.api.entity.Siswa newSiswa = new com.baknusbelajar.api.entity.Siswa();
+            newSiswa.setUser(user);
+            newSiswa.setNisn("ADMIN-" + user.getId());
+            String name = user.getNamaLengkap() != null && !user.getNamaLengkap().trim().isEmpty()
+                    ? user.getNamaLengkap().trim()
+                    : user.getUsername();
+            if (!name.toLowerCase().contains("admin")) {
+                name += " (Admin)";
+            }
+            newSiswa.setNamaLengkap(name);
+            return siswaRepository.save(newSiswa);
+        });
+    }
+
     public List<UjianMapelDTO> getUjianForStudent(Long eventId, Long userId) {
-        var siswa = siswaRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Siswa record not found"));
+        var user = userRepository.findById(userId).orElse(null);
+        boolean isAdminOrStaff = user != null && user.getRole() != null &&
+                (user.getRole().equalsIgnoreCase("ADMIN") || user.getRole().equalsIgnoreCase("TU") || user.getRole().equalsIgnoreCase("GURU"));
+
+        var siswa = getOrCreateSiswaForUser(userId);
+
+        List<com.baknusbelajar.api.entity.UjianMapel> rawExams = isAdminOrStaff
+                ? ujianMapelRepository.findByEventId(eventId)
+                : ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId());
 
         java.util.Map<String, com.baknusbelajar.api.entity.UjianMapel> distinctMap = new java.util.LinkedHashMap<>();
         java.util.Set<Long> seenIds = new java.util.HashSet<>();
-        for (com.baknusbelajar.api.entity.UjianMapel e : ujianMapelRepository.findByEventAndStudent(eventId, siswa.getId())) {
+        for (com.baknusbelajar.api.entity.UjianMapel e : rawExams) {
             if (e == null || e.getId() == null || seenIds.contains(e.getId())) continue;
-            if (Boolean.FALSE.equals(e.getStatusAktif())) continue;
+            if (Boolean.FALSE.equals(e.getStatusAktif()) && !isAdminOrStaff) continue;
             String sig = (e.getMapel() != null ? e.getMapel().getId() : "m") + "_" +
                          (e.getGuru() != null ? e.getGuru().getId() : "g") + "_" +
                          (e.getWaktuMulai() != null ? e.getWaktuMulai().toString() : e.getId().toString());
@@ -191,8 +217,7 @@ public class UjianMapelService {
     }
 
     public void markUjianAsFinished(Long ujianId, Long userId) {
-        var siswa = siswaRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Siswa record not found"));
+        var siswa = getOrCreateSiswaForUser(userId);
 
         com.baknusbelajar.api.entity.UjianMapel ujian = ujianMapelRepository.findById(ujianId)
                 .orElseThrow(() -> new RuntimeException("UjianMapel not found"));
@@ -315,12 +340,15 @@ public class UjianMapelService {
             ujianMapelRepository.save(entity);
         }
 
+        var user = userRepository.findById(userId).orElse(null);
+        boolean isAdminOrStaff = user != null && user.getRole() != null &&
+                (user.getRole().equalsIgnoreCase("ADMIN") || user.getRole().equalsIgnoreCase("TU") || user.getRole().equalsIgnoreCase("GURU"));
+
         String submittedToken = token != null ? token.trim() : "";
-        boolean isValid = !submittedToken.isEmpty() && actualToken.equalsIgnoreCase(submittedToken);
+        boolean isValid = isAdminOrStaff || (!submittedToken.isEmpty() && actualToken.equalsIgnoreCase(submittedToken));
 
         if (isValid && userId != null) {
-            var siswa = siswaRepository.findByUserId(userId)
-                    .orElseThrow(() -> new RuntimeException("Siswa record not found"));
+            var siswa = getOrCreateSiswaForUser(userId);
 
             com.baknusbelajar.api.entity.SiswaUjianStatus status = siswaUjianStatusRepository
                     .findBySiswaIdAndUjianMapelId(siswa.getId(), ujianId)
