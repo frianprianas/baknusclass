@@ -724,6 +724,16 @@ const StudentExams = () => {
 
             const pgQuestions = (pgResp.data || []).map(q => {
                 let resolvedTipe = (q.tipeSoal || '').toUpperCase().trim();
+
+                // PERTAHANKAN TIPE SOAL BS_MAJEMUK (Tabel Benar/Salah) SECARA MUTLAK
+                if (resolvedTipe === 'BS_MAJEMUK' || (q.kunciJawaban && (q.kunciJawaban.includes(':B') || q.kunciJawaban.includes(':S')))) {
+                    return {
+                        ...q,
+                        qType: 'pg',
+                        tipeSoal: 'BS_MAJEMUK'
+                    };
+                }
+
                 const pertHtml = (q.pertanyaan || '').toLowerCase();
                 const isBS = resolvedTipe === 'BENAR_SALAH' || (
                     q.pilihanA && q.pilihanB &&

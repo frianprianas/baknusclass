@@ -77,7 +77,18 @@ const ExamScoring = () => {
             ]);
 
             const pgQuestions = (pgResp.data || []).map(q => {
-                let resolvedTipe = q.tipeSoal;
+                let resolvedTipe = (q.tipeSoal || '').toUpperCase().trim();
+
+                // PERTAHANKAN TIPE SOAL BS_MAJEMUK (Tabel Benar/Salah)
+                if (resolvedTipe === 'BS_MAJEMUK' || (q.kunciJawaban && (q.kunciJawaban.includes(':B') || q.kunciJawaban.includes(':S')))) {
+                    return {
+                        ...q,
+                        qType: 'pg',
+                        tipeSoal: 'BS_MAJEMUK',
+                        bobotNilai: q.bobotNilai || 2
+                    };
+                }
+
                 const isBS = resolvedTipe === 'BENAR_SALAH' || (
                     q.pilihanA && q.pilihanB &&
                     (q.pilihanA.trim().toLowerCase() === 'benar' || q.pilihanA.trim().toLowerCase() === 'true') &&
