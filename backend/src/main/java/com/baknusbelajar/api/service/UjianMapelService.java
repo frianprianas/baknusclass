@@ -4,6 +4,7 @@ import com.baknusbelajar.api.dto.exam.ExamPesertaDTO;
 
 import com.baknusbelajar.api.dto.exam.UjianMapelDTO;
 import com.baknusbelajar.api.entity.EventUjian;
+import com.baknusbelajar.api.entity.Guru;
 import com.baknusbelajar.api.entity.GuruMapel;
 import com.baknusbelajar.api.entity.UjianMapel;
 import com.baknusbelajar.api.repository.EventUjianRepository;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -702,17 +704,17 @@ public class UjianMapelService {
         Map<Long, com.baknusbelajar.api.entity.Siswa> distinctSiswa = siswaList.stream()
                 .collect(Collectors.toMap(com.baknusbelajar.api.entity.Siswa::getId, s -> s, (s1, s2) -> s1, java.util.LinkedHashMap::new));
 
+        // Batch load status & answers
+        Map<Long, com.baknusbelajar.api.entity.SiswaUjianStatus> statusMap = siswaUjianStatusRepository.findByUjianMapelId(ujianId).stream()
+                .filter(st -> st.getSiswa() != null)
+                .collect(Collectors.toMap(st -> st.getSiswa().getId(), st -> st, (st1, st2) -> st1));
+
         // Pastikan siswa yang memiliki status ujian juga masuk jika belum ada di daftar
         for (com.baknusbelajar.api.entity.SiswaUjianStatus stRecord : statusMap.values()) {
             if (stRecord.getSiswa() != null && !distinctSiswa.containsKey(stRecord.getSiswa().getId())) {
                 distinctSiswa.put(stRecord.getSiswa().getId(), stRecord.getSiswa());
             }
         }
-
-        // Batch load status & answers
-        Map<Long, com.baknusbelajar.api.entity.SiswaUjianStatus> statusMap = siswaUjianStatusRepository.findByUjianMapelId(ujianId).stream()
-                .filter(st -> st.getSiswa() != null)
-                .collect(Collectors.toMap(st -> st.getSiswa().getId(), st -> st, (st1, st2) -> st1));
 
         Map<Long, List<com.baknusbelajar.api.entity.JawabanPG>> pgMap = jawabanPGRepository.findBySoalPG_UjianMapel_Id(ujianId).stream()
                 .filter(j -> j.getSiswa() != null)
@@ -791,6 +793,13 @@ public class UjianMapelService {
 
         result.sort(Comparator.comparing(ExamPesertaDTO::getNama, String.CASE_INSENSITIVE_ORDER));
         return result;
+    }
+
+    
+    public UjianMapelDTO getUjianById(Long id) {
+        UjianMapel entity = ujianMapelRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ujian tidak ditemukan (ID: " + id + ")"));
+        return mapToDTO(entity);
     }
 
     public byte[] exportPesertaExcel(Long ujianId, Long currentUserId, Collection<? extends GrantedAuthority> authorities) {
