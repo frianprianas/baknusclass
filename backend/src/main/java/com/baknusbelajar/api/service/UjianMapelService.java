@@ -799,7 +799,7 @@ public class UjianMapelService {
     public UjianMapelDTO getUjianById(Long id) {
         UjianMapel entity = ujianMapelRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ujian tidak ditemukan (ID: " + id + ")"));
-        return mapToDTO(entity);
+        return mapToDTO(entity, true);
     }
 
     public byte[] exportPesertaExcel(Long ujianId, Long currentUserId, Collection<? extends GrantedAuthority> authorities) {
