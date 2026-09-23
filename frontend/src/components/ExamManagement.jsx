@@ -33,7 +33,8 @@ import {
     EyeOff,
     ZoomIn,
     X,
-    Copy
+    Copy,
+    FileDown
 } from 'lucide-react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -238,6 +239,7 @@ const ExamManagement = () => {
     const [selectedItem, setSelectedItem] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [userRole, setUserRole] = useState('');
+    const [downloadingExamId, setDownloadingExamId] = useState(null);
 
     // Form States
     const [eventForm, setEventForm] = useState({
@@ -853,6 +855,56 @@ const ExamManagement = () => {
             fetchData();
         } catch (err) {
             alert('Gagal menyimpan event');
+        }
+    };
+
+    
+    const handleExportPesertaExcel = async (exam) => {
+        if (!exam || !exam.id) return;
+        setDownloadingExamId(exam.id);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`/api/exam/ujian-mapel/${exam.id}/export-peserta-excel`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            const cleanMapel = (exam.namaMapel || 'Mapel').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const nowStr = new Date().toISOString().split('T')[0];
+            const fileName = `Rekap_Ujian_${cleanMapel}_${nowStr}.xlsx`;
+
+            const blob = new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Export Excel error:', err);
+            let msg = 'Gagal mengunduh rekap ujian.';
+            if (err.response?.data) {
+                try {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        try {
+                            const json = JSON.parse(reader.result);
+                            alert(json.message || msg);
+                        } catch {
+                            alert(msg);
+                        }
+                    };
+                    reader.readAsText(err.response.data);
+                    return;
+                } catch {}
+            }
+            alert(msg);
+        } finally {
+            setDownloadingExamId(null);
         }
     };
 
@@ -4916,6 +4968,26 @@ const ExamManagement = () => {
                                                                     <RotateCcw size={13} style={{ marginRight: '4px' }} />
                                                                     Koreksi & Reset
                                                                 </button>
+                                                                {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && (JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin || exam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId))) && (
+                                                                    <button
+                                                                        className="btn-lengkapi"
+                                                                        style={{
+                                                                            background: '#ecfdf5',
+                                                                            color: '#059669',
+                                                                            border: '1.5px solid #a7f3d0',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            fontWeight: 700
+                                                                        }}
+                                                                        onClick={() => handleExportPesertaExcel(exam)}
+                                                                        disabled={downloadingExamId === exam.id}
+                                                                        title="Unduh rekap file Excel data seluruh siswa (yang sudah dan belum menyelesaikan ujian ini)"
+                                                                    >
+                                                                        <FileDown size={13} />
+                                                                        {downloadingExamId === exam.id ? 'Mengunduh...' : 'Unduh Rekap Siswa'}
+                                                                    </button>
+                                                                )}
                                                                 {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && exam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId)) && (
                                                                     <>
                                                                         <button

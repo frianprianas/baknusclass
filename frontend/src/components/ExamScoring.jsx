@@ -22,6 +22,7 @@ const ExamScoring = () => {
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [showAiModal, setShowAiModal] = useState(false);
     const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+    const [studentStatusFilter, setStudentStatusFilter] = useState('ALL'); // 'ALL' | 'SUDAH' | 'SEDANG' | 'BELUM'
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
@@ -133,7 +134,7 @@ const ExamScoring = () => {
                     nisn: m.nisn,
                     isOnline: m.isOnline,
                     isFinished: m.isFinished,
-                    namaKelas: 'Tanpa Kelas',
+                    namaKelas: m.namaKelas || 'Tanpa Kelas',
                     answers: [],
                     pgAnswers: [],
                     essayAnswers: []
@@ -633,8 +634,37 @@ const ExamScoring = () => {
     };
 
 
-    const exportToExcel = () => {
-        if (!selectedExam || studentsData.length === 0) return;
+    const exportToExcel = async () => {
+        if (!selectedExam) return;
+
+        // Coba unduh file .xlsx resmi dari backend terlebih dahulu
+        try {
+            const resp = await axios.get(`/api/exam/ujian-mapel/${selectedExam.id}/export-peserta-excel`, {
+                headers,
+                responseType: 'blob'
+            });
+
+            const cleanMapel = (selectedExam.namaMapel || 'Mapel').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const nowStr = new Date().toISOString().split('T')[0];
+            const fileName = `Rekap_Ujian_${cleanMapel}_${nowStr}.xlsx`;
+
+            const blob = new Blob([resp.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            return;
+        } catch (backendErr) {
+            console.warn('Backend excel export failed, fallback to client generation: ', backendErr);
+        }
+
+        if (studentsData.length === 0) return;
 
         // Create a hidden table for summary
         const table = document.createElement('table');
@@ -903,7 +933,7 @@ const ExamScoring = () => {
                         {/* LEFT: STUDENT LIST */}
                         <div className="student-list-card">
                             <div className="list-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span><UserCheck size={18} /> Daftar Submisi Siswa ({studentsData.length})</span>
+                                <span><UserCheck size={18} /> Daftar Peserta Ujian ({studentsData.length})</span>
                                 {studentsData.length > 0 && (
                                     <button
                                         onClick={handleResetAllExam}
@@ -926,10 +956,86 @@ const ExamScoring = () => {
                                     </button>
                                 )}
                             </div>
+
+                            {/* Quick Status Filter Tabs */}
+                            <div style={{ display: 'flex', gap: '6px', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', background: '#fafafa', overflowX: 'auto' }}>
+                                <button
+                                    type="button"
+                                    style={{
+                                        padding: '4px 10px',
+                                        fontSize: '0.72rem',
+                                        borderRadius: '6px',
+                                        fontWeight: 700,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: studentStatusFilter === 'ALL' ? '#3b82f6' : '#e2e8f0',
+                                        color: studentStatusFilter === 'ALL' ? 'white' : '#475569'
+                                    }}
+                                    onClick={() => setStudentStatusFilter('ALL')}
+                                >
+                                    Semua ({studentsData.length})
+                                </button>
+                                <button
+                                    type="button"
+                                    style={{
+                                        padding: '4px 10px',
+                                        fontSize: '0.72rem',
+                                        borderRadius: '6px',
+                                        fontWeight: 700,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: studentStatusFilter === 'SUDAH' ? '#10b981' : '#e2e8f0',
+                                        color: studentStatusFilter === 'SUDAH' ? 'white' : '#475569'
+                                    }}
+                                    onClick={() => setStudentStatusFilter('SUDAH')}
+                                >
+                                    Selesai ({studentsData.filter(s => s.isFinished).length})
+                                </button>
+                                <button
+                                    type="button"
+                                    style={{
+                                        padding: '4px 10px',
+                                        fontSize: '0.72rem',
+                                        borderRadius: '6px',
+                                        fontWeight: 700,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: studentStatusFilter === 'SEDANG' ? '#f59e0b' : '#e2e8f0',
+                                        color: studentStatusFilter === 'SEDANG' ? 'white' : '#475569'
+                                    }}
+                                    onClick={() => setStudentStatusFilter('SEDANG')}
+                                >
+                                    Sedang ({studentsData.filter(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline)).length})
+                                </button>
+                                <button
+                                    type="button"
+                                    style={{
+                                        padding: '4px 10px',
+                                        fontSize: '0.72rem',
+                                        borderRadius: '6px',
+                                        fontWeight: 700,
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: studentStatusFilter === 'BELUM' ? '#ef4444' : '#e2e8f0',
+                                        color: studentStatusFilter === 'BELUM' ? 'white' : '#475569'
+                                    }}
+                                    onClick={() => setStudentStatusFilter('BELUM')}
+                                >
+                                    Belum ({studentsData.filter(s => !s.isFinished && s.durasiStr !== 'Pengerjaan' && !s.isOnline).length})
+                                </button>
+                            </div>
+
                             {loading ? <p className="p-4 text-center">Memuat jawaban...</p> : (
                                 <div className="student-scroll">
                                     {Object.entries(
-                                        studentsData.reduce((acc, std) => {
+                                        studentsData
+                                            .filter(std => {
+                                                if (studentStatusFilter === 'SUDAH') return std.isFinished;
+                                                if (studentStatusFilter === 'SEDANG') return !std.isFinished && (std.durasiStr === 'Pengerjaan' || std.isOnline);
+                                                if (studentStatusFilter === 'BELUM') return !std.isFinished && std.durasiStr !== 'Pengerjaan' && !std.isOnline;
+                                                return true;
+                                            })
+                                            .reduce((acc, std) => {
                                             const kelas = std.namaKelas || 'Tanpa Kelas';
                                             if (!acc[kelas]) acc[kelas] = [];
                                             acc[kelas].push(std);
@@ -947,11 +1053,13 @@ const ExamScoring = () => {
                                                     <div className="std-info">
                                                         <div className="std-name">{std.namaSiswa}</div>
                                                         <div className="std-nisn">NIS: {std.nisn}</div>
-                                                        <div className={`std-status-tag ${std.isFinished ? 'selesai' : 'online'}`}>
+                                                        <div className={`std-status-tag ${std.isFinished ? 'selesai' : (std.durasiStr === 'Pengerjaan' || std.isOnline ? 'online' : 'offline')}`}>
                                                             {std.isFinished ? (
                                                                 <><CheckCircle2 size={10} style={{ marginRight: '4px' }} /> Selesai</>
-                                                            ) : (
+                                                            ) : (std.durasiStr === 'Pengerjaan' || std.isOnline) ? (
                                                                 <><Timer size={10} style={{ marginRight: '4px' }} /> Sedang Mengerjakan</>
+                                                            ) : (
+                                                                <><Clock size={10} style={{ marginRight: '4px' }} /> Belum Mulai</>
                                                             )}
                                                         </div>
                                                     </div>
@@ -959,7 +1067,7 @@ const ExamScoring = () => {
                                                         {std.isFullyGraded ? (
                                                             <span className="badge-graded"><CheckCircle2 size={14} /> Sudah Dinilai</span>
                                                         ) : (
-                                                            <span className="badge-pending">{std.isFinished ? 'Koreksi Essay' : 'Sedang Mengerjakan'}</span>
+                                                            <span className="badge-pending">{std.isFinished ? 'Koreksi Essay' : (std.durasiStr === 'Pengerjaan' || std.isOnline ? 'Sedang Mengerjakan' : 'Belum Mulai')}</span>
                                                         )}
                                                         <div className="std-score" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
                                                             Skor: <strong>{std.totalGuru}</strong> / {std.totalMaxBobot || 100}
@@ -1742,6 +1850,7 @@ const ExamScoring = () => {
 }
         .std-status-tag.selesai { background: #dcfce7; color: #166534; }
         .std-status-tag.online { background: #eff6ff; color: #1e40af; animation: pulse-blue 2s infinite; }
+        .std-status-tag.offline { background: #fef2f2; color: #991b1b; }
 
 @keyframes pulse-blue {
     0% { opacity: 1; }

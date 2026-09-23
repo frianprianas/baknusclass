@@ -21,6 +21,12 @@ import org.springframework.stereotype.Service;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.util.WorkbookUtil;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.GrantedAuthority;
 
 @Slf4j
 @Service
@@ -696,6 +702,13 @@ public class UjianMapelService {
         Map<Long, com.baknusbelajar.api.entity.Siswa> distinctSiswa = siswaList.stream()
                 .collect(Collectors.toMap(com.baknusbelajar.api.entity.Siswa::getId, s -> s, (s1, s2) -> s1, java.util.LinkedHashMap::new));
 
+        // Pastikan siswa yang memiliki status ujian juga masuk jika belum ada di daftar
+        for (com.baknusbelajar.api.entity.SiswaUjianStatus stRecord : statusMap.values()) {
+            if (stRecord.getSiswa() != null && !distinctSiswa.containsKey(stRecord.getSiswa().getId())) {
+                distinctSiswa.put(stRecord.getSiswa().getId(), stRecord.getSiswa());
+            }
+        }
+
         // Batch load status & answers
         Map<Long, com.baknusbelajar.api.entity.SiswaUjianStatus> statusMap = siswaUjianStatusRepository.findByUjianMapelId(ujianId).stream()
                 .filter(st -> st.getSiswa() != null)
@@ -779,4 +792,346 @@ public class UjianMapelService {
         result.sort(Comparator.comparing(ExamPesertaDTO::getNama, String.CASE_INSENSITIVE_ORDER));
         return result;
     }
+
+    public byte[] exportPesertaExcel(Long ujianId, Long currentUserId, Collection<? extends GrantedAuthority> authorities) {
+        UjianMapel ujian = ujianMapelRepository.findById(ujianId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ujian tidak ditemukan (ID: " + ujianId + ")"));
+
+        // 1. Otorisasi: ADMIN, TU, atau CO_ADMIN boleh unduh semua ujian
+        boolean isAdminOrTu = authorities != null && authorities.stream().anyMatch(a ->
+                "ROLE_ADMIN".equals(a.getAuthority()) ||
+                "ROLE_TU".equals(a.getAuthority()) ||
+                "ROLE_CO_ADMIN".equals(a.getAuthority()));
+
+        if (!isAdminOrTu) {
+            Guru guru = guruRepository.findByUserId(currentUserId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Data profil guru tidak ditemukan"));
+
+            boolean isCoAdmin = Boolean.TRUE.equals(guru.getIsCoAdmin());
+            if (!isCoAdmin) {
+                if (ujian.getGuru() == null || !ujian.getGuru().getId().equals(guru.getId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Akses ditolak: Anda hanya berhak mengunduh data rekap ujian untuk mata pelajaran yang Anda ampu.");
+                }
+            }
+        }
+
+        // 2. Ambil seluruh data peserta (SUDAH, SEDANG, BELUM)
+        List<ExamPesertaDTO> pesertaList = getPesertaUjian(ujianId, null, null);
+
+        // Urutkan berdasarkan: Kelas ASC, Nama Siswa ASC
+        pesertaList.sort((a, b) -> {
+            String k1 = a.getNamaKelas() != null ? a.getNamaKelas() : "";
+            String k2 = b.getNamaKelas() != null ? b.getNamaKelas() : "";
+            int compKelas = k1.compareToIgnoreCase(k2);
+            if (compKelas != 0) return compKelas;
+            String n1 = a.getNama() != null ? a.getNama() : "";
+            String n2 = b.getNama() != null ? b.getNama() : "";
+            return n1.compareToIgnoreCase(n2);
+        });
+
+        // 3. Hitung statistik
+        int totalPeserta = pesertaList.size();
+        long sudahSelesai = pesertaList.stream().filter(p -> "SUDAH".equalsIgnoreCase(p.getStatus())).count();
+        long sedangMengerjakan = pesertaList.stream().filter(p -> "SEDANG".equalsIgnoreCase(p.getStatus())).count();
+        long belumMengerjakan = pesertaList.stream().filter(p -> "BELUM".equalsIgnoreCase(p.getStatus())).count();
+        double persenSelesai = totalPeserta > 0 ? (sudahSelesai * 100.0 / totalPeserta) : 0.0;
+
+        // 4. Generate Workbook dengan Apache POI
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            String rawSheetName = ujian.getMapel() != null ? ujian.getMapel().getNamaMapel() : "Rekap_Ujian";
+            String safeSheetName = WorkbookUtil.createSafeSheetName(rawSheetName);
+            Sheet sheet = workbook.createSheet(safeSheetName);
+            sheet.setDisplayGridlines(true);
+
+            // Styling - Font
+            Font fontTitle = workbook.createFont();
+            fontTitle.setFontName("Arial");
+            fontTitle.setFontHeightInPoints((short) 13);
+            fontTitle.setBold(true);
+            fontTitle.setColor(IndexedColors.DARK_BLUE.getIndex());
+
+            Font fontSubtitle = workbook.createFont();
+            fontSubtitle.setFontName("Arial");
+            fontSubtitle.setFontHeightInPoints((short) 10);
+            fontSubtitle.setBold(true);
+            fontSubtitle.setColor(IndexedColors.GREY_50_PERCENT.getIndex());
+
+            Font fontBold = workbook.createFont();
+            fontBold.setFontName("Arial");
+            fontBold.setFontHeightInPoints((short) 10);
+            fontBold.setBold(true);
+
+            Font fontRegular = workbook.createFont();
+            fontRegular.setFontName("Arial");
+            fontRegular.setFontHeightInPoints((short) 10);
+
+            Font fontHeader = workbook.createFont();
+            fontHeader.setFontName("Arial");
+            fontHeader.setFontHeightInPoints((short) 10);
+            fontHeader.setBold(true);
+            fontHeader.setColor(IndexedColors.WHITE.getIndex());
+
+            // Header Style
+            CellStyle styleHeader = workbook.createCellStyle();
+            styleHeader.setFont(fontHeader);
+            styleHeader.setFillForegroundColor(IndexedColors.ROYAL_BLUE.getIndex());
+            styleHeader.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            styleHeader.setAlignment(HorizontalAlignment.CENTER);
+            styleHeader.setVerticalAlignment(VerticalAlignment.CENTER);
+            styleHeader.setBorderTop(BorderStyle.THIN);
+            styleHeader.setBorderBottom(BorderStyle.THIN);
+            styleHeader.setBorderLeft(BorderStyle.THIN);
+            styleHeader.setBorderRight(BorderStyle.THIN);
+
+            // Cell Styles
+            CellStyle styleCenter = workbook.createCellStyle();
+            styleCenter.setFont(fontRegular);
+            styleCenter.setAlignment(HorizontalAlignment.CENTER);
+            styleCenter.setVerticalAlignment(VerticalAlignment.CENTER);
+            styleCenter.setBorderTop(BorderStyle.THIN);
+            styleCenter.setBorderBottom(BorderStyle.THIN);
+            styleCenter.setBorderLeft(BorderStyle.THIN);
+            styleCenter.setBorderRight(BorderStyle.THIN);
+
+            CellStyle styleLeft = workbook.createCellStyle();
+            styleLeft.setFont(fontRegular);
+            styleLeft.setAlignment(HorizontalAlignment.LEFT);
+            styleLeft.setVerticalAlignment(VerticalAlignment.CENTER);
+            styleLeft.setBorderTop(BorderStyle.THIN);
+            styleLeft.setBorderBottom(BorderStyle.THIN);
+            styleLeft.setBorderLeft(BorderStyle.THIN);
+            styleLeft.setBorderRight(BorderStyle.THIN);
+
+            CellStyle styleScore = workbook.createCellStyle();
+            styleScore.setFont(fontBold);
+            styleScore.setAlignment(HorizontalAlignment.CENTER);
+            styleScore.setVerticalAlignment(VerticalAlignment.CENTER);
+            styleScore.setBorderTop(BorderStyle.THIN);
+            styleScore.setBorderBottom(BorderStyle.THIN);
+            styleScore.setBorderLeft(BorderStyle.THIN);
+            styleScore.setBorderRight(BorderStyle.THIN);
+
+            // Status: SUDAH (Green)
+            CellStyle styleSudah = workbook.createCellStyle();
+            styleSudah.cloneStyleFrom(styleCenter);
+            Font fontSudah = workbook.createFont();
+            fontSudah.setFontName("Arial");
+            fontSudah.setFontHeightInPoints((short) 10);
+            fontSudah.setBold(true);
+            fontSudah.setColor(IndexedColors.DARK_GREEN.getIndex());
+            styleSudah.setFont(fontSudah);
+            styleSudah.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
+            styleSudah.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            // Status: SEDANG (Yellow/Orange)
+            CellStyle styleSedang = workbook.createCellStyle();
+            styleSedang.cloneStyleFrom(styleCenter);
+            Font fontSedang = workbook.createFont();
+            fontSedang.setFontName("Arial");
+            fontSedang.setFontHeightInPoints((short) 10);
+            fontSedang.setBold(true);
+            fontSedang.setColor(IndexedColors.DARK_YELLOW.getIndex());
+            styleSedang.setFont(fontSedang);
+            styleSedang.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+            styleSedang.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            // Status: BELUM (Rose/Red)
+            CellStyle styleBelum = workbook.createCellStyle();
+            styleBelum.cloneStyleFrom(styleCenter);
+            Font fontBelum = workbook.createFont();
+            fontBelum.setFontName("Arial");
+            fontBelum.setFontHeightInPoints((short) 10);
+            fontBelum.setBold(true);
+            fontBelum.setColor(IndexedColors.RED.getIndex());
+            styleBelum.setFont(fontBelum);
+            styleBelum.setFillForegroundColor(IndexedColors.ROSE.getIndex());
+            styleBelum.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            // Meta styles
+            CellStyle styleTitle = workbook.createCellStyle();
+            styleTitle.setFont(fontTitle);
+
+            CellStyle styleSubtitle = workbook.createCellStyle();
+            styleSubtitle.setFont(fontSubtitle);
+
+            CellStyle styleMetaLabel = workbook.createCellStyle();
+            styleMetaLabel.setFont(fontBold);
+
+            CellStyle styleMetaVal = workbook.createCellStyle();
+            styleMetaVal.setFont(fontRegular);
+
+            // Row 0: Title
+            Row r0 = sheet.createRow(0);
+            Cell c0 = r0.createCell(0);
+            c0.setCellValue("REKAPITULASI STATUS PENGERJAAN & NILAI UJIAN CBT");
+            c0.setCellStyle(styleTitle);
+
+            // Row 1: Subtitle
+            Row r1 = sheet.createRow(1);
+            Cell c1 = r1.createCell(0);
+            c1.setCellValue("SMK BAKTI NUSANTARA 666");
+            c1.setCellStyle(styleSubtitle);
+
+            // Metadata info
+            String eventName = ujian.getEventUjian() != null ? ujian.getEventUjian().getNamaEvent() : "-";
+            String mapelName = ujian.getMapel() != null ? ujian.getMapel().getNamaMapel() : "-";
+            String guruName = ujian.getGuru() != null ? ujian.getGuru().getNamaLengkap() : "-";
+            String durasiStr = (ujian.getDurasi() != null && ujian.getDurasi() > 0) ? ujian.getDurasi() + " Menit" : "Tanpa Batas Waktu";
+            String waktuMulaiStr = ujian.getWaktuMulai() != null ? ujian.getWaktuMulai().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "-";
+            String waktuSelesaiStr = ujian.getWaktuSelesai() != null ? ujian.getWaktuSelesai().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "-";
+            String exportTimeStr = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) + " WIB";
+
+            String[][] meta = {
+                    {"Mata Pelajaran", ": " + mapelName},
+                    {"Event Ujian", ": " + eventName},
+                    {"Guru Pengampu", ": " + guruName},
+                    {"Waktu Pelaksanaan", ": " + waktuMulaiStr + " s/d " + waktuSelesaiStr + " (" + durasiStr + ")"},
+                    {"Waktu Unduh Data", ": " + exportTimeStr}
+            };
+
+            for (int i = 0; i < meta.length; i++) {
+                Row r = sheet.createRow(3 + i);
+                Cell cL = r.createCell(0);
+                cL.setCellValue(meta[i][0]);
+                cL.setCellStyle(styleMetaLabel);
+
+                Cell cV = r.createCell(1);
+                cV.setCellValue(meta[i][1]);
+                cV.setCellStyle(styleMetaVal);
+            }
+
+            // Summary Card Row (Row 9)
+            Row rSummary = sheet.createRow(9);
+            CellStyle styleSummaryBox = workbook.createCellStyle();
+            styleSummaryBox.setFont(fontBold);
+            styleSummaryBox.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            styleSummaryBox.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            styleSummaryBox.setBorderTop(BorderStyle.THIN);
+            styleSummaryBox.setBorderBottom(BorderStyle.THIN);
+            styleSummaryBox.setBorderLeft(BorderStyle.THIN);
+            styleSummaryBox.setBorderRight(BorderStyle.THIN);
+
+            Cell cSum = rSummary.createCell(0);
+            cSum.setCellValue(String.format("RINGKASAN: Total Siswa: %d | Sudah Selesai: %d (%.1f%%) | Sedang Mengerjakan: %d | Belum Mengerjakan: %d",
+                    totalPeserta, sudahSelesai, persenSelesai, sedangMengerjakan, belumMengerjakan));
+            cSum.setCellStyle(styleSummaryBox);
+
+            // Table Header (Row 11)
+            Row headerRow = sheet.createRow(11);
+            headerRow.setHeightInPoints(24);
+            String[] headers = {
+                    "No", "NISN", "Nama Lengkap Siswa", "Kelas", "Status Ujian",
+                    "Nilai Akhir", "Waktu Mulai", "Waktu Selesai", "Durasi Pengerjaan"
+            };
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(styleHeader);
+            }
+
+            // Data Rows (Row 12+)
+            int rowIdx = 12;
+            for (int i = 0; i < pesertaList.size(); i++) {
+                ExamPesertaDTO p = pesertaList.get(i);
+                Row row = sheet.createRow(rowIdx++);
+                row.setHeightInPoints(19);
+
+                // 0: No
+                Cell cNo = row.createCell(0);
+                cNo.setCellValue(i + 1);
+                cNo.setCellStyle(styleCenter);
+
+                // 1: NISN
+                Cell cNisn = row.createCell(1);
+                cNisn.setCellValue(p.getNisn() != null ? p.getNisn() : "-");
+                cNisn.setCellStyle(styleCenter);
+
+                // 2: Nama Lengkap
+                Cell cNama = row.createCell(2);
+                cNama.setCellValue(p.getNama() != null ? p.getNama() : "-");
+                cNama.setCellStyle(styleLeft);
+
+                // 3: Kelas
+                Cell cKelas = row.createCell(3);
+                cKelas.setCellValue(p.getNamaKelas() != null ? p.getNamaKelas() : "-");
+                cKelas.setCellStyle(styleCenter);
+
+                // 4: Status Ujian
+                Cell cStatus = row.createCell(4);
+                String st = p.getStatus() != null ? p.getStatus().toUpperCase() : "BELUM";
+                if ("SUDAH".equals(st)) {
+                    cStatus.setCellValue("SUDAH SELESAI");
+                    cStatus.setCellStyle(styleSudah);
+                } else if ("SEDANG".equals(st)) {
+                    cStatus.setCellValue("SEDANG MENGERJAKAN");
+                    cStatus.setCellStyle(styleSedang);
+                } else {
+                    cStatus.setCellValue("BELUM MENGERJAKAN");
+                    cStatus.setCellStyle(styleBelum);
+                }
+
+                // 5: Nilai Akhir
+                Cell cNilai = row.createCell(5);
+                if ("SUDAH".equals(st) && p.getNilai() != null) {
+                    cNilai.setCellValue(p.getNilai());
+                } else {
+                    cNilai.setCellValue("-");
+                }
+                cNilai.setCellStyle(styleScore);
+
+                // 6: Waktu Mulai
+                Cell cMul = row.createCell(6);
+                if (p.getWaktuMulai() != null) {
+                    cMul.setCellValue(p.getWaktuMulai().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
+                } else {
+                    cMul.setCellValue("-");
+                }
+                cMul.setCellStyle(styleCenter);
+
+                // 7: Waktu Selesai
+                Cell cSel = row.createCell(7);
+                if (p.getWaktuSelesai() != null) {
+                    cSel.setCellValue(p.getWaktuSelesai().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
+                } else {
+                    cSel.setCellValue("-");
+                }
+                cSel.setCellStyle(styleCenter);
+
+                // 8: Durasi Pengerjaan
+                Cell cDur = row.createCell(8);
+                if (p.getWaktuMulai() != null && p.getWaktuSelesai() != null) {
+                    long diffSeconds = java.time.Duration.between(p.getWaktuMulai(), p.getWaktuSelesai()).getSeconds();
+                    if (diffSeconds >= 0) {
+                        long m = diffSeconds / 60;
+                        long s = diffSeconds % 60;
+                        cDur.setCellValue(m + "m " + s + "s");
+                    } else {
+                        cDur.setCellValue("Selesai");
+                    }
+                } else if ("SUDAH".equals(st)) {
+                    cDur.setCellValue("Selesai");
+                } else if ("SEDANG".equals(st)) {
+                    cDur.setCellValue("Pengerjaan");
+                } else {
+                    cDur.setCellValue("-");
+                }
+                cDur.setCellStyle(styleCenter);
+            }
+
+            // Auto-size columns with padding
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                int currentWidth = sheet.getColumnWidth(i);
+                sheet.setColumnWidth(i, Math.max(currentWidth + 1200, 3000));
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Error generating Excel for UjianMapel id={}: ", ujianId, e);
+            throw new RuntimeException("Gagal membuat file Excel: " + e.getMessage());
+        }
+    }
+
 }

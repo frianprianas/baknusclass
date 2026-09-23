@@ -266,4 +266,26 @@ public class UjianMapelController {
         }
     }
 
+
+    @GetMapping("/{id}/export-peserta-excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<byte[]> exportPesertaExcel(
+            @PathVariable Long id,
+            Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        byte[] excelBytes = ujianMapelService.exportPesertaExcel(id, userDetails.getId(), userDetails.getAuthorities());
+
+        UjianMapelDTO ujian = ujianMapelService.getUjianById(id);
+        String cleanMapel = (ujian != null && ujian.getNamaMapel() != null)
+                ? ujian.getNamaMapel().replaceAll("[^a-zA-Z0-9_-]", "_")
+                : "Mapel";
+        String fileName = "Rekap_Ujian_" + cleanMapel + "_" + java.time.LocalDate.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(org.springframework.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Content-Disposition")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
+
 }
