@@ -4,6 +4,7 @@ import com.baknusbelajar.api.dto.exam.SoalEssayDTO;
 import com.baknusbelajar.api.entity.SoalEssay;
 import com.baknusbelajar.api.entity.UjianMapel;
 import com.baknusbelajar.api.repository.SoalEssayRepository;
+import com.baknusbelajar.api.repository.JawabanSiswaRepository;
 import com.baknusbelajar.api.repository.UjianMapelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public class SoalEssayService {
 
     private final SoalEssayRepository soalEssayRepository;
+    private final JawabanSiswaRepository jawabanSiswaRepository;
     private final UjianMapelRepository ujianMapelRepository;
     private final KartuSoalService kartuSoalService;
 
@@ -74,7 +76,9 @@ public class SoalEssayService {
     }
 
     @CacheEvict(value = "soalEssayCache", allEntries = true)
+    @Transactional
     public void deleteSoal(Long id) {
+        jawabanSiswaRepository.deleteBySoalEssayId(id);
         soalEssayRepository.deleteById(id);
     }
 

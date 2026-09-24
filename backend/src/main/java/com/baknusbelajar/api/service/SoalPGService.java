@@ -4,6 +4,7 @@ import com.baknusbelajar.api.dto.exam.SoalPGDTO;
 import com.baknusbelajar.api.entity.SoalPG;
 import com.baknusbelajar.api.entity.UjianMapel;
 import com.baknusbelajar.api.repository.SoalPGRepository;
+import com.baknusbelajar.api.repository.JawabanPGRepository;
 import com.baknusbelajar.api.repository.UjianMapelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class SoalPGService {
 
     private final SoalPGRepository soalPGRepository;
+    private final JawabanPGRepository jawabanPGRepository;
     private final UjianMapelRepository ujianMapelRepository;
     private final KartuSoalService kartuSoalService;
     private final JawabanPGService jawabanPGService;
