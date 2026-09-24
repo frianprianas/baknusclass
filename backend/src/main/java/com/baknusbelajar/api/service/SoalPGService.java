@@ -30,7 +30,7 @@ public class SoalPGService {
     @Transactional
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
         List<SoalPG> soalList = soalPGRepository.findByUjianMapelId(ujianId);
-        if (soalList.isEmpty()) {
+        if (soalList.isEmpty() && !includeKunci) {
             tryAutoCopyQuestions(ujianId);
             soalList = soalPGRepository.findByUjianMapelId(ujianId);
         }

@@ -27,7 +27,7 @@ public class SoalEssayService {
     @Cacheable(value = "soalEssayCache", key = "#ujianId + '-' + #withKunci")
     public List<SoalEssayDTO> getSoalByUjian(Long ujianId, boolean withKunci) {
         List<SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
-        if (essayList.isEmpty()) {
+        if (essayList.isEmpty() && !withKunci) {
             tryAutoCopyEssay(ujianId);
             essayList = soalEssayRepository.findByUjianMapelId(ujianId);
         }

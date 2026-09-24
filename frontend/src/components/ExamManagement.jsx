@@ -1280,6 +1280,8 @@ const ExamManagement = () => {
                 await axios.delete(`/api/exam/soal-essay/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
             }
             
+            setQuestions([]);
+            setQuestionsPG([]);
             await handleManageQuestions(viewingQuestions);
             alert('Semua soal berhasil dibersihkan.');
         } catch (err) {
