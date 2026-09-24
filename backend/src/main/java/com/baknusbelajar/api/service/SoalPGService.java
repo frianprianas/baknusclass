@@ -114,7 +114,9 @@ public class SoalPGService {
     }
 
     @CacheEvict(value = "soalPGCache", allEntries = true)
+    @Transactional
     public void deleteSoal(Long id) {
+        jawabanPGRepository.deleteBySoalPGId(id);
         soalPGRepository.deleteById(id);
     }
 

@@ -2,6 +2,9 @@ package com.baknusbelajar.api.repository;
 
 import com.baknusbelajar.api.entity.JawabanSiswa;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -22,4 +25,8 @@ public interface JawabanSiswaRepository extends JpaRepository<JawabanSiswa, Long
     long countBySkorFinalGuruIsNull();
     long countBySoalEssay_UjianMapel_Guru_IdAndSkorFinalGuruIsNull(Long guruId);
     List<JawabanSiswa> findBySoalEssay_UjianMapel_Guru_Id(Long guruId);
+
+    @Modifying
+    @Query("DELETE FROM JawabanSiswa j WHERE j.soalEssay.id = :soalEssayId")
+    void deleteBySoalEssayId(@Param("soalEssayId") Long soalEssayId);
 }

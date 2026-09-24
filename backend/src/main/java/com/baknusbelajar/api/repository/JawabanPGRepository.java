@@ -2,6 +2,9 @@ package com.baknusbelajar.api.repository;
 
 import com.baknusbelajar.api.entity.JawabanPG;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,4 +17,8 @@ public interface JawabanPGRepository extends JpaRepository<JawabanPG, Long> {
     List<JawabanPG> findBySiswaId(Long siswaId);
     List<JawabanPG> findBySoalPG_UjianMapel_Id(Long ujianMapelId);
     List<JawabanPG> findBySiswaIdAndSoalPG_UjianMapel_Id(Long siswaId, Long ujianMapelId);
+
+    @Modifying
+    @Query("DELETE FROM JawabanPG j WHERE j.soalPG.id = :soalPGId")
+    void deleteBySoalPGId(@Param("soalPGId") Long soalPGId);
 }
