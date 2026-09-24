@@ -278,6 +278,7 @@ const ExamManagement = () => {
     const [isExtractingAi, setIsExtractingAi] = useState(false);
     const [isSavingBatch, setIsSavingBatch] = useState(false);
     const [draftQuestions, setDraftQuestions] = useState([]);
+    const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     const handleOpenWordImportModal = (exam) => {
         setWordImportTargetExam(exam);
@@ -1260,6 +1261,31 @@ const ExamManagement = () => {
             alert('Soal berhasil dihapus.');
         } catch (err) {
             alert('Gagal hapus soal');
+        }
+    };
+
+    const handleDeleteAllQuestions = async () => {
+        if (!viewingQuestions) return;
+        if (!window.confirm('Yakin ingin MENGHAPUS SEMUA SOAL pada ujian ini? Tindakan ini tidak dapat dibatalkan.')) return;
+        
+        setIsDeletingAll(true);
+        const token = localStorage.getItem('token');
+        try {
+            // Hapus semua PG
+            for (const q of questionsPG) {
+                await axios.delete(`/api/exam/soal-pg/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
+            }
+            // Hapus semua Essay
+            for (const q of questions) {
+                await axios.delete(`/api/exam/soal-essay/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
+            }
+            
+            await handleManageQuestions(viewingQuestions);
+            alert('Semua soal berhasil dibersihkan.');
+        } catch (err) {
+            alert('Gagal menghapus beberapa soal.');
+        } finally {
+            setIsDeletingAll(false);
         }
     };
 
@@ -2814,9 +2840,22 @@ const ExamManagement = () => {
                                     <div className="header-icon"><Book size={20} /></div>
                                     <h3>Daftar Soal Tersimpan</h3>
                                 </div>
-                                <div className="filter-badges">
+                                <div className="filter-badges" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <div className="badge-v2">PG: {questionsPG.length}</div>
                                     <div className="badge-v2">Essay: {questions.length}</div>
+                                    {(questionsPG.length > 0 || questions.length > 0) && (
+                                        <button 
+                                            type="button" 
+                                            onClick={handleDeleteAllQuestions}
+                                            disabled={isDeletingAll}
+                                            className="q-btn-delete"
+                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '20px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fecaca', cursor: isDeletingAll ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.8rem' }}
+                                            title="Hapus Semua Soal"
+                                        >
+                                            <Trash2 size={14} />
+                                            {isDeletingAll ? 'Membersihkan...' : 'Bersihkan Soal'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
