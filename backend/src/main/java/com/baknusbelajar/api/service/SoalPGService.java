@@ -30,10 +30,6 @@ public class SoalPGService {
     @Transactional
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
         List<SoalPG> soalList = soalPGRepository.findByUjianMapelId(ujianId);
-        if (soalList.isEmpty() && !includeKunci) {
-            tryAutoCopyQuestions(ujianId);
-            soalList = soalPGRepository.findByUjianMapelId(ujianId);
-        }
         return soalList.stream().map(s -> {
             // Respect existing tipeSoal. Only fallback if null or empty.
             if (s.getTipeSoal() == null || s.getTipeSoal().trim().isEmpty()) {
@@ -116,8 +112,14 @@ public class SoalPGService {
     @CacheEvict(value = "soalPGCache", allEntries = true)
     @Transactional
     public void deleteSoal(Long id) {
-        jawabanPGRepository.deleteBySoalPGId(id);
+        log.info("[SoalPGService] Deleting SoalPG with ID: {}", id);
+        try {
+            jawabanPGRepository.deleteBySoalPGId(id);
+        } catch (Exception e) {
+            log.warn("[SoalPGService] deleteBySoalPGId failed or no rows: {}", e.getMessage());
+        }
         soalPGRepository.deleteById(id);
+        log.info("[SoalPGService] Deleted SoalPG with ID: {}", id);
     }
 
     @CacheEvict(value = "soalPGCache", allEntries = true)

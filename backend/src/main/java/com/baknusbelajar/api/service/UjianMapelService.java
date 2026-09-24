@@ -18,6 +18,8 @@ import com.baknusbelajar.api.repository.KelasRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
@@ -1143,4 +1145,34 @@ public class UjianMapelService {
         }
     }
 
+
+    @CacheEvict(value = {"soalPGCache", "soalEssayCache"}, allEntries = true)
+    @Transactional
+    public void clearAllSoal(Long ujianId) {
+        log.info("[UjianMapelService] Clearing all questions for Ujian ID: {}", ujianId);
+        List<com.baknusbelajar.api.entity.SoalPG> pgList = soalPGRepository.findByUjianMapelId(ujianId);
+        for (var pg : pgList) {
+            try {
+                jawabanPGRepository.deleteBySoalPGId(pg.getId());
+            } catch (Exception e) {
+                log.warn("[UjianMapelService] deleteBySoalPGId error: {}", e.getMessage());
+            }
+        }
+        if (!pgList.isEmpty()) {
+            soalPGRepository.deleteAll(pgList);
+        }
+
+        List<com.baknusbelajar.api.entity.SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
+        for (var essay : essayList) {
+            try {
+                jawabanSiswaRepository.deleteBySoalEssayId(essay.getId());
+            } catch (Exception e) {
+                log.warn("[UjianMapelService] deleteBySoalEssayId error: {}", e.getMessage());
+            }
+        }
+        if (!essayList.isEmpty()) {
+            soalEssayRepository.deleteAll(essayList);
+        }
+        log.info("[UjianMapelService] Cleared {} PG and {} Essay questions for Ujian ID: {}", pgList.size(), essayList.size(), ujianId);
+    }
 }

@@ -288,4 +288,14 @@ public class UjianMapelController {
                 .body(excelBytes);
     }
 
+
+    @DeleteMapping("/{id}/clear-soal")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<?> clearAllSoal(@PathVariable Long id) {
+        ujianMapelService.clearAllSoal(id);
+        return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "message", "Semua soal berhasil dibersihkan"
+        ));
+    }
 }

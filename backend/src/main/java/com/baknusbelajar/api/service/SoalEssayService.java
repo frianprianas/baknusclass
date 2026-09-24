@@ -27,10 +27,6 @@ public class SoalEssayService {
     @Cacheable(value = "soalEssayCache", key = "#ujianId + '-' + #withKunci")
     public List<SoalEssayDTO> getSoalByUjian(Long ujianId, boolean withKunci) {
         List<SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
-        if (essayList.isEmpty() && !withKunci) {
-            tryAutoCopyEssay(ujianId);
-            essayList = soalEssayRepository.findByUjianMapelId(ujianId);
-        }
         return essayList.stream()
                 .map(entity -> mapToDTO(entity, withKunci))
                 .collect(Collectors.toList());
@@ -79,8 +75,14 @@ public class SoalEssayService {
     @CacheEvict(value = "soalEssayCache", allEntries = true)
     @Transactional
     public void deleteSoal(Long id) {
-        jawabanSiswaRepository.deleteBySoalEssayId(id);
+        log.info("[SoalEssayService] Deleting SoalEssay with ID: {}", id);
+        try {
+            jawabanSiswaRepository.deleteBySoalEssayId(id);
+        } catch (Exception e) {
+            log.warn("[SoalEssayService] deleteBySoalEssayId failed or no rows: {}", e.getMessage());
+        }
         soalEssayRepository.deleteById(id);
+        log.info("[SoalEssayService] Deleted SoalEssay with ID: {}", id);
     }
 
     private SoalEssayDTO mapToDTO(SoalEssay entity, boolean includeKunci) {

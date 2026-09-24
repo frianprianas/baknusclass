@@ -1257,10 +1257,17 @@ const ExamManagement = () => {
             await axios.delete(endpoint, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            if (type === 'essay') {
+                setQuestions(prev => prev.filter(q => q.id !== id));
+            } else {
+                setQuestionsPG(prev => prev.filter(q => q.id !== id));
+            }
             await handleManageQuestions(viewingQuestions);
             alert('Soal berhasil dihapus.');
         } catch (err) {
-            alert('Gagal hapus soal');
+            console.error('Delete question error:', err);
+            const msg = err.response?.data?.message || err.message || 'Gagal hapus soal';
+            alert('Gagal hapus soal: ' + msg);
         }
     };
 
@@ -1271,21 +1278,32 @@ const ExamManagement = () => {
         setIsDeletingAll(true);
         const token = localStorage.getItem('token');
         try {
-            // Hapus semua PG
-            for (const q of questionsPG) {
-                await axios.delete(`/api/exam/soal-pg/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
-            }
-            // Hapus semua Essay
-            for (const q of questions) {
-                await axios.delete(`/api/exam/soal-essay/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
-            }
-            
+            // Panggil endpoint atomic backend untuk membersihkan semua soal
+            await axios.delete(`/api/exam/ujian-mapel/${viewingQuestions.id}/clear-soal`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setQuestions([]);
             setQuestionsPG([]);
             await handleManageQuestions(viewingQuestions);
             alert('Semua soal berhasil dibersihkan.');
         } catch (err) {
-            alert('Gagal menghapus beberapa soal.');
+            console.warn('Dedicated clear-soal endpoint failed, falling back to sequential delete:', err);
+            try {
+                for (const q of questionsPG) {
+                    await axios.delete(`/api/exam/soal-pg/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                }
+                for (const q of questions) {
+                    await axios.delete(`/api/exam/soal-essay/${q.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                }
+                setQuestions([]);
+                setQuestionsPG([]);
+                await handleManageQuestions(viewingQuestions);
+                alert('Semua soal berhasil dibersihkan.');
+            } catch (fallbackErr) {
+                console.error('Fallback delete error:', fallbackErr);
+                const msg = fallbackErr.response?.data?.message || fallbackErr.message || 'Gagal menghapus beberapa soal.';
+                alert('Gagal membersihkan soal: ' + msg);
+            }
         } finally {
             setIsDeletingAll(false);
         }

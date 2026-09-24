@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +20,7 @@ public interface JawabanPGRepository extends JpaRepository<JawabanPG, Long> {
     List<JawabanPG> findBySiswaIdAndSoalPG_UjianMapel_Id(Long siswaId, Long ujianMapelId);
 
     @Modifying
+    @Transactional
     @Query("DELETE FROM JawabanPG j WHERE j.soalPG.id = :soalPGId")
     void deleteBySoalPGId(@Param("soalPGId") Long soalPGId);
 }
