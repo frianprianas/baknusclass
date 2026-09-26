@@ -35,9 +35,43 @@ const ExamScoring = () => {
     const fetchEvents = async () => {
         try {
             const resp = await axios.get('/api/exam/event', { headers });
-            setEvents(resp.data);
+            const eventList = resp.data || [];
+            setEvents(eventList);
+
+            // Read query params ?examId=...&eventId=...
+            const params = new URLSearchParams(window.location.search);
+            const qEventId = params.get('eventId');
+            const qExamId = params.get('examId');
+
+            if (qEventId) {
+                setSelectedEventId(qEventId);
+                loadExamsForEvent(qEventId, qExamId);
+            }
         } catch (err) {
             console.error('Error fetching events:', err);
+        }
+    };
+
+    const loadExamsForEvent = async (eventId, autoSelectExamId) => {
+        setLoading(true);
+        try {
+            const resp = await axios.get(`/api/exam/ujian-mapel/event/${eventId}`, { headers });
+            let fetchedExams = resp.data || [];
+            if (user.role === 'GURU') {
+                fetchedExams = fetchedExams.filter(exam => exam.guruId == user.profileId);
+            }
+            setExams(fetchedExams);
+
+            if (autoSelectExamId) {
+                const target = fetchedExams.find(ex => String(ex.id) === String(autoSelectExamId));
+                if (target) {
+                    handleSelectExam(target);
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching exams:', err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -46,21 +80,7 @@ const ExamScoring = () => {
         setSelectedEventId(eventId);
         setSelectedExam(null);
         if (!eventId) return;
-
-        setLoading(true);
-        try {
-            const resp = await axios.get(`/api/exam/ujian-mapel/event/${eventId}`, { headers });
-            // Filter only exams that belong to this teacher, unless ADMIN/TU
-            let fetchedExams = resp.data;
-            if (user.role === 'GURU') {
-                fetchedExams = fetchedExams.filter(exam => exam.guruId == user.profileId);
-            }
-            setExams(fetchedExams);
-        } catch (err) {
-            console.error('Error fetching exams:', err);
-        } finally {
-            setLoading(false);
-        }
+        loadExamsForEvent(eventId, null);
     };
 
     const handleSelectExam = async (exam) => {
@@ -876,7 +896,13 @@ const ExamScoring = () => {
                                     <div className="ex-icon"><BookMarked size={24} /></div>
                                     <h3>{ex.namaMapel}</h3>
                                     <p>{ex.namaGuru}</p>
-                                    <div className="tag-kelas">{ex.durasi} Menit</div>
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+                                        <span className="tag-kelas">{ex.durasi} Menit</span>
+                                        {ex.token && <span className="tag-kelas" style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>Token: {ex.token}</span>}
+                                        <span className="tag-kelas" style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                            <UserCheck size={12} /> Daftar Siswa & Nilai &rarr;
+                                        </span>
+                                    </div>
                                 </div>
                             ))}
                         </div>

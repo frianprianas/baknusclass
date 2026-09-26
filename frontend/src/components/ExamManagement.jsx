@@ -34,7 +34,11 @@ import {
     ZoomIn,
     X,
     Copy,
-    FileDown
+    FileDown,
+    Users,
+    UserCheck,
+    Award,
+    Filter
 } from 'lucide-react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -268,6 +272,16 @@ const ExamManagement = () => {
     const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
     const [copyTargetExam, setCopyTargetExam] = useState(null);
     const [selectedSourceExamId, setSelectedSourceExamId] = useState('');
+    // Daftar Peserta Ujian Modal States
+    const [isPesertaModalOpen, setIsPesertaModalOpen] = useState(false);
+    const [selectedPesertaExam, setSelectedPesertaExam] = useState(null);
+    const [pesertaList, setPesertaList] = useState([]);
+    const [loadingPeserta, setLoadingPeserta] = useState(false);
+    const [pesertaStatusFilter, setPesertaStatusFilter] = useState('ALL'); // 'ALL' | 'SUDAH' | 'SEDANG' | 'BELUM'
+    const [pesertaSearchQuery, setPesertaSearchQuery] = useState('');
+    const [pesertaKelasFilter, setPesertaKelasFilter] = useState('ALL');
+    const [resettingSiswaId, setResettingSiswaId] = useState(null);
+    const [resettingAll, setResettingAll] = useState(false);
     // AI Word Import & Draft States
     const [isWordImportModalOpen, setIsWordImportModalOpen] = useState(false);
     const [wordImportTargetExam, setWordImportTargetExam] = useState(null);
@@ -909,6 +923,75 @@ const ExamManagement = () => {
         }
     };
 
+    const handleOpenPesertaModal = async (exam) => {
+        if (!exam || !exam.id) return;
+        setSelectedPesertaExam(exam);
+        setIsPesertaModalOpen(true);
+        setPesertaStatusFilter('ALL');
+        setPesertaSearchQuery('');
+        setPesertaKelasFilter('ALL');
+        fetchPesertaList(exam.id);
+    };
+
+    const fetchPesertaList = async (examId) => {
+        if (!examId) return;
+        setLoadingPeserta(true);
+        try {
+            const token = localStorage.getItem('token');
+            const resp = await axios.get(`/api/exam/ujian-mapel/${examId}/peserta`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setPesertaList(resp.data || []);
+        } catch (err) {
+            console.error('Error fetching peserta list:', err);
+            alert('Gagal memuat daftar peserta: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setLoadingPeserta(false);
+        }
+    };
+
+    const handleResetPeserta = async (p) => {
+        if (!selectedPesertaExam) return;
+        const confirmMsg = `Izinkan siswa "${p.nama}" (${p.nisn || '-'}) untuk mengulang ujian ini dari awal?\n\nSemua riwayat pengerjaan dan jawaban siswa ini akan direset.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        setResettingSiswaId(p.siswaId);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/reset/${p.siswaId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(`Ujian berhasil direset untuk ${p.nama}. Siswa dapat mengerjakan kembali.`);
+            fetchPesertaList(selectedPesertaExam.id);
+        } catch (err) {
+            console.error('Error resetting peserta:', err);
+            alert('Gagal mereset ujian siswa: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setResettingSiswaId(null);
+        }
+    };
+
+    const handleResetAllPeserta = async () => {
+        if (!selectedPesertaExam) return;
+        const confirmMsg = `PERINGATAN: Apakah Anda yakin ingin mereset ujian "${selectedPesertaExam.namaMapel}" untuk SELURUH SISWA?\n\nSemua siswa akan dapat mengulang ujian ini dari awal.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        setResettingAll(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/reset-all`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Ujian berhasil direset untuk seluruh siswa.');
+            fetchPesertaList(selectedPesertaExam.id);
+        } catch (err) {
+            console.error('Error resetting all peserta:', err);
+            alert('Gagal mereset seluruh peserta: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setResettingAll(false);
+        }
+    };
+
     const handleSaveExam = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
@@ -1363,6 +1446,603 @@ const ExamManagement = () => {
     };
 
     
+
+    const renderPesertaModal = () => {
+        if (!isPesertaModalOpen || !selectedPesertaExam) return null;
+
+        const totalCount = pesertaList.length;
+        const sudahCount = pesertaList.filter(p => p.status === 'SUDAH').length;
+        const sedangCount = pesertaList.filter(p => p.status === 'SEDANG').length;
+        const belumCount = pesertaList.filter(p => p.status === 'BELUM').length;
+
+        // Extract distinct classes
+        const classSet = new Set();
+        pesertaList.forEach(p => {
+            if (p.namaKelas && p.namaKelas !== '-') classSet.add(p.namaKelas);
+        });
+        const distinctKelasList = Array.from(classSet).sort();
+
+        // Filter list
+        const filteredList = pesertaList.filter(p => {
+            if (pesertaStatusFilter !== 'ALL' && p.status !== pesertaStatusFilter) {
+                return false;
+            }
+            if (pesertaKelasFilter !== 'ALL') {
+                if ((p.namaKelas || '') !== pesertaKelasFilter) return false;
+            }
+            if (pesertaSearchQuery.trim()) {
+                const q = pesertaSearchQuery.toLowerCase();
+                const matchName = (p.nama || '').toLowerCase().includes(q);
+                const matchNisn = (p.nisn || '').toLowerCase().includes(q);
+                const matchKelas = (p.namaKelas || '').toLowerCase().includes(q);
+                if (!matchName && !matchNisn && !matchKelas) return false;
+            }
+            return true;
+        });
+
+        const formatWaktu = (dtStr) => {
+            if (!dtStr) return '-';
+            try {
+                const d = new Date(dtStr);
+                if (isNaN(d.getTime())) return dtStr;
+                return d.toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch {
+                return dtStr;
+            }
+        };
+
+        return createPortal(
+            <div className="modal-overlay" style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100vw',
+                height: '100vh',
+                background: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(8px)',
+                zIndex: 999999,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '20px 16px',
+                overflowY: 'auto',
+                boxSizing: 'border-box'
+            }}>
+                <div className="modal-content animate-slide-up" style={{
+                    borderRadius: '20px',
+                    width: '100%',
+                    maxWidth: '1150px',
+                    maxHeight: '90vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: '#ffffff',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                    overflow: 'hidden'
+                }}>
+                    {/* Header */}
+                    <div style={{
+                        padding: '18px 24px',
+                        borderBottom: '1.5px solid #f1f5f9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#f8fafc',
+                        flexShrink: 0
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div style={{
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '12px',
+                                background: '#eff6ff',
+                                border: '1.5px solid #bfdbfe',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#2563eb'
+                            }}>
+                                <Users size={24} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Daftar Siswa Ujian: {selectedPesertaExam.namaMapel}
+                                </h3>
+                                <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                                    Event: <strong style={{ color: '#334155' }}>{selectedPesertaExam.namaEvent || 'Ujian'}</strong> &bull; Guru: <strong style={{ color: '#334155' }}>{selectedPesertaExam.namaGuru || '-'}</strong> &bull; Durasi: <strong style={{ color: '#334155' }}>{selectedPesertaExam.durasi || '-'} Menit</strong> &bull; Token: <strong style={{ color: '#059669', letterSpacing: '1px' }}>{selectedPesertaExam.token || '-'}</strong>
+                                </p>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={() => handleExportPesertaExcel(selectedPesertaExam)}
+                                disabled={downloadingExamId === selectedPesertaExam.id}
+                                style={{
+                                    padding: '8px 14px',
+                                    borderRadius: '10px',
+                                    border: '1.5px solid #a7f3d0',
+                                    background: '#ecfdf5',
+                                    color: '#059669',
+                                    fontWeight: 700,
+                                    fontSize: '0.8rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer'
+                                }}
+                                title="Unduh rekap file Excel"
+                            >
+                                <FileDown size={15} />
+                                {downloadingExamId === selectedPesertaExam.id ? 'Mengunduh...' : 'Unduh Rekap Excel'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => window.location.href = `/exam-scoring?examId=${selectedPesertaExam.id}&eventId=${selectedPesertaExam.eventId || selectedEventId || ''}`}
+                                style={{
+                                    padding: '8px 14px',
+                                    borderRadius: '10px',
+                                    border: '1.5px solid #fed7aa',
+                                    background: '#fff7ed',
+                                    color: '#c2410c',
+                                    fontWeight: 700,
+                                    fontSize: '0.8rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer'
+                                }}
+                                title="Buka menu Koreksi Nilai & Essay"
+                            >
+                                <Award size={15} />
+                                Koreksi & Nilai
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsPesertaModalOpen(false)}
+                                style={{
+                                    border: 'none',
+                                    background: '#f1f5f9',
+                                    color: '#64748b',
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '10px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* KPI Cards Row */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: '12px',
+                        padding: '16px 24px',
+                        background: '#fafafa',
+                        borderBottom: '1px solid #f1f5f9',
+                        flexShrink: 0
+                    }}>
+                        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '12px 16px', border: '1.5px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Users size={20} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Total Peserta</div>
+                                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1e293b' }}>{totalCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8' }}>Siswa</span></div>
+                            </div>
+                        </div>
+
+                        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '12px 16px', border: '1.5px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CheckCircle2 size={20} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700 }}>Sudah Ujian (Selesai)</div>
+                                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#065f46' }}>{sudahCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8' }}>Siswa</span></div>
+                            </div>
+                        </div>
+
+                        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '12px 16px', border: '1.5px solid #fde68a', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Clock size={20} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 700 }}>Sedang Mengerjakan</div>
+                                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#92400e' }}>{sedangCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8' }}>Siswa</span></div>
+                            </div>
+                        </div>
+
+                        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '12px 16px', border: '1.5px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <XCircle size={20} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Belum Mulai</div>
+                                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#475569' }}>{belumCount} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8' }}>Siswa</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Filter, Tabs, & Search Bar */}
+                    <div style={{
+                        padding: '12px 24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                        flexWrap: 'wrap',
+                        flexShrink: 0
+                    }}>
+                        {/* Status Filter Tabs */}
+                        <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setPesertaStatusFilter('ALL')}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: pesertaStatusFilter === 'ALL' ? '#ffffff' : 'transparent',
+                                    color: pesertaStatusFilter === 'ALL' ? '#0f172a' : '#64748b',
+                                    boxShadow: pesertaStatusFilter === 'ALL' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    transition: 'all 0.15s'
+                                }}
+                            >
+                                Semua ({totalCount})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPesertaStatusFilter('SUDAH')}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: pesertaStatusFilter === 'SUDAH' ? '#ecfdf5' : 'transparent',
+                                    color: pesertaStatusFilter === 'SUDAH' ? '#059669' : '#64748b',
+                                    boxShadow: pesertaStatusFilter === 'SUDAH' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    transition: 'all 0.15s'
+                                }}
+                            >
+                                Sudah Ujian ({sudahCount})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPesertaStatusFilter('SEDANG')}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: pesertaStatusFilter === 'SEDANG' ? '#fef3c7' : 'transparent',
+                                    color: pesertaStatusFilter === 'SEDANG' ? '#d97706' : '#64748b',
+                                    boxShadow: pesertaStatusFilter === 'SEDANG' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    transition: 'all 0.15s'
+                                }}
+                            >
+                                Sedang ({sedangCount})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPesertaStatusFilter('BELUM')}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: pesertaStatusFilter === 'BELUM' ? '#ffffff' : 'transparent',
+                                    color: pesertaStatusFilter === 'BELUM' ? '#dc2626' : '#64748b',
+                                    boxShadow: pesertaStatusFilter === 'BELUM' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    transition: 'all 0.15s'
+                                }}
+                            >
+                                Belum ({belumCount})
+                            </button>
+                        </div>
+
+                        {/* Search & Class Dropdown */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end', minWidth: '300px' }}>
+                            {distinctKelasList.length > 0 && (
+                                <select
+                                    value={pesertaKelasFilter}
+                                    onChange={(e) => setPesertaKelasFilter(e.target.value)}
+                                    style={{
+                                        padding: '7px 12px',
+                                        borderRadius: '8px',
+                                        border: '1.5px solid #e2e8f0',
+                                        fontSize: '0.82rem',
+                                        fontWeight: 600,
+                                        color: '#334155',
+                                        background: '#ffffff',
+                                        outline: 'none',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="ALL">Semua Kelas ({distinctKelasList.length} Kelas)</option>
+                                    {distinctKelasList.map(k => (
+                                        <option key={k} value={k}>{k}</option>
+                                    ))}
+                                </select>
+                            )}
+
+                            <div style={{ position: 'relative', width: '220px' }}>
+                                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama atau NISN..."
+                                    value={pesertaSearchQuery}
+                                    onChange={(e) => setPesertaSearchQuery(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '7px 10px 7px 32px',
+                                        borderRadius: '8px',
+                                        border: '1.5px solid #e2e8f0',
+                                        fontSize: '0.82rem',
+                                        outline: 'none',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => fetchPesertaList(selectedPesertaExam.id)}
+                                disabled={loadingPeserta}
+                                style={{
+                                    padding: '7px 12px',
+                                    borderRadius: '8px',
+                                    border: '1.5px solid #e2e8f0',
+                                    background: '#ffffff',
+                                    color: '#475569',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600
+                                }}
+                                title="Segarkan Data"
+                            >
+                                <RefreshCw size={13} className={loadingPeserta ? 'animate-spin' : ''} />
+                            </button>
+
+                            {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && (JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin || selectedPesertaExam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId))) && (
+                                <button
+                                    type="button"
+                                    onClick={handleResetAllPeserta}
+                                    disabled={resettingAll || loadingPeserta}
+                                    style={{
+                                        padding: '7px 12px',
+                                        borderRadius: '8px',
+                                        border: '1.5px solid #fecaca',
+                                        background: '#fef2f2',
+                                        color: '#b91c1c',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700
+                                    }}
+                                    title="Izinkan seluruh siswa mengulang ujian ini dari awal"
+                                >
+                                    <RotateCcw size={13} />
+                                    {resettingAll ? 'Mereset...' : 'Reset Semua Siswa'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Table Body Scrollable */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px 24px' }}>
+                        {loadingPeserta ? (
+                            <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
+                                <RefreshCw size={28} className="animate-spin" style={{ margin: '0 auto 12px auto', display: 'block', color: '#3b82f6' }} />
+                                <p style={{ margin: 0, fontWeight: 600 }}>Memuat status peserta ujian...</p>
+                            </div>
+                        ) : filteredList.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+                                <Users size={36} style={{ margin: '0 auto 8px auto', display: 'block', opacity: 0.5 }} />
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem' }}>Tidak ada data siswa yang cocok dengan filter.</p>
+                            </div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px', fontSize: '0.85rem' }}>
+                                <thead>
+                                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textAlign: 'left', fontWeight: 700 }}>
+                                        <th style={{ padding: '10px 12px', width: '45px', textAlign: 'center' }}>No</th>
+                                        <th style={{ padding: '10px 12px', width: '120px' }}>NISN</th>
+                                        <th style={{ padding: '10px 12px' }}>Nama Siswa</th>
+                                        <th style={{ padding: '10px 12px', width: '140px' }}>Kelas</th>
+                                        <th style={{ padding: '10px 12px', width: '160px', textAlign: 'center' }}>Status Ujian</th>
+                                        <th style={{ padding: '10px 12px', width: '100px', textAlign: 'center' }}>Nilai Akhir</th>
+                                        <th style={{ padding: '10px 12px', width: '170px' }}>Waktu Pengerjaan</th>
+                                        <th style={{ padding: '10px 12px', width: '120px', textAlign: 'center' }}>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredList.map((p, idx) => {
+                                        const isFinished = p.status === 'SUDAH';
+                                        const isWorking = p.status === 'SEDANG';
+
+                                        return (
+                                            <tr key={p.siswaId || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                <td style={{ padding: '10px 12px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>{idx + 1}</td>
+                                                <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>{p.nisn || '-'}</td>
+                                                <td style={{ padding: '10px 12px' }}>
+                                                    <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.nama}</div>
+                                                </td>
+                                                <td style={{ padding: '10px 12px' }}>
+                                                    <span style={{
+                                                        background: '#f1f5f9',
+                                                        color: '#475569',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 700
+                                                    }}>
+                                                        {p.namaKelas || '-'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                    {isFinished ? (
+                                                        <span style={{
+                                                            background: '#ecfdf5',
+                                                            color: '#059669',
+                                                            border: '1px solid #a7f3d0',
+                                                            padding: '3px 10px',
+                                                            borderRadius: '20px',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 800,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <CheckCircle2 size={12} /> Selesai
+                                                        </span>
+                                                    ) : isWorking ? (
+                                                        <span style={{
+                                                            background: '#fef3c7',
+                                                            color: '#d97706',
+                                                            border: '1px solid #fde68a',
+                                                            padding: '3px 10px',
+                                                            borderRadius: '20px',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 800,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <Clock size={12} /> Sedang Mengerjakan
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{
+                                                            background: '#f1f5f9',
+                                                            color: '#64748b',
+                                                            border: '1px solid #e2e8f0',
+                                                            padding: '3px 10px',
+                                                            borderRadius: '20px',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 700,
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}>
+                                                            <XCircle size={12} /> Belum Mulai
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                    {isFinished && p.nilai !== null && p.nilai !== undefined ? (
+                                                        <span style={{
+                                                            fontSize: '0.95rem',
+                                                            fontWeight: 800,
+                                                            color: p.nilai >= 75 ? '#059669' : '#d97706'
+                                                        }}>
+                                                            {p.nilai}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ color: '#94a3b8' }}>-</span>
+                                                    )}
+                                                </td>
+                                                <td style={{ padding: '10px 12px', fontSize: '0.75rem', color: '#64748b' }}>
+                                                    {p.waktuMulai ? (
+                                                        <div>
+                                                            <div>Mulai: <strong style={{ color: '#334155' }}>{formatWaktu(p.waktuMulai)}</strong></div>
+                                                            {p.waktuSelesai && (
+                                                                <div>Selesai: <strong style={{ color: '#334155' }}>{formatWaktu(p.waktuSelesai)}</strong></div>
+                                                            )}
+                                                        </div>
+                                                    ) : '-'}
+                                                </td>
+                                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                    {(isFinished || isWorking) ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleResetPeserta(p)}
+                                                            disabled={resettingSiswaId === p.siswaId}
+                                                            style={{
+                                                                background: '#fef2f2',
+                                                                color: '#b91c1c',
+                                                                border: '1px solid #fecaca',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px'
+                                                            }}
+                                                            title="Izinkan siswa ini mengulang ujian dari awal"
+                                                        >
+                                                            <RotateCcw size={11} className={resettingSiswaId === p.siswaId ? 'animate-spin' : ''} />
+                                                            {resettingSiswaId === p.siswaId ? 'Mereset...' : 'Reset Ujian'}
+                                                        </button>
+                                                    ) : (
+                                                        <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>-</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{
+                        padding: '12px 24px',
+                        borderTop: '1px solid #f1f5f9',
+                        background: '#f8fafc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.8rem',
+                        color: '#64748b',
+                        flexShrink: 0
+                    }}>
+                        <div>
+                            Menampilkan <strong>{filteredList.length}</strong> dari total <strong>{totalCount}</strong> siswa terdaftar
+                        </div>
+                        <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => setIsPesertaModalOpen(false)}
+                            style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '0.82rem' }}
+                        >
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
     const renderWordImportModal = () => {
         if (!isWordImportModalOpen) return null;
 
@@ -4686,6 +5366,7 @@ const ExamManagement = () => {
                     </div>
                 )}
                 {renderWordImportModal()}
+            {renderPesertaModal()}
             </>
         );
     }
@@ -4906,7 +5587,27 @@ const ExamManagement = () => {
                                                         <td>
                                                             <div className="mapel-cell">
                                                                 <span className="nama-mapel">{exam.namaMapel}</span>
-                                                                <div style={{ marginTop: '4px' }}>
+                                                                <div style={{ marginTop: '4px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleOpenPesertaModal(exam)}
+                                                                        style={{
+                                                                            fontSize: '0.72rem',
+                                                                            background: '#eff6ff',
+                                                                            color: '#1d4ed8',
+                                                                            border: '1px solid #bfdbfe',
+                                                                            padding: '2px 8px',
+                                                                            borderRadius: '6px',
+                                                                            fontWeight: 700,
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                        title="Lihat daftar siswa yang sudah atau sedang ujian"
+                                                                    >
+                                                                        <Users size={12} /> Cek Siswa Ujian
+                                                                    </button>
                                                                     {exam.statusAktif !== false ? (
                                                                         <span style={{
                                                                             fontSize: '0.72rem',
@@ -5021,11 +5722,28 @@ const ExamManagement = () => {
                                                                 <button
                                                                     className="btn-lengkapi"
                                                                     style={{ background: '#fff7ed', color: '#c2410c', border: '1.5px solid #fed7aa', display: 'inline-flex', alignItems: 'center' }}
-                                                                    onClick={() => window.location.href = '/exam-scoring'}
+                                                                    onClick={() => window.location.href = `/exam-scoring?examId=${exam.id}&eventId=${exam.eventId || selectedEventId || ''}`}
                                                                     title="Buka menu Koreksi Nilai & Reset / Ulangi Ujian Siswa"
                                                                 >
                                                                     <RotateCcw size={13} style={{ marginRight: '4px' }} />
                                                                     Koreksi & Reset
+                                                                </button>
+                                                                <button
+                                                                    className="btn-lengkapi"
+                                                                    style={{
+                                                                        background: '#eff6ff',
+                                                                        color: '#1d4ed8',
+                                                                        border: '1.5px solid #93c5fd',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px',
+                                                                        fontWeight: 700
+                                                                    }}
+                                                                    onClick={() => handleOpenPesertaModal(exam)}
+                                                                    title="Lihat daftar siswa yang sudah ujian, sedang mengerjakan, atau belum mulai beserta nilainya"
+                                                                >
+                                                                    <Users size={13} />
+                                                                    Daftar Siswa
                                                                 </button>
                                                                 {(userRole === 'ADMIN' || userRole === 'TU' || (userRole === 'GURU' && (JSON.parse(localStorage.getItem('user') || '{}').isCoAdmin || exam.guruId == JSON.parse(localStorage.getItem('user') || '{}').profileId))) && (
                                                                     <button
