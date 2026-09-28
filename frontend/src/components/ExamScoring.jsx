@@ -637,6 +637,29 @@ const ExamScoring = () => {
         }
     };
 
+    const handleFillAverageScoresAllFromScoring = async () => {
+        if (!selectedExam) return;
+        const belumStudents = studentsData.filter(s => !s.isFinished && s.durasiStr !== 'Pengerjaan' && !s.isOnline);
+        if (belumStudents.length === 0) {
+            alert('Tidak ada siswa yang berstatus belum ujian.');
+            return;
+        }
+
+        try {
+            const avgResp = await axios.get(`/api/exam/ujian-mapel/${selectedExam.id}/average-score`, { headers });
+            const avg = avgResp.data?.averageScore;
+            const confirmMsg = `[FITUR KHUSUS ADMIN]\n\nIsi nilai SEMUA siswa yang BELUM ujian (${belumStudents.length} siswa) dengan nilai rata-rata kelas (${avg})?\n\nSemua siswa ini akan langsung berstatus Selesai Ujian dengan nilai ${avg}.\n(Catatan: Jika siswa susulan ujian nanti, ujian dapat direset).`;
+            if (!window.confirm(confirmMsg)) return;
+
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/fill-average-scores-all`, {}, { headers });
+            alert(resp.data?.message || `Berhasil mengisi nilai rata-rata (${avg}) untuk ${resp.data?.filledCount || belumStudents.length} siswa.`);
+            handleSelectExam(selectedExam);
+        } catch (err) {
+            console.error('Error fill all average scores:', err);
+            alert('Gagal mengisi nilai rata-rata massal: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
     const handleFillAverageScoreFromScoring = async (student) => {
         if (!selectedExam) return;
         try {
@@ -1014,29 +1037,73 @@ const ExamScoring = () => {
                     <div className="scoring-grid">
                         {/* LEFT: STUDENT LIST */}
                         <div className="student-list-card">
-                            <div className="list-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="list-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                                 <span><UserCheck size={18} /> Daftar Peserta Ujian ({studentsData.length})</span>
-                                {studentsData.length > 0 && (
-                                    <button
-                                        onClick={handleResetAllExam}
-                                        title="Izinkan SEMUA siswa mengulang ujian ini dari awal"
-                                        style={{
-                                            background: '#fef2f2',
-                                            color: '#b91c1c',
-                                            border: '1px solid #fecaca',
-                                            padding: '4px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '0.7rem',
-                                            fontWeight: 700,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px'
-                                        }}
-                                    >
-                                        <RotateCcw size={11} /> Reset Semua
-                                    </button>
-                                )}
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {studentsData.some(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline)) && (
+                                        <button
+                                            onClick={handleForceFinishAllFromScoring}
+                                            title="Selesaikan semua siswa yang masih berstatus sedang mengerjakan"
+                                            style={{
+                                                background: '#ecfdf5',
+                                                color: '#047857',
+                                                border: '1px solid #a7f3d0',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <CheckCircle2 size={11} /> Selesaikan Semua Sedang
+                                        </button>
+                                    )}
+                                    {isAdmin && studentsData.some(s => !s.isFinished && s.durasiStr !== 'Pengerjaan' && !s.isOnline) && (
+                                        <button
+                                            onClick={handleFillAverageScoresAllFromScoring}
+                                            title="[ADMIN] Isi nilai seluruh siswa yang belum ujian dengan nilai rata-rata kelas"
+                                            style={{
+                                                background: '#faf5ff',
+                                                color: '#7e22ce',
+                                                border: '1px solid #e9d5ff',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <Sparkles size={11} /> Isi Rata-rata Semua Belum
+                                        </button>
+                                    )}
+                                    {studentsData.length > 0 && (
+                                        <button
+                                            onClick={handleResetAllExam}
+                                            title="Izinkan SEMUA siswa mengulang ujian ini dari awal"
+                                            style={{
+                                                background: '#fef2f2',
+                                                color: '#b91c1c',
+                                                border: '1px solid #fecaca',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <RotateCcw size={11} /> Reset Semua
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Quick Status Filter Tabs */}
@@ -1162,7 +1229,55 @@ const ExamScoring = () => {
                                                         <Clock size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                                                         Durasi: <strong>{std.durasiStr}</strong>
                                                     </div>
-                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', gap: '5px', flexWrap: 'wrap' }}>
+                                                        {!std.isFinished && (std.durasiStr === 'Pengerjaan' || std.isOnline) && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleForceFinishStudentFromScoring(std);
+                                                                }}
+                                                                style={{
+                                                                    background: '#ecfdf5',
+                                                                    color: '#047857',
+                                                                    border: '1px solid #a7f3d0',
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="Selesaikan ujian siswa ini dan nilai langsung sekarang"
+                                                            >
+                                                                <CheckCircle2 size={11} /> Selesaikan
+                                                            </button>
+                                                        )}
+                                                        {isAdmin && !std.isFinished && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleFillAverageScoreFromScoring(std);
+                                                                }}
+                                                                style={{
+                                                                    background: '#faf5ff',
+                                                                    color: '#7e22ce',
+                                                                    border: '1px solid #e9d5ff',
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="[ADMIN] Isi ujian siswa ini mengikuti nilai rata-rata kelas"
+                                                            >
+                                                                <Sparkles size={11} /> Isi Rata-rata
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -1213,7 +1328,57 @@ const ExamScoring = () => {
                                             <div style={{ color: '#64748b', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                                                 <Clock size={14} /> Waktu Mengerjakan: <strong>{selectedStudent.durasiStr}</strong>
                                             </div>
-                                            <div style={{ marginTop: '10px' }}>
+                                            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                {!selectedStudent.isFinished && (selectedStudent.durasiStr === 'Pengerjaan' || selectedStudent.isOnline) && (
+                                                    <button
+                                                        onClick={() => handleForceFinishStudentFromScoring(selectedStudent)}
+                                                        style={{
+                                                            background: '#ecfdf5',
+                                                            color: '#047857',
+                                                            border: '1.5px solid #a7f3d0',
+                                                            padding: '7px 14px',
+                                                            borderRadius: '8px',
+                                                            fontWeight: 800,
+                                                            fontSize: '0.82rem',
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseOver={(e) => { e.currentTarget.style.background = '#d1fae5'; }}
+                                                        onMouseOut={(e) => { e.currentTarget.style.background = '#ecfdf5'; }}
+                                                        title="Paksa selesaikan ujian siswa ini dan langsung nilai jawabannya sekarang"
+                                                    >
+                                                        <CheckCircle2 size={15} /> Selesaikan & Nilai Ujian Siswa Ini
+                                                    </button>
+                                                )}
+                                                {isAdmin && !selectedStudent.isFinished && (
+                                                    <button
+                                                        onClick={() => handleFillAverageScoreFromScoring(selectedStudent)}
+                                                        style={{
+                                                            background: '#faf5ff',
+                                                            color: '#7e22ce',
+                                                            border: '1.5px solid #e9d5ff',
+                                                            padding: '7px 14px',
+                                                            borderRadius: '8px',
+                                                            fontWeight: 800,
+                                                            fontSize: '0.82rem',
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseOver={(e) => { e.currentTarget.style.background = '#f3e8ff'; }}
+                                                        onMouseOut={(e) => { e.currentTarget.style.background = '#faf5ff'; }}
+                                                        title="[ADMIN] Isi ujian siswa ini mengikuti rata-rata nilai kelas yang sudah selesai"
+                                                    >
+                                                        <Sparkles size={15} /> Isi Nilai Rata-rata Kelas
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => handleResetStudentExam(selectedStudent)}
                                                     className="btn-reset-single-exam"
