@@ -282,6 +282,10 @@ const ExamManagement = () => {
     const [pesertaKelasFilter, setPesertaKelasFilter] = useState('ALL');
     const [resettingSiswaId, setResettingSiswaId] = useState(null);
     const [resettingAll, setResettingAll] = useState(false);
+    const [finishingSiswaId, setFinishingSiswaId] = useState(null);
+    const [finishingAllSedang, setFinishingAllSedang] = useState(false);
+    const [fillingAvgSiswaId, setFillingAvgSiswaId] = useState(null);
+    const [fillingAllAvg, setFillingAllAvg] = useState(false);
     // AI Word Import & Draft States
     const [isWordImportModalOpen, setIsWordImportModalOpen] = useState(false);
     const [wordImportTargetExam, setWordImportTargetExam] = useState(null);
@@ -992,6 +996,115 @@ const ExamManagement = () => {
         }
     };
 
+    const handleForceFinishSingle = async (p) => {
+        if (!selectedPesertaExam) return;
+        const confirmMsg = `Selesaikan ujian untuk siswa "${p.nama}" sekarang?\n\nJawaban siswa akan langsung dievaluasi dan nilainya dihitung otomatis.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        setFinishingSiswaId(p.siswaId);
+        try {
+            const token = localStorage.getItem('token');
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/force-finish/${p.siswaId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(resp.data?.message || `Ujian ${p.nama} berhasil diselesaikan dan dinilai.`);
+            fetchPesertaList(selectedPesertaExam.id);
+        } catch (err) {
+            console.error('Error force finish student:', err);
+            alert('Gagal menyelesaikan ujian: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setFinishingSiswaId(null);
+        }
+    };
+
+    const handleForceFinishAllSedang = async () => {
+        if (!selectedPesertaExam) return;
+        const sedangCount = pesertaList.filter(p => p.status === 'SEDANG').length;
+        if (sedangCount === 0) {
+            alert('Tidak ada siswa yang berstatus sedang mengerjakan.');
+            return;
+        }
+
+        const confirmMsg = `PERINGATAN: Apakah Anda yakin ingin menyelesaikan ujian untuk SEMUA siswa (${sedangCount} siswa) yang saat ini berstatus 'Sedang Mengerjakan'?\n\nSiswa akan langsung dihentikan dan seluruh jawabannya akan dinilai otomatis.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        setFinishingAllSedang(true);
+        try {
+            const token = localStorage.getItem('token');
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/force-finish-all`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const finished = resp.data?.finishedCount ?? sedangCount;
+            alert(`Berhasil menyelesaikan dan menilai ${finished} siswa yang sedang mengerjakan.`);
+            fetchPesertaList(selectedPesertaExam.id);
+        } catch (err) {
+            console.error('Error force finish all:', err);
+            alert('Gagal menyelesaikan ujian massal: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setFinishingAllSedang(false);
+        }
+    };
+
+    const handleFillAverageScoreSingle = async (p) => {
+        if (!selectedPesertaExam) return;
+        try {
+            const token = localStorage.getItem('token');
+            // Fetch average score preview first
+            const avgResp = await axios.get(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/average-score`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const avg = avgResp.data?.averageScore;
+
+            const confirmMsg = `[FITUR KHUSUS ADMIN]\n\nIsi ujian untuk siswa "${p.nama}" dengan nilai rata-rata kelas (${avg})?\n\nSiswa ini akan berstatus Selesai Ujian dengan nilai ${avg} agar rekap nilai dapat segera diolah.\n(Catatan: Ujian dapat direset atau dikoreksi manual jika siswa mengikuti ujian susulan).`;
+            if (!window.confirm(confirmMsg)) return;
+
+            setFillingAvgSiswaId(p.siswaId);
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/fill-average-score/${p.siswaId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert(resp.data?.message || `Berhasil mengisi ujian ${p.nama} dengan nilai rata-rata (${avg}).`);
+            fetchPesertaList(selectedPesertaExam.id);
+        } catch (err) {
+            console.error('Error fill average score:', err);
+            alert('Gagal mengisi nilai rata-rata: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setFillingAvgSiswaId(null);
+        }
+    };
+
+    const handleFillAverageScoresAll = async () => {
+        if (!selectedPesertaExam) return;
+        const belumCount = pesertaList.filter(p => p.status === 'BELUM').length;
+        if (belumCount === 0) {
+            alert('Tidak ada siswa yang berstatus belum ujian.');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const avgResp = await axios.get(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/average-score`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const avg = avgResp.data?.averageScore;
+
+            const confirmMsg = `[FITUR KHUSUS ADMIN]\n\nPERINGATAN: Apakah Anda yakin ingin mengisi hasil ujian untuk SELURUH SISWA YANG BELUM UJIAN (${belumCount} siswa) dengan nilai rata-rata kelas (${avg})?\n\nSemua siswa yang belum ujian akan otomatis berstatus Selesai dengan nilai ${avg} agar nilai dapat segera diolah ke rapor/rekap.\n(Catatan: Nilai dapat direset atau dikoreksi manual saat siswa mengerjakan ujian susulan).\n\nLanjutkan proses ini?`;
+            if (!window.confirm(confirmMsg)) return;
+
+            setFillingAllAvg(true);
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedPesertaExam.id}/fill-average-scores-all`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const filled = resp.data?.filledCount ?? belumCount;
+            alert(`Berhasil mengisi ${filled} siswa belum ujian dengan nilai rata-rata (${avg}).`);
+            fetchPesertaList(selectedPesertaExam.id);
+        } catch (err) {
+            console.error('Error fill all average scores:', err);
+            alert('Gagal mengisi nilai rata-rata massal: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setFillingAllAvg(false);
+        }
+    };
+
     const handleSaveExam = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
@@ -1559,7 +1672,55 @@ const ExamManagement = () => {
                                 </p>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {sedangCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleForceFinishAllSedang}
+                                    disabled={finishingAllSedang || loadingPeserta}
+                                    style={{
+                                        padding: '8px 14px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid #a7f3d0',
+                                        background: '#ecfdf5',
+                                        color: '#059669',
+                                        fontWeight: 700,
+                                        fontSize: '0.8rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        cursor: 'pointer'
+                                    }}
+                                    title="Selesaikan ujian untuk semua siswa yang saat ini sedang mengerjakan agar langsung dinilai otomatis"
+                                >
+                                    <CheckCircle2 size={15} className={finishingAllSedang ? 'animate-spin' : ''} />
+                                    {finishingAllSedang ? 'Menyelesaikan...' : `Selesaikan Semua Sedang (${sedangCount})`}
+                                </button>
+                            )}
+                            {userRole === 'ADMIN' && belumCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleFillAverageScoresAll}
+                                    disabled={fillingAllAvg || loadingPeserta}
+                                    style={{
+                                        padding: '8px 14px',
+                                        borderRadius: '10px',
+                                        border: '1.5px solid #c4b5fd',
+                                        background: '#f5f3ff',
+                                        color: '#6d28d9',
+                                        fontWeight: 800,
+                                        fontSize: '0.8rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        cursor: 'pointer'
+                                    }}
+                                    title="Khusus Admin: Isi nilai siswa yang belum ujian mengikuti nilai rata-rata kelas"
+                                >
+                                    <Sparkles size={15} className={fillingAllAvg ? 'animate-spin' : ''} />
+                                    {fillingAllAvg ? 'Mengisi Nilai...' : `Isi Nilai Rata-rata (${belumCount} Belum)`}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => handleExportPesertaExcel(selectedPesertaExam)}
@@ -1978,32 +2139,83 @@ const ExamManagement = () => {
                                                     ) : '-'}
                                                 </td>
                                                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                                                    {(isFinished || isWorking) ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleResetPeserta(p)}
-                                                            disabled={resettingSiswaId === p.siswaId}
-                                                            style={{
-                                                                background: '#fef2f2',
-                                                                color: '#b91c1c',
-                                                                border: '1px solid #fecaca',
-                                                                padding: '4px 8px',
-                                                                borderRadius: '6px',
-                                                                fontSize: '0.72rem',
-                                                                fontWeight: 700,
-                                                                cursor: 'pointer',
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                gap: '4px'
-                                                            }}
-                                                            title="Izinkan siswa ini mengulang ujian dari awal"
-                                                        >
-                                                            <RotateCcw size={11} className={resettingSiswaId === p.siswaId ? 'animate-spin' : ''} />
-                                                            {resettingSiswaId === p.siswaId ? 'Mereset...' : 'Reset Ujian'}
-                                                        </button>
-                                                    ) : (
-                                                        <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>-</span>
-                                                    )}
+                                                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                                        {isWorking && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleForceFinishSingle(p)}
+                                                                disabled={finishingSiswaId === p.siswaId}
+                                                                style={{
+                                                                    background: '#ecfdf5',
+                                                                    color: '#059669',
+                                                                    border: '1px solid #a7f3d0',
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="Selesaikan ujian siswa ini sekarang dan langsung hitung nilainya"
+                                                            >
+                                                                <CheckCircle2 size={11} className={finishingSiswaId === p.siswaId ? 'animate-spin' : ''} />
+                                                                {finishingSiswaId === p.siswaId ? 'Menilai...' : 'Selesaikan'}
+                                                            </button>
+                                                        )}
+                                                        {p.status === 'BELUM' && userRole === 'ADMIN' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleFillAverageScoreSingle(p)}
+                                                                disabled={fillingAvgSiswaId === p.siswaId}
+                                                                style={{
+                                                                    background: '#f5f3ff',
+                                                                    color: '#6d28d9',
+                                                                    border: '1px solid #ddd6fe',
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="Khusus Admin: Isi ujian siswa ini dengan nilai rata-rata kelas"
+                                                            >
+                                                                <Sparkles size={11} className={fillingAvgSiswaId === p.siswaId ? 'animate-spin' : ''} />
+                                                                {fillingAvgSiswaId === p.siswaId ? 'Mengisi...' : 'Isi Rata-rata'}
+                                                            </button>
+                                                        )}
+                                                        {(isFinished || isWorking) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleResetPeserta(p)}
+                                                                disabled={resettingSiswaId === p.siswaId}
+                                                                style={{
+                                                                    background: '#fef2f2',
+                                                                    color: '#b91c1c',
+                                                                    border: '1px solid #fecaca',
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="Izinkan siswa ini mengulang ujian dari awal"
+                                                            >
+                                                                <RotateCcw size={11} className={resettingSiswaId === p.siswaId ? 'animate-spin' : ''} />
+                                                                {resettingSiswaId === p.siswaId ? 'Mereset...' : 'Reset Ujian'}
+                                                            </button>
+                                                        )}
+                                                        {p.status === 'BELUM' && userRole !== 'ADMIN' && (
+                                                            <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>-</span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );

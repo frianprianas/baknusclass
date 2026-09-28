@@ -225,6 +225,72 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.getPesertaUjian(ujianId, kelasId, status));
     }
 
+    @PostMapping("/{id}/force-finish/{siswaId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<?> forceFinishStudent(
+            @PathVariable Long id,
+            @PathVariable Long siswaId) {
+        try {
+            ujianMapelService.forceFinishUjianForStudent(id, siswaId);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "message", "Ujian siswa berhasil diselesaikan dan dinilai."
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Gagal menyelesaikan ujian siswa"));
+        }
+    }
+
+    @PostMapping("/{id}/force-finish-all")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<?> forceFinishAllSedang(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(ujianMapelService.forceFinishAllSedangUjian(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Gagal menyelesaikan seluruh ujian yang sedang berlangsung"));
+        }
+    }
+
+    @GetMapping("/{id}/average-score")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAverageScore(@PathVariable Long id) {
+        try {
+            Double avg = ujianMapelService.calculateExamAverageScore(id);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "averageScore", avg
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Gagal menghitung nilai rata-rata"));
+        }
+    }
+
+    @PostMapping("/{id}/fill-average-score/{siswaId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> fillAverageScoreForStudent(
+            @PathVariable Long id,
+            @PathVariable Long siswaId) {
+        try {
+            ujianMapelService.fillAverageScoreForStudent(id, siswaId);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "message", "Berhasil mengisi ujian siswa dengan nilai rata-rata kelas."
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Gagal mengisi nilai rata-rata"));
+        }
+    }
+
+    @PostMapping("/{id}/fill-average-scores-all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> fillAverageScoresAll(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(ujianMapelService.fillAverageScoreForAllBelum(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", e.getMessage() != null ? e.getMessage() : "Gagal mengisi nilai rata-rata massal"));
+        }
+    }
+
     @PostMapping(value = "/ai-extract-word", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
     public ResponseEntity<?> extractQuestionsFromWord(

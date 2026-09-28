@@ -584,7 +584,215 @@ public class UjianMapelService {
         log.info("Exam ID {} reset successfully for all students", ujianId);
     }
 
-    public com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO getExamClassSummary(Long ujianId) {
+    @Transactional
+    public void forceFinishUjianForStudent(Long ujianId, Long siswaId) {
+        UjianMapel ujian = ujianMapelRepository.findById(ujianId)
+                .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan (ID: " + ujianId + ")"));
+        com.baknusbelajar.api.entity.Siswa siswa = siswaRepository.findById(siswaId)
+                .orElseThrow(() -> new RuntimeException("Siswa tidak ditemukan (ID: " + siswaId + ")"));
+
+        com.baknusbelajar.api.entity.SiswaUjianStatus status = siswaUjianStatusRepository
+                .findBySiswaIdAndUjianMapelId(siswa.getId(), ujianId)
+                .orElseGet(() -> {
+                    com.baknusbelajar.api.entity.SiswaUjianStatus newStatus = new com.baknusbelajar.api.entity.SiswaUjianStatus();
+                    newStatus.setSiswa(siswa);
+                    newStatus.setUjianMapel(ujian);
+                    return newStatus;
+                });
+
+        int durasi = ujian.getDurasi() != null ? ujian.getDurasi() : 60;
+        if (status.getWaktuMulaiSiswa() == null) {
+            status.setWaktuMulaiSiswa(java.time.LocalDateTime.now().minusMinutes(durasi));
+        }
+        status.setStatusSelesai(true);
+        status.setWaktuSelesai(java.time.LocalDateTime.now());
+        siswaUjianStatusRepository.save(status);
+
+        // Auto-scoring PG:
+        try {
+            jawabanPGService.evaluateAndEnsureScoresForUjianAndSiswa(ujianId, siswa.getId());
+        } catch (Exception ex) {
+            log.error("Error auto-scoring PG for ujian: {}, siswa: {}", ujianId, siswa.getId(), ex);
+        }
+
+        // Trigger automatic AI scoring if enabled
+        try {
+            jawabanSiswaService.processAiScoringForUjianAndSiswa(ujianId, siswa.getId());
+        } catch (Exception ex) {
+            log.error("Error AI scoring for ujian: {}, siswa: {}", ujianId, siswa.getId(), ex);
+        }
+
+        // Remove from active online redis
+        if (siswa.getNisn() != null && examStatusService != null) {
+            try {
+                examStatusService.removeStudent(ujianId, siswa.getNisn(), siswa.getNamaLengkap());
+            } catch (Exception e) {
+                log.warn("Redis removeStudent error: {}", e.getMessage());
+            }
+        }
+    }
+
+    @Transactional
+    public Map<String, Object> forceFinishAllSedangUjian(Long ujianId) {
+        List<ExamPesertaDTO> sedangList = getPesertaUjian(ujianId, null, "SEDANG");
+        int count = 0;
+        for (ExamPesertaDTO p : sedangList) {
+            try {
+                forceFinishUjianForStudent(ujianId, p.getSiswaId());
+                count++;
+            } catch (Exception e) {
+                log.error("Error force finishing ujian for student {}: {}", p.getSiswaId(), e.getMessage());
+            }
+        }
+        return Map.of("success", true, "finishedCount", count);
+    }
+
+    @Transactional
+    public Double calculateExamAverageScore(Long ujianId) {
+        List<ExamPesertaDTO> pesertaList = getPesertaUjian(ujianId, null, "SUDAH");
+        List<Double> validScores = pesertaList.stream()
+                .map(ExamPesertaDTO::getNilai)
+                .filter(n -> n != null && n > 0.0)
+                .collect(Collectors.toList());
+
+        if (validScores.isEmpty()) {
+            validScores = pesertaList.stream()
+                    .map(ExamPesertaDTO::getNilai)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+
+        if (validScores.isEmpty()) {
+            throw new RuntimeException("Belum ada siswa yang menyelesaikan ujian ini untuk menghitung nilai rata-rata.");
+        }
+
+        double avg = validScores.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+        return Math.round(avg * 10.0) / 10.0;
+    }
+
+    @Transactional
+    public void fillAverageScoreForStudent(Long ujianId, Long siswaId) {
+        Double avg = calculateExamAverageScore(ujianId);
+        applyScoreToStudent(ujianId, siswaId, avg);
+    }
+
+    @Transactional
+    public Map<String, Object> fillAverageScoreForAllBelum(Long ujianId) {
+        Double avg = calculateExamAverageScore(ujianId);
+        List<ExamPesertaDTO> belumList = getPesertaUjian(ujianId, null, "BELUM");
+        int count = 0;
+        for (ExamPesertaDTO p : belumList) {
+            try {
+                applyScoreToStudent(ujianId, p.getSiswaId(), avg);
+                count++;
+            } catch (Exception e) {
+                log.error("Error applying average score for student {}: {}", p.getSiswaId(), e.getMessage());
+            }
+        }
+        return Map.of("success", true, "filledCount", count, "averageScore", avg);
+    }
+
+    @Transactional
+    public void applyScoreToStudent(Long ujianId, Long siswaId, Double targetScore) {
+        UjianMapel ujian = ujianMapelRepository.findById(ujianId)
+                .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan (ID: " + ujianId + ")"));
+        com.baknusbelajar.api.entity.Siswa siswa = siswaRepository.findById(siswaId)
+                .orElseThrow(() -> new RuntimeException("Siswa tidak ditemukan (ID: " + siswaId + ")"));
+
+        // 1. Update status
+        com.baknusbelajar.api.entity.SiswaUjianStatus status = siswaUjianStatusRepository
+                .findBySiswaIdAndUjianMapelId(siswa.getId(), ujianId)
+                .orElseGet(() -> {
+                    com.baknusbelajar.api.entity.SiswaUjianStatus newStatus = new com.baknusbelajar.api.entity.SiswaUjianStatus();
+                    newStatus.setSiswa(siswa);
+                    newStatus.setUjianMapel(ujian);
+                    return newStatus;
+                });
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        int durasi = ujian.getDurasi() != null ? ujian.getDurasi() : 60;
+        if (status.getWaktuMulaiSiswa() == null) {
+            status.setWaktuMulaiSiswa(now.minusMinutes(durasi));
+        }
+        status.setStatusSelesai(true);
+        status.setWaktuSelesai(now);
+        siswaUjianStatusRepository.save(status);
+
+        // 2. Clear old answers if any
+        var existingPg = jawabanPGRepository.findBySiswaIdAndSoalPG_UjianMapel_Id(siswaId, ujianId);
+        if (existingPg != null && !existingPg.isEmpty()) {
+            jawabanPGRepository.deleteAll(existingPg);
+        }
+        var existingEssay = jawabanSiswaRepository.findBySiswaIdAndSoalEssay_UjianMapel_Id(siswaId, ujianId);
+        if (existingEssay != null && !existingEssay.isEmpty()) {
+            jawabanSiswaRepository.deleteAll(existingEssay);
+        }
+
+        // 3. Populate answers to match targetScore
+        List<com.baknusbelajar.api.entity.SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
+        List<com.baknusbelajar.api.entity.SoalPG> pgList = soalPGRepository.findByUjianMapelId(ujianId);
+
+        if (!essayList.isEmpty()) {
+            com.baknusbelajar.api.entity.SoalEssay firstEssay = essayList.get(0);
+            com.baknusbelajar.api.entity.JawabanSiswa js = com.baknusbelajar.api.entity.JawabanSiswa.builder()
+                    .soalEssay(firstEssay)
+                    .siswa(siswa)
+                    .teksJawaban("[Nilai Ujian Sementara - Diisi Otomatis Mengikuti Rata-rata Kelas oleh Admin]")
+                    .skorFinalGuru(targetScore)
+                    .skorAi(targetScore)
+                    .raguRagu(false)
+                    .build();
+            jawabanSiswaRepository.save(js);
+
+            for (int i = 1; i < essayList.size(); i++) {
+                com.baknusbelajar.api.entity.JawabanSiswa emptyJs = com.baknusbelajar.api.entity.JawabanSiswa.builder()
+                        .soalEssay(essayList.get(i))
+                        .siswa(siswa)
+                        .teksJawaban("-")
+                        .skorFinalGuru(0.0)
+                        .skorAi(0.0)
+                        .raguRagu(false)
+                        .build();
+                jawabanSiswaRepository.save(emptyJs);
+            }
+
+            for (com.baknusbelajar.api.entity.SoalPG pg : pgList) {
+                com.baknusbelajar.api.entity.JawabanPG jpg = com.baknusbelajar.api.entity.JawabanPG.builder()
+                        .soalPG(pg)
+                        .siswa(siswa)
+                        .jawaban(pg.getKunciJawaban() != null ? pg.getKunciJawaban() : "")
+                        .skor(0.0)
+                        .isCorrect(false)
+                        .raguRagu(false)
+                        .build();
+                jawabanPGRepository.save(jpg);
+            }
+        } else if (!pgList.isEmpty()) {
+            int totalPg = pgList.size();
+            double remaining = targetScore;
+            for (int i = 0; i < totalPg; i++) {
+                com.baknusbelajar.api.entity.SoalPG pg = pgList.get(i);
+                double allocated;
+                if (i == totalPg - 1) {
+                    allocated = Math.round(remaining * 10.0) / 10.0;
+                } else {
+                    allocated = Math.round((targetScore / totalPg) * 10.0) / 10.0;
+                    remaining -= allocated;
+                }
+                com.baknusbelajar.api.entity.JawabanPG jpg = com.baknusbelajar.api.entity.JawabanPG.builder()
+                        .soalPG(pg)
+                        .siswa(siswa)
+                        .jawaban(pg.getKunciJawaban() != null ? pg.getKunciJawaban() : "A")
+                        .skor(allocated)
+                        .isCorrect(allocated > 0)
+                        .raguRagu(false)
+                        .build();
+                jawabanPGRepository.save(jpg);
+            }
+        }
+    }
+
+        public com.baknusbelajar.api.dto.exam.ExamClassSummaryDTO getExamClassSummary(Long ujianId) {
         var monitoringList = getExamMonitoring(ujianId, null);
         UjianMapel ujian = ujianMapelRepository.findById(ujianId)
                 .orElseThrow(() -> new RuntimeException("Ujian not found"));

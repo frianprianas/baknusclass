@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
-    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw, RotateCcw
+    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw, RotateCcw,
+    Sparkles
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -960,9 +961,31 @@ const ExamScoring = () => {
                         <div className="student-list-card">
                             <div className="list-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span><UserCheck size={18} /> Daftar Peserta Ujian ({studentsData.length})</span>
-                                {studentsData.length > 0 && (
-                                    <button
-                                        onClick={handleResetAllExam}
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {studentsData.filter(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline)).length > 0 && (
+                                        <button
+                                            onClick={handleForceFinishAllFromScoring}
+                                            title="Selesaikan ujian untuk semua siswa yang saat ini sedang mengerjakan"
+                                            style={{
+                                                background: '#ecfdf5',
+                                                color: '#059669',
+                                                border: '1px solid #a7f3d0',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            <CheckCircle2 size={11} /> Selesaikan Yang Sedang ({studentsData.filter(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline)).length})
+                                        </button>
+                                    )}
+                                    {studentsData.length > 0 && (
+                                        <button
+                                            onClick={handleResetAllExam}
                                         title="Izinkan SEMUA siswa mengulang ujian ini dari awal"
                                         style={{
                                             background: '#fef2f2',
@@ -1106,7 +1129,55 @@ const ExamScoring = () => {
                                                         <Clock size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                                                         Durasi: <strong>{std.durasiStr}</strong>
                                                     </div>
-                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                                                        {!std.isFinished && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleForceFinishStudentFromScoring(std);
+                                                                }}
+                                                                style={{
+                                                                    background: '#ecfdf5',
+                                                                    color: '#059669',
+                                                                    border: '1px solid #a7f3d0',
+                                                                    padding: '3px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.7rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="Selesaikan ujian siswa ini sekarang dan langsung beri penilaian"
+                                                            >
+                                                                <CheckCircle2 size={11} /> Selesaikan
+                                                            </button>
+                                                        )}
+                                                        {user.role === 'ADMIN' && !std.isFinished && std.durasiStr !== 'Pengerjaan' && !std.isOnline && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleFillAverageScoreFromScoring(std);
+                                                                }}
+                                                                style={{
+                                                                    background: '#f5f3ff',
+                                                                    color: '#6d28d9',
+                                                                    border: '1px solid #ddd6fe',
+                                                                    padding: '3px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.7rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px'
+                                                                }}
+                                                                title="Khusus Admin: Isi ujian siswa ini dengan nilai rata-rata kelas"
+                                                            >
+                                                                <Sparkles size={11} /> Isi Rata-rata
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
