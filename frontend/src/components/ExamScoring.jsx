@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
     BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
-    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw, RotateCcw,
-    Sparkles
+    ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw, RotateCcw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -600,6 +599,61 @@ const ExamScoring = () => {
         }
     };
 
+    const handleForceFinishStudentFromScoring = async (student) => {
+        if (!selectedExam) return;
+        const confirmMsg = `Selesaikan ujian untuk siswa "${student.namaSiswa}" sekarang?\n\nJawaban siswa akan langsung dievaluasi dan nilainya dihitung otomatis.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/force-finish/${student.siswaId}`, {}, { headers });
+            alert(`Ujian ${student.namaSiswa} berhasil diselesaikan dan dinilai.`);
+            handleSelectExam(selectedExam);
+        } catch (err) {
+            console.error('Error force finish student:', err);
+            alert('Gagal menyelesaikan ujian siswa: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const handleForceFinishAllFromScoring = async () => {
+        if (!selectedExam) return;
+        const sedangStudents = studentsData.filter(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline));
+        if (sedangStudents.length === 0) {
+            alert('Tidak ada siswa yang berstatus sedang mengerjakan.');
+            return;
+        }
+
+        const confirmMsg = `PERINGATAN: Selesaikan ujian untuk SEMUA siswa (${sedangStudents.length} siswa) yang saat ini berstatus sedang mengerjakan?\n\nSiswa akan langsung dihentikan dan seluruh jawabannya dinilai otomatis.`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/force-finish-all`, {}, { headers });
+            const finished = resp.data?.finishedCount ?? sedangStudents.length;
+            alert(`Berhasil menyelesaikan dan menilai ${finished} siswa yang sedang mengerjakan.`);
+            handleSelectExam(selectedExam);
+        } catch (err) {
+            console.error('Error force finish all:', err);
+            alert('Gagal menyelesaikan ujian massal: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const handleFillAverageScoreFromScoring = async (student) => {
+        if (!selectedExam) return;
+        try {
+            const avgResp = await axios.get(`/api/exam/ujian-mapel/${selectedExam.id}/average-score`, { headers });
+            const avg = avgResp.data?.averageScore;
+
+            const confirmMsg = `[FITUR KHUSUS ADMIN]\n\nIsi hasil ujian siswa "${student.namaSiswa}" dengan nilai rata-rata kelas (${avg})?\n\nSiswa akan berstatus Selesai Ujian dengan nilai ${avg} agar rekap nilai dapat segera diolah.\n(Catatan: Nilai dapat direset atau dikoreksi manual saat ujian susulan dilakukan).`;
+            if (!window.confirm(confirmMsg)) return;
+
+            const resp = await axios.post(`/api/exam/ujian-mapel/${selectedExam.id}/fill-average-score/${student.siswaId}`, {}, { headers });
+            alert(resp.data?.message || `Berhasil mengisi ujian ${student.namaSiswa} dengan nilai rata-rata (${avg}).`);
+            handleSelectExam(selectedExam);
+        } catch (err) {
+            console.error('Error fill average score:', err);
+            alert('Gagal mengisi nilai rata-rata: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
     const handleResetStudentExam = async (targetStudent = null) => {
         const student = targetStudent || selectedStudent;
         if (!student || !selectedExam) return;
@@ -961,31 +1015,9 @@ const ExamScoring = () => {
                         <div className="student-list-card">
                             <div className="list-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span><UserCheck size={18} /> Daftar Peserta Ujian ({studentsData.length})</span>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    {studentsData.filter(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline)).length > 0 && (
-                                        <button
-                                            onClick={handleForceFinishAllFromScoring}
-                                            title="Selesaikan ujian untuk semua siswa yang saat ini sedang mengerjakan"
-                                            style={{
-                                                background: '#ecfdf5',
-                                                color: '#059669',
-                                                border: '1px solid #a7f3d0',
-                                                padding: '4px 8px',
-                                                borderRadius: '6px',
-                                                fontSize: '0.7rem',
-                                                fontWeight: 700,
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                            }}
-                                        >
-                                            <CheckCircle2 size={11} /> Selesaikan Yang Sedang ({studentsData.filter(s => !s.isFinished && (s.durasiStr === 'Pengerjaan' || s.isOnline)).length})
-                                        </button>
-                                    )}
-                                    {studentsData.length > 0 && (
-                                        <button
-                                            onClick={handleResetAllExam}
+                                {studentsData.length > 0 && (
+                                    <button
+                                        onClick={handleResetAllExam}
                                         title="Izinkan SEMUA siswa mengulang ujian ini dari awal"
                                         style={{
                                             background: '#fef2f2',
@@ -1129,55 +1161,7 @@ const ExamScoring = () => {
                                                         <Clock size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                                                         Durasi: <strong>{std.durasiStr}</strong>
                                                     </div>
-                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                                                        {!std.isFinished && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleForceFinishStudentFromScoring(std);
-                                                                }}
-                                                                style={{
-                                                                    background: '#ecfdf5',
-                                                                    color: '#059669',
-                                                                    border: '1px solid #a7f3d0',
-                                                                    padding: '3px 8px',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '0.7rem',
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '4px'
-                                                                }}
-                                                                title="Selesaikan ujian siswa ini sekarang dan langsung beri penilaian"
-                                                            >
-                                                                <CheckCircle2 size={11} /> Selesaikan
-                                                            </button>
-                                                        )}
-                                                        {user.role === 'ADMIN' && !std.isFinished && std.durasiStr !== 'Pengerjaan' && !std.isOnline && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleFillAverageScoreFromScoring(std);
-                                                                }}
-                                                                style={{
-                                                                    background: '#f5f3ff',
-                                                                    color: '#6d28d9',
-                                                                    border: '1px solid #ddd6fe',
-                                                                    padding: '3px 8px',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '0.7rem',
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '4px'
-                                                                }}
-                                                                title="Khusus Admin: Isi ujian siswa ini dengan nilai rata-rata kelas"
-                                                            >
-                                                                <Sparkles size={11} /> Isi Rata-rata
-                                                            </button>
-                                                        )}
+                                                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
