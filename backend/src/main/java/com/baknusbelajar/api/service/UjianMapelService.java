@@ -728,9 +728,22 @@ public class UjianMapelService {
             jawabanSiswaRepository.deleteAll(existingEssay);
         }
 
-        // 3. Populate answers to match targetScore
+        // 3. Hitung bobot maksimal ujian agar targetScore skala 0-100 terdistribusi akurat
         List<com.baknusbelajar.api.entity.SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
         List<com.baknusbelajar.api.entity.SoalPG> pgList = soalPGRepository.findByUjianMapelId(ujianId);
+
+        double totalMaxBobot = 0.0;
+        for (com.baknusbelajar.api.entity.SoalPG spg : pgList) {
+            totalMaxBobot += (spg.getBobotNilai() != null && spg.getBobotNilai() > 0 ? spg.getBobotNilai() : 2.0);
+        }
+        for (com.baknusbelajar.api.entity.SoalEssay se : essayList) {
+            totalMaxBobot += (se.getBobotNilai() != null && se.getBobotNilai() > 0 ? se.getBobotNilai() : 10.0);
+        }
+
+        double rawTarget = targetScore != null ? targetScore : 0.0;
+        if (totalMaxBobot > 0.0) {
+            rawTarget = (targetScore * totalMaxBobot) / 100.0;
+        }
 
         if (!essayList.isEmpty()) {
             com.baknusbelajar.api.entity.SoalEssay firstEssay = essayList.get(0);
@@ -738,8 +751,8 @@ public class UjianMapelService {
                     .soalEssay(firstEssay)
                     .siswa(siswa)
                     .teksJawaban("[Nilai Ujian Sementara - Diisi Otomatis Mengikuti Rata-rata Kelas oleh Admin]")
-                    .skorFinalGuru(targetScore)
-                    .skorAi(targetScore)
+                    .skorFinalGuru(rawTarget)
+                    .skorAi(rawTarget)
                     .raguRagu(false)
                     .build();
             jawabanSiswaRepository.save(js);
@@ -769,14 +782,14 @@ public class UjianMapelService {
             }
         } else if (!pgList.isEmpty()) {
             int totalPg = pgList.size();
-            double remaining = targetScore;
+            double remaining = rawTarget;
             for (int i = 0; i < totalPg; i++) {
                 com.baknusbelajar.api.entity.SoalPG pg = pgList.get(i);
                 double allocated;
                 if (i == totalPg - 1) {
                     allocated = Math.round(remaining * 10.0) / 10.0;
                 } else {
-                    allocated = Math.round((targetScore / totalPg) * 10.0) / 10.0;
+                    allocated = Math.round((rawTarget / totalPg) * 10.0) / 10.0;
                     remaining -= allocated;
                 }
                 com.baknusbelajar.api.entity.JawabanPG jpg = com.baknusbelajar.api.entity.JawabanPG.builder()
@@ -939,6 +952,18 @@ public class UjianMapelService {
         String normalizedStatusFilter = (statusFilter != null && !statusFilter.trim().isEmpty())
                 ? statusFilter.trim().toUpperCase() : null;
 
+        // Hitung total bobot maksimal ujian (PG + Essay) agar skala nilai konsisten 0 - 100 dengan ExamScoring (Penilaian Ujian)
+        List<com.baknusbelajar.api.entity.SoalPG> allSoalPG = soalPGRepository.findByUjianMapelId(ujianId);
+        List<com.baknusbelajar.api.entity.SoalEssay> allSoalEssay = soalEssayRepository.findByUjianMapelId(ujianId);
+
+        double totalMaxBobot = 0.0;
+        for (com.baknusbelajar.api.entity.SoalPG spg : allSoalPG) {
+            totalMaxBobot += (spg.getBobotNilai() != null && spg.getBobotNilai() > 0 ? spg.getBobotNilai() : 2.0);
+        }
+        for (com.baknusbelajar.api.entity.SoalEssay se : allSoalEssay) {
+            totalMaxBobot += (se.getBobotNilai() != null && se.getBobotNilai() > 0 ? se.getBobotNilai() : 10.0);
+        }
+
         List<ExamPesertaDTO> result = new java.util.ArrayList<>();
 
         for (com.baknusbelajar.api.entity.Siswa siswa : distinctSiswa.values()) {
@@ -963,7 +988,15 @@ public class UjianMapelService {
                 double totalEssay = essayMap.getOrDefault(siswa.getId(), Collections.emptyList()).stream()
                         .mapToDouble(e -> e.getSkorFinalGuru() != null ? e.getSkorFinalGuru() : (e.getSkorAi() != null ? e.getSkorAi() : 0.0)).sum();
 
-                nilai = Math.round((totalPg + totalEssay) * 10.0) / 10.0;
+                double rawScore = totalPg + totalEssay;
+                if (totalMaxBobot > 0.0) {
+                    double scaled = (rawScore / totalMaxBobot) * 100.0;
+                    if (scaled > 100.0) scaled = 100.0;
+                    if (scaled < 0.0) scaled = 0.0;
+                    nilai = Math.round(scaled * 10.0) / 10.0;
+                } else {
+                    nilai = Math.round(rawScore * 10.0) / 10.0;
+                }
             } else if (hasStarted || isOnline) {
                 statusStr = "SEDANG";
                 waktuMulai = (st != null) ? st.getWaktuMulaiSiswa() : null;
