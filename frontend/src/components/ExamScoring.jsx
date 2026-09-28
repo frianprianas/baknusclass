@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-    BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Award, Brain, Save, Check, Clock, Timer, FileDown,
+    BookOpen, BookMarked, UserCheck, AlertCircle, ChevronLeft, CheckCircle2, Sparkles, Award, Brain, Save, Check, Clock, Timer, FileDown,
     ArrowLeft, CloudUpload, ShieldCheck, BarChart2, X, Activity, Brush, RefreshCw, RotateCcw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
@@ -25,6 +25,7 @@ const ExamScoring = () => {
     const [studentStatusFilter, setStudentStatusFilter] = useState('ALL'); // 'ALL' | 'SUDAH' | 'SEDANG' | 'BELUM'
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userRole = user.role || '';
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
 
