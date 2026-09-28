@@ -25,7 +25,8 @@ const ExamScoring = () => {
     const [studentStatusFilter, setStudentStatusFilter] = useState('ALL'); // 'ALL' | 'SUDAH' | 'SEDANG' | 'BELUM'
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const userRole = user.role || '';
+    const userRole = (user.role || '').toUpperCase().trim();
+    const isAdmin = userRole === 'ADMIN' || Boolean(user.isCoAdmin);
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
 
