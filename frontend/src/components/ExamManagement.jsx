@@ -592,13 +592,6 @@ const ExamManagement = () => {
             setIsSavingBatch(false);
         }
     };
-
-    // Render MathJax (LaTeX, integral, pangkat, matrix) whenever questions or drafts update
-    useEffect(() => {
-        if (window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise().catch(() => {});
-        }
-    }, [viewingQuestions, questions, questionsPG, draftQuestions, wordImportStep]);
     const [isCopying, setIsCopying] = useState(false);
     const [qType, setQType] = useState('essay'); // 'essay' or 'pg'
     const [questions, setQuestions] = useState([]);
@@ -916,13 +909,20 @@ const ExamManagement = () => {
     };
 
     useEffect(() => {
-        if (isModalOpen || isKartuModalOpen) {
+        if (isModalOpen || isKartuModalOpen || isExcelModalOpen || isWordImportModalOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
         }
         return () => { document.body.style.overflow = 'unset'; };
-    }, [isModalOpen, isKartuModalOpen]);
+    }, [isModalOpen, isKartuModalOpen, isExcelModalOpen, isWordImportModalOpen]);
+
+    // Render MathJax (LaTeX, integral, pangkat, matrix) whenever questions or drafts update
+    useEffect(() => {
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise().catch(() => {});
+        }
+    }, [viewingQuestions, questions, questionsPG, draftQuestions, wordImportStep]);
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
