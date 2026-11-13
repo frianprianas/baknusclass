@@ -311,10 +311,11 @@ const ExamManagement = () => {
         setIsWordImportModalOpen(true);
     };
 
-    // Excel Template & Upload States
+    // Template & Upload States (Word .docx & Excel .xlsx)
     const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
     const [excelTargetExam, setExcelTargetExam] = useState(null);
     const [excelTab, setExcelTab] = useState('download'); // 'download' | 'upload'
+    const [templateDocType, setTemplateDocType] = useState('docx'); // 'docx' (default) | 'xlsx'
     const [excelFile, setExcelFile] = useState(null);
     const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
     const [isUploadingExcel, setIsUploadingExcel] = useState(false);
@@ -331,11 +332,12 @@ const ExamManagement = () => {
     const handleOpenExcelModal = (exam) => {
         setExcelTargetExam(exam);
         setExcelTab('download');
+        setTemplateDocType('docx');
         setExcelFile(null);
         setIsExcelModalOpen(true);
     };
 
-    const handleDownloadTemplateExcel = async () => {
+    const handleDownloadTemplate = async () => {
         setIsGeneratingExcel(true);
         try {
             const token = localStorage.getItem('token');
@@ -350,34 +352,41 @@ const ExamManagement = () => {
                 namaMapel: excelTargetExam?.namaMapel || 'Soal_Ujian'
             };
 
-            const response = await axios.post('/api/exam/ujian-mapel/download-template-excel', payload, {
+            const isDocx = templateDocType === 'docx';
+            const endpoint = isDocx 
+                ? '/api/exam/ujian-mapel/download-template-docx'
+                : '/api/exam/ujian-mapel/download-template-excel';
+
+            const response = await axios.post(endpoint, payload, {
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob'
             });
 
-            const blob = new Blob([response.data], {
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            });
+            const mimeType = isDocx 
+                ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+            const blob = new Blob([response.data], { type: mimeType });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             const cleanName = (excelTargetExam?.namaMapel || 'Soal_Ujian').replace(/[^a-zA-Z0-9_-]/g, '_');
-            a.download = `Template_Soal_${cleanName}.xlsx`;
+            a.download = `Template_Soal_${cleanName}.${isDocx ? 'docx' : 'xlsx'}`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch (err) {
-            console.error('Error downloading template excel:', err);
-            alert('Gagal mengunduh template Excel: ' + (err.response?.data?.message || err.message));
+            console.error('Error downloading template:', err);
+            alert('Gagal mengunduh template: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsGeneratingExcel(false);
         }
     };
 
-    const handleParseExcelForReview = async () => {
+    const handleParseTemplateForReview = async () => {
         if (!excelFile) {
-            alert('Silakan pilih berkas Excel (.xlsx) terlebih dahulu.');
+            alert('Silakan pilih berkas Word (.docx) atau Excel (.xlsx) terlebih dahulu.');
             return;
         }
         setIsUploadingExcel(true);
@@ -386,7 +395,7 @@ const ExamManagement = () => {
             const formData = new FormData();
             formData.append('file', excelFile);
 
-            const res = await axios.post('/api/exam/ujian-mapel/parse-excel', formData, {
+            const res = await axios.post('/api/exam/ujian-mapel/parse-template', formData, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
@@ -396,7 +405,7 @@ const ExamManagement = () => {
             if (res.data && res.data.success) {
                 const parsedDrafts = res.data.drafts || [];
                 if (parsedDrafts.length === 0) {
-                    alert('Tidak ada soal yang terdeteksi dalam berkas Excel tersebut.');
+                    alert('Tidak ada soal yang terdeteksi dalam tabel berkas tersebut. Pastikan tabel template tidak dihapus.');
                     return;
                 }
                 setDraftQuestions(parsedDrafts);
@@ -405,22 +414,22 @@ const ExamManagement = () => {
                 setIsExcelModalOpen(false);
                 setIsWordImportModalOpen(true);
             } else {
-                alert('Gagal membaca berkas Excel: ' + (res.data?.message || 'Format tidak sesuai'));
+                alert('Gagal membaca berkas: ' + (res.data?.message || 'Format tidak sesuai'));
             }
         } catch (err) {
-            console.error('Error parsing excel:', err);
-            alert('Gagal membaca file Excel: ' + (err.response?.data?.message || err.message));
+            console.error('Error parsing template:', err);
+            alert('Gagal membaca berkas: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsUploadingExcel(false);
         }
     };
 
-    const handleDirectImportExcel = async () => {
+    const handleDirectImportTemplate = async () => {
         if (!excelFile) {
-            alert('Silakan pilih berkas Excel (.xlsx) terlebih dahulu.');
+            alert('Silakan pilih berkas Word (.docx) atau Excel (.xlsx) terlebih dahulu.');
             return;
         }
-        if (!window.confirm(`Yakin ingin langsung mengimpor seluruh soal dari Excel ke ujian "${excelTargetExam?.namaMapel}"?`)) {
+        if (!window.confirm(`Yakin ingin langsung mengimpor seluruh soal dari berkas "${excelFile.name}" ke ujian "${excelTargetExam?.namaMapel}"?`)) {
             return;
         }
         setIsUploadingExcel(true);
@@ -429,7 +438,7 @@ const ExamManagement = () => {
             const formData = new FormData();
             formData.append('file', excelFile);
 
-            const res = await axios.post(`/api/exam/ujian-mapel/${excelTargetExam.id}/import-excel`, formData, {
+            const res = await axios.post(`/api/exam/ujian-mapel/${excelTargetExam.id}/import-template`, formData, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
@@ -449,8 +458,8 @@ const ExamManagement = () => {
                 alert('Gagal mengimpor: ' + (res.data?.message || 'Terjadi kesalahan'));
             }
         } catch (err) {
-            console.error('Error importing excel:', err);
-            alert('Gagal mengimpor file Excel: ' + (err.response?.data?.message || err.message));
+            console.error('Error importing template:', err);
+            alert('Gagal mengimpor berkas: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsUploadingExcel(false);
         }
@@ -3206,7 +3215,7 @@ const ExamManagement = () => {
                 <div className="modal-content animate-slide-up" style={{
                     borderRadius: '24px',
                     width: '100%',
-                    maxWidth: '720px',
+                    maxWidth: '760px',
                     maxHeight: '92vh',
                     display: 'flex',
                     flexDirection: 'column',
@@ -3221,27 +3230,27 @@ const ExamManagement = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        background: '#f0fdf4'
+                        background: templateDocType === 'docx' ? '#f0f9ff' : '#f0fdf4'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                             <div style={{
                                 width: '44px',
                                 height: '44px',
                                 borderRadius: '14px',
-                                background: 'linear-gradient(135deg, #059669, #10b981)',
+                                background: templateDocType === 'docx' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : 'linear-gradient(135deg, #059669, #10b981)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: '#ffffff',
-                                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                                boxShadow: templateDocType === 'docx' ? '0 4px 12px rgba(37, 99, 235, 0.3)' : '0 4px 12px rgba(16, 185, 129, 0.3)'
                             }}>
-                                <FileSpreadsheet size={22} />
+                                {templateDocType === 'docx' ? <FileText size={22} /> : <FileSpreadsheet size={22} />}
                             </div>
                             <div>
-                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#064e3b' }}>
-                                    Template & Upload Soal Excel (.xlsx)
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: templateDocType === 'docx' ? '#1e3a8a' : '#064e3b' }}>
+                                    Template Tabel Soal ({templateDocType === 'docx' ? 'Microsoft Word .docx' : 'Excel .xlsx'})
                                 </h3>
-                                <p style={{ margin: 0, fontSize: '0.82rem', color: '#047857' }}>
+                                <p style={{ margin: 0, fontSize: '0.82rem', color: templateDocType === 'docx' ? '#1d4ed8' : '#047857' }}>
                                     Ujian: <strong>{excelTargetExam?.namaMapel}</strong> • {excelTargetExam?.namaEvent || 'Event Ujian'}
                                 </p>
                             </div>
@@ -3272,9 +3281,9 @@ const ExamManagement = () => {
                                 padding: '12px 16px',
                                 borderRadius: '12px 12px 0 0',
                                 border: 'none',
-                                borderBottom: excelTab === 'download' ? '3px solid #059669' : '3px solid transparent',
-                                background: excelTab === 'download' ? '#f0fdf4' : 'transparent',
-                                color: excelTab === 'download' ? '#065f46' : '#64748b',
+                                borderBottom: excelTab === 'download' ? (templateDocType === 'docx' ? '3px solid #2563eb' : '3px solid #059669') : '3px solid transparent',
+                                background: excelTab === 'download' ? (templateDocType === 'docx' ? '#eff6ff' : '#f0fdf4') : 'transparent',
+                                color: excelTab === 'download' ? (templateDocType === 'docx' ? '#1e40af' : '#065f46') : '#64748b',
                                 fontWeight: 800,
                                 fontSize: '0.9rem',
                                 display: 'flex',
@@ -3296,9 +3305,9 @@ const ExamManagement = () => {
                                 padding: '12px 16px',
                                 borderRadius: '12px 12px 0 0',
                                 border: 'none',
-                                borderBottom: excelTab === 'upload' ? '3px solid #059669' : '3px solid transparent',
-                                background: excelTab === 'upload' ? '#f0fdf4' : 'transparent',
-                                color: excelTab === 'upload' ? '#065f46' : '#64748b',
+                                borderBottom: excelTab === 'upload' ? (templateDocType === 'docx' ? '3px solid #2563eb' : '3px solid #059669') : '3px solid transparent',
+                                background: excelTab === 'upload' ? (templateDocType === 'docx' ? '#eff6ff' : '#f0fdf4') : 'transparent',
+                                color: excelTab === 'upload' ? (templateDocType === 'docx' ? '#1e40af' : '#065f46') : '#64748b',
                                 fontWeight: 800,
                                 fontSize: '0.9rem',
                                 display: 'flex',
@@ -3310,7 +3319,7 @@ const ExamManagement = () => {
                             }}
                         >
                             <Upload size={16} />
-                            2. Upload File Excel yang Sudah Diisi
+                            2. Upload File yang Sudah Diisi
                         </button>
                     </div>
 
@@ -3318,127 +3327,176 @@ const ExamManagement = () => {
                     <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
                         {excelTab === 'download' ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {/* Pilihan Format Berkas: Word vs Excel */}
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        Pilih Format Berkas Template:
+                                    </label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                        <div
+                                            onClick={() => setTemplateDocType('docx')}
+                                            style={{
+                                                padding: '14px 16px',
+                                                borderRadius: '14px',
+                                                border: `2px solid ${templateDocType === 'docx' ? '#2563eb' : '#e2e8f0'}`,
+                                                background: templateDocType === 'docx' ? '#eff6ff' : '#f8fafc',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: templateDocType === 'docx' ? '#1e40af' : '#334155', fontSize: '0.95rem', marginBottom: '4px' }}>
+                                                <FileText size={18} color={templateDocType === 'docx' ? '#2563eb' : '#64748b'} />
+                                                Microsoft Word (.docx)
+                                                <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: '#dbeafe', color: '#1d4ed8', fontWeight: 800 }}>Direkomendasikan</span>
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+                                                Tabel terstruktur. Sangat mudah paste gambar langsung, rumus matematika, serta teks Arab & Jepang.
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            onClick={() => setTemplateDocType('xlsx')}
+                                            style={{
+                                                padding: '14px 16px',
+                                                borderRadius: '14px',
+                                                border: `2px solid ${templateDocType === 'xlsx' ? '#059669' : '#e2e8f0'}`,
+                                                background: templateDocType === 'xlsx' ? '#f0fdf4' : '#f8fafc',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: templateDocType === 'xlsx' ? '#065f46' : '#334155', fontSize: '0.95rem', marginBottom: '4px' }}>
+                                                <FileSpreadsheet size={18} color={templateDocType === 'xlsx' ? '#059669' : '#64748b'} />
+                                                Microsoft Excel (.xlsx)
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+                                                Format spreadsheet baris & kolom dengan lembar petunjuk terpisah.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div style={{
-                                    padding: '14px 18px',
-                                    borderRadius: '14px',
-                                    background: '#ecfdf5',
-                                    border: '1.5px solid #a7f3d0',
-                                    color: '#065f46',
-                                    fontSize: '0.85rem',
+                                    padding: '12px 16px',
+                                    borderRadius: '12px',
+                                    background: templateDocType === 'docx' ? '#eff6ff' : '#ecfdf5',
+                                    border: `1px solid ${templateDocType === 'docx' ? '#bfdbfe' : '#a7f3d0'}`,
+                                    color: templateDocType === 'docx' ? '#1e40af' : '#065f46',
+                                    fontSize: '0.82rem',
                                     lineHeight: 1.5
                                 }}>
-                                    💡 <strong>Petunjuk:</strong> Tentukan jumlah butir soal untuk setiap tipe soal yang Anda inginkan (tidak harus semuanya diisi). Template Excel akan dibuat otomatis dengan format kolom lengkap: pertanyaan, opsi A-E, kunci jawaban, dan skor per butir.
+                                    💡 <strong>Info:</strong> Tentukan jumlah butir untuk masing-masing tipe soal yang Anda perlukan. Template akan otomatis menyiapkan tabel dengan kolom nomor soal, tipe, pertanyaan, opsi jawaban, kunci, dan skor.
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                         Jumlah Butir Soal Berdasarkan Tipe
                                     </h4>
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
                                         {/* PG Biasa */}
-                                        <div style={{ padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                <label style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>1. PG Biasa (1 Kunci)</label>
+                                        <div style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>1. PG Biasa (1 Kunci)</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     value={excelCounts.pgBiasa}
                                                     onChange={(e) => setExcelCounts({ ...excelCounts, pgBiasa: Math.max(0, parseInt(e.target.value) || 0) })}
-                                                    style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
+                                                    style={{ width: '65px', padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
                                                 />
                                             </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Opsi A-E dengan 1 kunci jawaban benar (A/B/C/D/E).</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Opsi A-E, 1 kunci jawaban (A/B/C/D/E).</span>
                                         </div>
 
                                         {/* PG Kompleks */}
-                                        <div style={{ padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                <label style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>2. PG Kompleks (Banyak Kunci)</label>
+                                        <div style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>2. PG Kompleks (Banyak Kunci)</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     value={excelCounts.pgKompleks}
                                                     onChange={(e) => setExcelCounts({ ...excelCounts, pgKompleks: Math.max(0, parseInt(e.target.value) || 0) })}
-                                                    style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
+                                                    style={{ width: '65px', padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
                                                 />
                                             </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Opsi A-E, beberapa kunci benar (misal: A,C atau B,D,E).</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Opsi A-E, beberapa kunci benar (misal: A,C).</span>
                                         </div>
 
                                         {/* Benar / Salah */}
-                                        <div style={{ padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                <label style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>3. Benar / Salah Tunggal</label>
+                                        <div style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>3. Benar / Salah Tunggal</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     value={excelCounts.benarSalah}
                                                     onChange={(e) => setExcelCounts({ ...excelCounts, benarSalah: Math.max(0, parseInt(e.target.value) || 0) })}
-                                                    style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
+                                                    style={{ width: '65px', padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
                                                 />
                                             </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>1 pernyataan (A = Benar, B = Salah).</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>1 pernyataan (A = Benar, B = Salah).</span>
                                         </div>
 
                                         {/* BS Majemuk */}
-                                        <div style={{ padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                <label style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>4. Tabel Benar/Salah (Matriks)</label>
+                                        <div style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>4. Tabel Benar/Salah (Matriks)</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     value={excelCounts.bsMajemuk}
                                                     onChange={(e) => setExcelCounts({ ...excelCounts, bsMajemuk: Math.max(0, parseInt(e.target.value) || 0) })}
-                                                    style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
+                                                    style={{ width: '65px', padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
                                                 />
                                             </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Matriks butir 1 s/d 5 (kunci contoh: B,S,B,B,S).</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Matriks butir 1 s/d 5 (kunci contoh: B,S,B,B,S).</span>
                                         </div>
 
                                         {/* Essay */}
-                                        <div style={{ padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                <label style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>5. Essay / Uraian</label>
+                                        <div style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>5. Essay / Uraian</label>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     value={excelCounts.essay}
                                                     onChange={(e) => setExcelCounts({ ...excelCounts, essay: Math.max(0, parseInt(e.target.value) || 0) })}
-                                                    style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
+                                                    style={{ width: '65px', padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
                                                 />
                                             </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Jawaban uraian bebas (kunci/rubrik opsional).</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Jawaban teks bebas (kunci/rubrik opsional).</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Bobot Default */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                         Pengaturan Skor / Bobot Standar
                                     </h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Bobot per Soal PG / Objektif</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Bobot per Soal PG / Objektif</label>
                                             <input
                                                 type="number"
                                                 step="0.5"
                                                 min="0.1"
                                                 value={excelCounts.bobotPG}
                                                 onChange={(e) => setExcelCounts({ ...excelCounts, bobotPG: parseFloat(e.target.value) || 0 })}
-                                                style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontWeight: 700 }}
+                                                style={{ padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 700 }}
                                             />
                                         </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Bobot per Soal Essay / Uraian</label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Bobot per Soal Essay / Uraian</label>
                                             <input
                                                 type="number"
                                                 step="0.5"
                                                 min="0.1"
                                                 value={excelCounts.bobotEssay}
                                                 onChange={(e) => setExcelCounts({ ...excelCounts, bobotEssay: parseFloat(e.target.value) || 0 })}
-                                                style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontWeight: 700 }}
+                                                style={{ padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 700 }}
                                             />
                                         </div>
                                     </div>
@@ -3449,19 +3507,19 @@ const ExamManagement = () => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    padding: '16px 20px',
-                                    borderRadius: '16px',
+                                    padding: '14px 18px',
+                                    borderRadius: '14px',
                                     background: '#f8fafc',
                                     border: '1.5px dashed #cbd5e1'
                                 }}>
                                     <div>
-                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Total Soal Dibuat:</div>
-                                        <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>{totalSoalCount} Butir</div>
+                                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>Total Soal Dibuat:</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>{totalSoalCount} Butir</div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Estimasi Total Skor:</div>
+                                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>Estimasi Total Skor:</div>
                                         <div style={{
-                                            fontSize: '1.3rem',
+                                            fontSize: '1.25rem',
                                             fontWeight: 900,
                                             color: totalEstPoin === '100.0' || totalEstPoin === '100' ? '#059669' : '#0284c7'
                                         }}>
@@ -3481,7 +3539,7 @@ const ExamManagement = () => {
                                     fontSize: '0.85rem',
                                     lineHeight: 1.5
                                 }}>
-                                    💡 <strong>Upload File Excel:</strong> Unggah template Excel (.xlsx) yang telah Anda isi dengan soal, opsi, kunci, dan skor. Anda dapat memilih untuk <strong>Review Draf</strong> terlebih dahulu atau <strong>Langsung Simpan</strong> ke ujian.
+                                    💡 <strong>Upload File Template:</strong> Unggah berkas Word (.docx) atau Excel (.xlsx) yang tabelnya telah Anda isi dengan soal, opsi, kunci, dan skor. Sistem akan membaca seluruh baris tabel secara otomatis.
                                 </div>
 
                                 {/* Drag and Drop Zone */}
@@ -3491,17 +3549,17 @@ const ExamManagement = () => {
                                         borderRadius: '18px',
                                         padding: '36px 20px',
                                         textAlign: 'center',
-                                        background: excelFile ? '#f0fdf4' : '#f8fafc',
-                                        borderColor: excelFile ? '#22c55e' : '#cbd5e1',
+                                        background: excelFile ? '#f0f9ff' : '#f8fafc',
+                                        borderColor: excelFile ? '#3b82f6' : '#cbd5e1',
                                         cursor: 'pointer',
                                         transition: 'all 0.2s'
                                     }}
-                                    onClick={() => document.getElementById('excel-file-input')?.click()}
+                                    onClick={() => document.getElementById('template-file-input')?.click()}
                                 >
                                     <input
-                                        id="excel-file-input"
+                                        id="template-file-input"
                                         type="file"
-                                        accept=".xlsx, .xls"
+                                        accept=".docx, .xlsx, .xls"
                                         style={{ display: 'none' }}
                                         onChange={(e) => {
                                             if (e.target.files && e.target.files[0]) {
@@ -3513,31 +3571,31 @@ const ExamManagement = () => {
                                         width: '54px',
                                         height: '54px',
                                         borderRadius: '16px',
-                                        background: excelFile ? '#dcfce7' : '#e0e7ff',
-                                        color: excelFile ? '#16a34a' : '#4f46e5',
+                                        background: excelFile ? '#dbeafe' : '#f1f5f9',
+                                        color: excelFile ? '#2563eb' : '#64748b',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         marginBottom: '12px'
                                     }}>
-                                        <FileSpreadsheet size={28} />
+                                        <FileText size={28} />
                                     </div>
                                     {excelFile ? (
                                         <div>
-                                            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#166534', marginBottom: '4px' }}>
+                                            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1e40af', marginBottom: '4px' }}>
                                                 {excelFile.name}
                                             </div>
-                                            <div style={{ fontSize: '0.8rem', color: '#15803d' }}>
+                                            <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>
                                                 {(excelFile.size / 1024).toFixed(1)} KB • Klik untuk ganti berkas
                                             </div>
                                         </div>
                                     ) : (
                                         <div>
                                             <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', marginBottom: '4px' }}>
-                                                Pilih atau Tarik Berkas Excel ke Sini
+                                                Pilih atau Tarik Berkas Word (.docx) / Excel (.xlsx) ke Sini
                                             </div>
                                             <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                                Mendukung format .xlsx dan .xls
+                                                Mendukung berkas tabel resmi .docx dan spreadsheet .xlsx
                                             </div>
                                         </div>
                                     )}
@@ -3576,13 +3634,15 @@ const ExamManagement = () => {
                         {excelTab === 'download' ? (
                             <button
                                 type="button"
-                                onClick={handleDownloadTemplateExcel}
+                                onClick={handleDownloadTemplate}
                                 disabled={isGeneratingExcel}
                                 style={{
                                     padding: '10px 24px',
                                     borderRadius: '12px',
                                     border: 'none',
-                                    background: isGeneratingExcel ? '#94a3b8' : 'linear-gradient(135deg, #059669, #10b981)',
+                                    background: isGeneratingExcel 
+                                        ? '#94a3b8' 
+                                        : (templateDocType === 'docx' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : 'linear-gradient(135deg, #059669, #10b981)'),
                                     color: '#ffffff',
                                     fontWeight: 800,
                                     fontSize: '0.85rem',
@@ -3590,18 +3650,18 @@ const ExamManagement = () => {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                                    boxShadow: templateDocType === 'docx' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : '0 4px 12px rgba(16, 185, 129, 0.25)'
                                 }}
                             >
                                 {isGeneratingExcel ? (
                                     <>
                                         <RefreshCw size={16} className="animate-spin" />
-                                        Sedang Membuat Template...
+                                        Sedang Menyiapkan Template...
                                     </>
                                 ) : (
                                     <>
                                         <Download size={16} />
-                                        Download Template Excel ({totalSoalCount} Soal)
+                                        Download Template {templateDocType === 'docx' ? 'Word (.docx)' : 'Excel (.xlsx)'} ({totalSoalCount} Soal)
                                     </>
                                 )}
                             </button>
@@ -3609,7 +3669,7 @@ const ExamManagement = () => {
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button
                                     type="button"
-                                    onClick={handleParseExcelForReview}
+                                    onClick={handleParseTemplateForReview}
                                     disabled={isUploadingExcel || !excelFile}
                                     style={{
                                         padding: '10px 20px',
@@ -3631,7 +3691,7 @@ const ExamManagement = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={handleDirectImportExcel}
+                                    onClick={handleDirectImportTemplate}
                                     disabled={isUploadingExcel || !excelFile}
                                     style={{
                                         padding: '10px 22px',
@@ -3647,7 +3707,7 @@ const ExamManagement = () => {
                                         gap: '8px',
                                         boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
                                     }}
-                                    title="Langsung simpan seluruh soal dari Excel ke ujian"
+                                    title="Langsung simpan seluruh soal dari tabel ke ujian"
                                 >
                                     {isUploadingExcel ? (
                                         <>
@@ -3749,19 +3809,19 @@ const ExamManagement = () => {
                                     gap: '8px',
                                     padding: '10px 18px',
                                     borderRadius: '12px',
-                                    background: '#ecfdf5',
-                                    color: '#047857',
-                                    border: '1.5px solid #a7f3d0',
+                                    background: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    border: '1.5px solid #bfdbfe',
                                     fontWeight: 800,
                                     fontSize: '0.85rem',
                                     cursor: 'pointer',
-                                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.1)',
+                                    boxShadow: '0 2px 4px rgba(37, 99, 235, 0.1)',
                                     transition: 'all 0.2s'
                                 }}
-                                title="Unduh template Excel atau upload soal format Excel (.xlsx)"
+                                title="Unduh template tabel soal Word (.docx) atau upload file yang sudah diisi"
                             >
-                                <FileSpreadsheet size={16} />
-                                <span>Template / Upload Excel</span>
+                                <FileText size={16} />
+                                <span>Template / Upload Soal (Word/Excel)</span>
                             </button>
                             <div className="stat-item">
                                 <label>Total Soal</label>
@@ -6580,12 +6640,12 @@ const ExamManagement = () => {
                                                                 </button>
                                                                 <button
                                                                     className="btn-lengkapi"
-                                                                    style={{ background: '#f0fdf4', color: '#15803d', border: '1.5px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                                                    style={{ background: '#eff6ff', color: '#1d4ed8', border: '1.5px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                                                                     onClick={() => handleOpenExcelModal(exam)}
-                                                                    title="Unduh template Excel atau upload soal format Excel (.xlsx)"
+                                                                    title="Unduh template tabel soal Word (.docx) atau Excel (.xlsx)"
                                                                 >
-                                                                    <FileSpreadsheet size={13} />
-                                                                    Template / Excel
+                                                                    <FileText size={13} />
+                                                                    Template Soal (Word/Excel)
                                                                 </button>
                                                                 <button
                                                                     className="btn-lengkapi"

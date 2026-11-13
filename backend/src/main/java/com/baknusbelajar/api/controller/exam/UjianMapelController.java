@@ -25,6 +25,7 @@ public class UjianMapelController {
     private final com.baknusbelajar.api.service.AiQuestionImportService aiQuestionImportService;
     private final com.baknusbelajar.api.service.ExamStatusService examStatusService;
     private final com.baknusbelajar.api.service.QuestionExcelService questionExcelService;
+    private final com.baknusbelajar.api.service.QuestionDocxService questionDocxService;
 
     @GetMapping("/event/{eventId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'SISWA')")
@@ -415,6 +416,71 @@ public class UjianMapelController {
             ));
         } catch (Exception e) {
             log.error("Failed to import questions Excel for ujian id={}: ", id, e);
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/download-template-docx")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<byte[]> downloadTemplateDocx(@RequestBody(required = false) com.baknusbelajar.api.dto.exam.QuestionTemplateRequestDTO req) {
+        if (req == null) {
+            req = new com.baknusbelajar.api.dto.exam.QuestionTemplateRequestDTO();
+        }
+        byte[] bytes = questionDocxService.generateTemplate(req);
+        String name = (req.getNamaMapel() != null && !req.getNamaMapel().trim().isEmpty())
+                ? req.getNamaMapel().replaceAll("[^a-zA-Z0-9_-]", "_")
+                : "Soal_Ujian";
+        String fileName = "Template_" + name + ".docx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(org.springframework.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Content-Disposition")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(bytes);
+    }
+
+    @PostMapping("/parse-template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> parseTemplate(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+            java.util.List<com.baknusbelajar.api.dto.exam.DraftSoalDTO> drafts;
+            if (filename.endsWith(".docx")) {
+                drafts = questionDocxService.parseDocx(file);
+            } else {
+                drafts = questionExcelService.parseExcel(file);
+            }
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "drafts", drafts,
+                    "total", drafts.size()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to parse questions template: ", e);
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/import-template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> importTemplate(
+            @PathVariable Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+            int savedCount;
+            if (filename.endsWith(".docx")) {
+                savedCount = questionDocxService.importAndSave(id, file);
+            } else {
+                savedCount = questionExcelService.importAndSave(id, file);
+            }
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "savedCount", savedCount,
+                    "message", "Berhasil mengimpor " + savedCount + " butir soal ke dalam ujian!"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to import template for ujian id={}: ", id, e);
             return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
         }
     }
