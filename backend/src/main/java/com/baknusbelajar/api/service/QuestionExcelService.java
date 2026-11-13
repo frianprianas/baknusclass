@@ -4,16 +4,18 @@ import com.baknusbelajar.api.dto.exam.DraftSoalDTO;
 import com.baknusbelajar.api.dto.exam.QuestionTemplateRequestDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ooxml.POIXMLDocumentPart;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddressList;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -22,9 +24,14 @@ public class QuestionExcelService {
 
     private final AiQuestionImportService aiQuestionImportService;
 
+    // Pattern untuk mendeteksi huruf Arab
+    private static final Pattern ARABIC_PATTERN = Pattern.compile("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]");
+    // Pattern untuk mendeteksi sintaks markdown gambar ![alt](url)
+    private static final Pattern MD_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
+
     /**
      * Menghasilkan file Excel (.xlsx) dinamis berisi template bank soal
-     * dengan jumlah baris yang disesuaikan dengan permintaan guru.
+     * dengan dukungan teks multibahasa (Arab, Jepang), notasi matematika, dan gambar.
      */
     public byte[] generateTemplate(QuestionTemplateRequestDTO req) {
         int pgBiasa = req.getPgBiasaCount() != null ? Math.max(0, req.getPgBiasaCount()) : 0;
@@ -206,23 +213,37 @@ public class QuestionExcelService {
             titleCell.setCellStyle(titleStyle);
 
             String[][] petunjukData = {
-                    {"Kolom", "Aturan & Format Pengisian"},
+                    {"Topik / Kolom", "Aturan & Format Pengisian"},
                     {"No", "Nomor urut soal (angka bulat 1, 2, 3, ...)."},
                     {"Tipe Soal", "Wajib memilih salah satu: PG_BIASA, PG_KOMPLEKS, BENAR_SALAH, BS_MAJEMUK, atau ESSAY."},
-                    {"Pertanyaan", "Isi dengan teks pertanyaan/soal lengkap. Jika memiliki teks stimulus/pengantar, gabungkan ke kolom ini."},
-                    {"Pilihan A - E", "Untuk PG_BIASA / PG_KOMPLEKS: Isi opsi jawaban A sampai E (jika hanya 4 opsi A-D, isi Pilihan E dengan tanda strip '-').\nUntuk BENAR_SALAH: Pilihan A diisi 'Benar', Pilihan B diisi 'Salah', C s/d E diisi '-'.\nUntuk BS_MAJEMUK: Pilihan A sampai E diisi teks butir-butir pernyataan (1 s/d 5).\nUntuk ESSAY: Pilihan A sampai E diisi tanda strip '-'."},
+                    {"Pertanyaan", "Isi dengan teks pertanyaan/soal lengkap. Stimulus, narasi, rumus, dan gambar bisa disematkan di sini."},
+                    {"Pilihan A - E", "Untuk PG_BIASA / PG_KOMPLEKS: Opsi A sampai E (jika hanya 4 opsi A-D, isi Pilihan E dengan '-').\nUntuk BENAR_SALAH: Pilihan A = 'Benar', B = 'Salah', C-E = '-'.\nUntuk BS_MAJEMUK: Pilihan A sampai E diisi butir-butir pernyataan.\nUntuk ESSAY: Pilihan A sampai E diisi '-'."},
                     {"Kunci Jawaban", "Format kunci berdasarkan tipe soal:\n"
-                            + "1. PG_BIASA: 1 huruf kapital opsi yang benar (misal: A atau B atau C atau D atau E).\n"
-                            + "2. PG_KOMPLEKS: Beberapa huruf kapital dipisah tanda koma (misal: A,C atau B,D,E).\n"
-                            + "3. BENAR_SALAH: Huruf 'A' jika Benar, atau huruf 'B' jika Salah.\n"
-                            + "4. BS_MAJEMUK: Urutan huruf status B (Benar) dan S (Salah) dipisah koma (misal: B,S,B atau B,B,S,B).\n"
-                            + "5. ESSAY: Boleh diisi rubrik/pedoman penskoran essay atau tanda strip '-' (tidak dinilai otomatis)."},
-                    {"Bobot Nilai", "Nilai / skor per butir soal (misal: 2 untuk PG atau 10 untuk Essay)."}
+                            + "1. PG_BIASA: 1 huruf kapital (misal: A atau B).\n"
+                            + "2. PG_KOMPLEKS: Huruf kapital dipisah koma (misal: A,C atau B,D,E).\n"
+                            + "3. BENAR_SALAH: Huruf 'A' jika Benar, atau 'B' jika Salah.\n"
+                            + "4. BS_MAJEMUK: Status B dan S dipisah koma (misal: B,S,B atau B,B,S,B).\n"
+                            + "5. ESSAY: Boleh diisi pedoman penskoran essay atau '-' (tidak dinilai otomatis)."},
+                    {"Bobot Nilai", "Nilai / skor per butir soal (misal: 2 untuk PG atau 10 untuk Essay)."},
+                    {"Gambar (Diagram / Foto)", "DAPAT DIMASUKKAN DENGAN CARA:\n"
+                            + "a) Paste / Insert Picture langsung ke dalam baris soal di Excel. Sistem akan otomatis mengekstrak gambar dan menyematkannya ke soal.\n"
+                            + "b) Mengetikkan link gambar langsung, misalnya: https://domain.com/gambar.png\n"
+                            + "c) Format Markdown gambar: ![Keterangan](https://domain.com/gambar.png)\n"
+                            + "d) Tag HTML: <img src=\"https://...\" />"},
+                    {"Huruf Arab & Harakat", "Mendukung 100% huruf Hijaiyah, harakat lengkap, dan ayat Al-Qur'an (misal: بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ). Cukup copy-paste langsung ke kolom Pertanyaan atau Pilihan jawaban. Tampilan otomatis diatur Right-to-Left (RTL)."},
+                    {"Huruf Jepang / Mandarin", "Mendukung penuh aksara Jepang (Kanji, Hiragana, Katakana: 日本語, ひらがな, カタカナ) dan Mandarin (Hanzi). Langsung ketik atau paste ke sel Excel."},
+                    {"Notasi Matematika", "Mendukung berbagai gaya penulisan matematika:\n"
+                            + "a) Format LaTeX Math (Direkomendasikan):\n"
+                            + "   - Integral: $$\\int_{0}^{1} (3x^2 + 2x) dx$$\n"
+                            + "   - Matriks: $$\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}$$ atau $$\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}$$\n"
+                            + "   - Pangkat & Pecahan: $$x^{2} + \\frac{1}{2}x - 5 = 0$$\n"
+                            + "b) Simbol Unicode Matematika Langsung: ∫, ∑, √, ±, ≠, ≤, ≥, π, θ, x², x³, yⁿ, x₁\n"
+                            + "c) Tag HTML: x<sup>2</sup> (pangkat), x<sub>1</sub> (indeks), atau tabel matriks."}
             };
 
             for (int r = 0; r < petunjukData.length; r++) {
                 Row row = sheetPetunjuk.createRow(r + 2);
-                row.setHeightInPoints(r == 0 ? 24 : 36);
+                row.setHeightInPoints(r == 0 ? 24 : 44);
                 Cell c0 = row.createCell(0);
                 Cell c1 = row.createCell(1);
                 c0.setCellValue(petunjukData[r][0]);
@@ -240,8 +261,8 @@ public class QuestionExcelService {
                 }
             }
 
-            sheetPetunjuk.setColumnWidth(0, 18 * 256);
-            sheetPetunjuk.setColumnWidth(1, 90 * 256);
+            sheetPetunjuk.setColumnWidth(0, 24 * 256);
+            sheetPetunjuk.setColumnWidth(1, 100 * 256);
 
             workbook.write(out);
             return out.toByteArray();
@@ -267,7 +288,8 @@ public class QuestionExcelService {
     }
 
     /**
-     * Membaca dan menguraikan file Excel template menjadi List<DraftSoalDTO>
+     * Membaca dan menguraikan file Excel template menjadi List<DraftSoalDTO>.
+     * Ekstraksi gambar tertanam (embedded images), huruf Arab, Jepang, dan rumus matematika.
      */
     public List<DraftSoalDTO> parseExcel(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -283,6 +305,9 @@ public class QuestionExcelService {
                 sheet = workbook.getSheetAt(0);
             }
 
+            // 1. Ekstraksi seluruh gambar yang disematkan ke dalam worksheet (anchored images)
+            Map<Integer, Map<Integer, List<String>>> embeddedPictures = extractEmbeddedPictures(sheet);
+
             int lastRow = sheet.getLastRowNum();
             int questionCounter = 1;
 
@@ -291,12 +316,17 @@ public class QuestionExcelService {
                 if (row == null) continue;
 
                 String pertanyaan = getCellValueAsString(row.getCell(2));
-                if (pertanyaan == null || pertanyaan.trim().isEmpty()) {
+
+                // Cek gambar pada baris ini
+                Map<Integer, List<String>> rowPictures = embeddedPictures.get(r);
+                boolean hasRowPictures = rowPictures != null && !rowPictures.isEmpty();
+
+                if ((pertanyaan == null || pertanyaan.trim().isEmpty()) && !hasRowPictures) {
                     continue; // Skip baris kosong
                 }
 
                 // Cek jika pertanyaan adalah header yang tidak sengaja terbaca
-                if (pertanyaan.trim().equalsIgnoreCase("pertanyaan") || pertanyaan.trim().equalsIgnoreCase("pertanyaan (soal)")) {
+                if (pertanyaan != null && (pertanyaan.trim().equalsIgnoreCase("pertanyaan") || pertanyaan.trim().equalsIgnoreCase("pertanyaan (soal)"))) {
                     continue;
                 }
 
@@ -311,11 +341,34 @@ public class QuestionExcelService {
                 String kunci = getCellValueAsString(row.getCell(8));
                 String bobotRaw = getCellValueAsString(row.getCell(9));
 
-                pilA = (pilA != null && !pilA.trim().isEmpty()) ? pilA.trim() : "-";
-                pilB = (pilB != null && !pilB.trim().isEmpty()) ? pilB.trim() : "-";
-                pilC = (pilC != null && !pilC.trim().isEmpty()) ? pilC.trim() : "-";
-                pilD = (pilD != null && !pilD.trim().isEmpty()) ? pilD.trim() : "-";
-                pilE = (pilE != null && !pilE.trim().isEmpty()) ? pilE.trim() : "-";
+                // Sematkan gambar ke Pertanyaan atau Opsi Jawaban berdasarkan letak kolomnya
+                if (rowPictures != null) {
+                    for (Map.Entry<Integer, List<String>> entry : rowPictures.entrySet()) {
+                        int col = entry.getKey();
+                        String imgHtml = String.join(" ", entry.getValue());
+                        if (col == 3) {
+                            pilA = (pilA == null || pilA.equals("-") ? "" : pilA + " ") + imgHtml;
+                        } else if (col == 4) {
+                            pilB = (pilB == null || pilB.equals("-") ? "" : pilB + " ") + imgHtml;
+                        } else if (col == 5) {
+                            pilC = (pilC == null || pilC.equals("-") ? "" : pilC + " ") + imgHtml;
+                        } else if (col == 6) {
+                            pilD = (pilD == null || pilD.equals("-") ? "" : pilD + " ") + imgHtml;
+                        } else if (col == 7) {
+                            pilE = (pilE == null || pilE.equals("-") ? "" : pilE + " ") + imgHtml;
+                        } else {
+                            pertanyaan = (pertanyaan == null ? "" : pertanyaan + " ") + imgHtml;
+                        }
+                    }
+                }
+
+                // Format teks (proses markdown image, arab RTL wrapper jika perlu)
+                pertanyaan = formatRichContent(pertanyaan);
+                pilA = formatRichContent(pilA != null && !pilA.trim().isEmpty() ? pilA.trim() : "-");
+                pilB = formatRichContent(pilB != null && !pilB.trim().isEmpty() ? pilB.trim() : "-");
+                pilC = formatRichContent(pilC != null && !pilC.trim().isEmpty() ? pilC.trim() : "-");
+                pilD = formatRichContent(pilD != null && !pilD.trim().isEmpty() ? pilD.trim() : "-");
+                pilE = formatRichContent(pilE != null && !pilE.trim().isEmpty() ? pilE.trim() : "-");
 
                 if ("BENAR_SALAH".equalsIgnoreCase(tipeSoal)) {
                     if (pilA.equals("-")) pilA = "Benar";
@@ -360,6 +413,81 @@ public class QuestionExcelService {
             log.error("Error reading questions Excel: ", e);
             throw new RuntimeException("Gagal membaca berkas Excel: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Mengekstrak seluruh gambar tertanam di worksheet XLSX dan mengelompokkannya
+     * berdasarkan baris dan kolom anchor.
+     */
+    private Map<Integer, Map<Integer, List<String>>> extractEmbeddedPictures(Sheet sheet) {
+        Map<Integer, Map<Integer, List<String>>> result = new HashMap<>();
+
+        try {
+            if (sheet instanceof XSSFSheet) {
+                XSSFSheet xssfSheet = (XSSFSheet) sheet;
+                for (POIXMLDocumentPart part : xssfSheet.getRelations()) {
+                    if (part instanceof XSSFDrawing) {
+                        XSSFDrawing drawing = (XSSFDrawing) part;
+                        for (XSSFShape shape : drawing.getShapes()) {
+                            if (shape instanceof XSSFPicture) {
+                                XSSFPicture pic = (XSSFPicture) shape;
+                                XSSFClientAnchor anchor = pic.getClientAnchor();
+                                if (anchor != null) {
+                                    int row = anchor.getRow1();
+                                    int col = anchor.getCol1();
+                                    PictureData picData = pic.getPictureData();
+                                    if (picData != null && picData.getData() != null) {
+                                        String mime = picData.getMimeType();
+                                        if (mime == null || mime.isEmpty()) {
+                                            mime = "image/png";
+                                        }
+                                        String base64 = Base64.getEncoder().encodeToString(picData.getData());
+                                        String imgTag = "<p><img src=\"data:" + mime + ";base64," + base64 + "\" style=\"max-width:100%; max-height:420px; border-radius:10px; margin:8px 0; display:block; box-shadow:0 2px 8px rgba(0,0,0,0.1);\" alt=\"Gambar Soal\" /></p>";
+
+                                        result.computeIfAbsent(row, k -> new HashMap<>())
+                                                .computeIfAbsent(col, k -> new ArrayList<>())
+                                                .add(imgTag);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Tidak dapat membaca gambar tertanam di Excel: {}", e.getMessage());
+        }
+
+        return result;
+    }
+
+    /**
+     * Memformat teks konten agar gambar link markdown dan teks Arab tampil sempurna.
+     */
+    private String formatRichContent(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return "-";
+        }
+
+        String formatted = text;
+
+        // 1. Ubah markdown image ![alt](url) menjadi tag <img>
+        Matcher matcher = MD_IMAGE_PATTERN.matcher(formatted);
+        if (matcher.find()) {
+            formatted = matcher.replaceAll("<p><img src=\"$2\" alt=\"$1\" style=\"max-width:100%; border-radius:8px; margin:6px 0;\" /></p>");
+        }
+
+        // 2. Jika teks murni URL gambar (misal: https://domain/soal.png), bungkus dengan tag img
+        if (formatted.matches("^(http|https)://\\S+\\.(png|jpg|jpeg|gif|webp|svg)(\\?\\S*)?$")) {
+            formatted = "<p><img src=\"" + formatted + "\" style=\"max-width:100%; border-radius:8px; margin:6px 0;\" alt=\"Gambar Soal\" /></p>";
+        }
+
+        // 3. Jika mengandung teks Arab yang dominan dan belum dibungkus tag HTML, beri wadah RTL
+        if (ARABIC_PATTERN.matcher(formatted).find() && !formatted.contains("<div dir=\"rtl\"") && !formatted.contains("<span dir=\"rtl\"")) {
+            formatted = "<div dir=\"rtl\" style=\"font-family:'Traditional Arabic', 'Amiri', Tahoma, sans-serif; text-align:right; font-size:1.25em; line-height:1.8;\">" + formatted + "</div>";
+        }
+
+        return formatted;
     }
 
     /**
@@ -412,4 +540,3 @@ public class QuestionExcelService {
         }
     }
 }
-

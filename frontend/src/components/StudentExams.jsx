@@ -296,6 +296,13 @@ const StudentExams = () => {
         };
     }, [currentExam, showTokenOverlay, showFinishConfirm]);
 
+    // Render MathJax (LaTeX, integral, pangkat, matrix) whenever question changes
+    useEffect(() => {
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise().catch(() => {});
+        }
+    }, [currentIndex, currentExam, questions]);
+
     const DEFAULT_PRACTICE_EVENT = {
         id: 'event_latihan_cbt',
         namaEvent: '🎯 Simulasi & Latihan CBT',
