@@ -24,6 +24,7 @@ public class UjianMapelController {
     private final UjianMapelService ujianMapelService;
     private final com.baknusbelajar.api.service.AiQuestionImportService aiQuestionImportService;
     private final com.baknusbelajar.api.service.ExamStatusService examStatusService;
+    private final com.baknusbelajar.api.service.QuestionExcelService questionExcelService;
 
     @GetMapping("/event/{eventId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'SISWA')")
@@ -363,5 +364,58 @@ public class UjianMapelController {
                 "success", true,
                 "message", "Semua soal berhasil dibersihkan"
         ));
+    }
+
+    @PostMapping("/download-template-excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<byte[]> downloadTemplateExcel(@RequestBody(required = false) com.baknusbelajar.api.dto.exam.QuestionTemplateRequestDTO req) {
+        if (req == null) {
+            req = new com.baknusbelajar.api.dto.exam.QuestionTemplateRequestDTO();
+        }
+        byte[] bytes = questionExcelService.generateTemplate(req);
+        String name = (req.getNamaMapel() != null && !req.getNamaMapel().trim().isEmpty())
+                ? req.getNamaMapel().replaceAll("[^a-zA-Z0-9_-]", "_")
+                : "Soal_Ujian";
+        String fileName = "Template_" + name + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(org.springframework.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "Content-Disposition")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    @PostMapping("/parse-excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> parseExcel(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            var drafts = questionExcelService.parseExcel(file);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "drafts", drafts,
+                    "total", drafts.size()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to parse questions Excel: ", e);
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/import-excel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    public ResponseEntity<?> importExcel(
+            @PathVariable Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            int savedCount = questionExcelService.importAndSave(id, file);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "success", true,
+                    "savedCount", savedCount,
+                    "message", "Berhasil mengimpor " + savedCount + " butir soal dari Excel ke dalam ujian!"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to import questions Excel for ujian id={}: ", id, e);
+            return ResponseEntity.status(500).body(java.util.Map.of("message", e.getMessage()));
+        }
     }
 }
