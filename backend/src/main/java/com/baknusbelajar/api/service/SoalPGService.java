@@ -35,11 +35,13 @@ public class SoalPGService {
             if (s.getTipeSoal() == null || s.getTipeSoal().trim().isEmpty()) {
                 String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
                 boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
-                if (isMultiKey) {
-                    s.setTipeSoal("PG_KOMPLEKS");
+                if (isBSMajemukKey(kj)) {
+                    s.setTipeSoal("BS_MAJEMUK");
                 } else if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
                            ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB()))) {
                     s.setTipeSoal("BENAR_SALAH");
+                } else if (isMultiKey) {
+                    s.setTipeSoal("PG_KOMPLEKS");
                 } else {
                     s.setTipeSoal("PG_BIASA");
                 }
@@ -52,6 +54,31 @@ public class SoalPGService {
             }
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    private boolean isBSMajemukKey(String kj) {
+        if (kj == null) return false;
+        String s = kj.trim().toUpperCase();
+        if (s.contains(":B") || s.contains(":S") || s.contains("=B") || s.contains("=S")) {
+            return true;
+        }
+        String[] parts = s.split("[,;\\s]+");
+        if (parts.length >= 2) {
+            for (String p : parts) {
+                String clean = p.replaceAll("<[^>]*>", "").trim();
+                if (clean.contains(":") || clean.contains("=") || clean.contains(".")) {
+                    String[] sub = clean.split("[:=.]");
+                    if (sub.length > 1) clean = sub[sub.length - 1].trim();
+                }
+                boolean isBS = clean.equals("B") || clean.equals("S") ||
+                               clean.startsWith("BENAR") || clean.startsWith("SALAH") ||
+                               clean.equals("TRUE") || clean.equals("FALSE") ||
+                               clean.equals("T") || clean.equals("F");
+                if (!isBS) return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     @CacheEvict(value = "soalPGCache", allEntries = true)
@@ -76,7 +103,9 @@ public class SoalPGService {
         String tipe = dto.getTipeSoal();
         String kj = dto.getKunciJawaban() != null ? dto.getKunciJawaban().trim() : "";
         if (tipe == null || tipe.isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
-            if ("Benar".equalsIgnoreCase(dto.getPilihanA()) && "Salah".equalsIgnoreCase(dto.getPilihanB())) {
+            if (isBSMajemukKey(kj)) {
+                tipe = "BS_MAJEMUK";
+            } else if ("Benar".equalsIgnoreCase(dto.getPilihanA()) && "Salah".equalsIgnoreCase(dto.getPilihanB())) {
                 tipe = "BENAR_SALAH";
             } else if (kj.contains(",") || kj.contains(";") || kj.length() > 1) {
                 tipe = "PG_KOMPLEKS";
@@ -131,13 +160,17 @@ public class SoalPGService {
         String kj = newKunci != null ? newKunci.trim() : "";
         entity.setKunciJawaban(kj);
 
-        boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
-        if (isMultiKey) {
-            entity.setTipeSoal("PG_KOMPLEKS");
-        } else if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
-            entity.setTipeSoal("BENAR_SALAH");
+        if ("BS_MAJEMUK".equalsIgnoreCase(entity.getTipeSoal()) || isBSMajemukKey(kj)) {
+            entity.setTipeSoal("BS_MAJEMUK");
         } else {
-            entity.setTipeSoal("PG_BIASA");
+            boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
+            if (isMultiKey) {
+                entity.setTipeSoal("PG_KOMPLEKS");
+            } else if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
+                entity.setTipeSoal("BENAR_SALAH");
+            } else {
+                entity.setTipeSoal("PG_BIASA");
+            }
         }
 
         SoalPG saved = soalPGRepository.save(entity);
@@ -160,7 +193,9 @@ public class SoalPGService {
         String upTipe = dto.getTipeSoal();
         String upKj = dto.getKunciJawaban() != null ? dto.getKunciJawaban().trim() : "";
         if (upTipe == null || upTipe.isEmpty() || "PG_BIASA".equalsIgnoreCase(upTipe)) {
-            if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
+            if (isBSMajemukKey(upKj)) {
+                upTipe = "BS_MAJEMUK";
+            } else if ("Benar".equalsIgnoreCase(entity.getPilihanA()) && "Salah".equalsIgnoreCase(entity.getPilihanB())) {
                 upTipe = "BENAR_SALAH";
             } else if (upKj.contains(",") || upKj.contains(";") || upKj.length() > 1) {
                 upTipe = "PG_KOMPLEKS";
@@ -208,7 +243,9 @@ public class SoalPGService {
         boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
 
         if (tipe == null || tipe.trim().isEmpty()) {
-            if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
+            if (isBSMajemukKey(kj)) {
+                tipe = "BS_MAJEMUK";
+            } else if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
                 ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB())) &&
                 (s.getPilihanC() == null || "-".equals(s.getPilihanC().trim()) || s.getPilihanC().trim().isEmpty())) {
                 tipe = "BENAR_SALAH";

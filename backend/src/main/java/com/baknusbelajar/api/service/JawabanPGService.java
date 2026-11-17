@@ -270,6 +270,70 @@ public class JawabanPGService {
         log.info("Re-evaluated {} student answers for Soal ID: {}", list.size(), soal.getId());
     }
 
+    public Boolean parseBSToken(String token) {
+        if (token == null) return null;
+        String t = cleanHtml(token).trim().toUpperCase();
+        if (t.isEmpty() || t.equals("-")) return null;
+
+        // Mendukung format berlabel seperti "1:B", "A:B", "1. B", "1=B", "A=B", "1-B"
+        if (t.contains(":") || t.contains("=") || t.contains(".")) {
+            String[] parts = t.split("[:=.]");
+            if (parts.length > 1) {
+                t = parts[parts.length - 1].trim();
+            }
+        }
+
+        // Benar: "B", "BENAR", "TRUE", "T", "1", "YA", "YES"
+        if (t.equals("B") || t.startsWith("BENAR") || t.equals("TRUE") || t.equals("T") || t.equals("1") || t.equals("YA") || t.equals("YES")) {
+            return true;
+        }
+
+        // Salah: "S", "SALAH", "FALSE", "F", "0", "TIDAK", "NO"
+        if (t.equals("S") || t.startsWith("SALAH") || t.equals("FALSE") || t.equals("F") || t.equals("0") || t.equals("TIDAK") || t.equals("NO")) {
+            return false;
+        }
+
+        return null;
+    }
+
+    private boolean isBSMajemukPattern(String tipe, String rawKunci, String rawJawaban) {
+        if ("BS_MAJEMUK".equalsIgnoreCase(tipe)) {
+            return true;
+        }
+        String upKunci = rawKunci != null ? rawKunci.toUpperCase() : "";
+        if (upKunci.contains(":B") || upKunci.contains(":S") || upKunci.contains("=B") || upKunci.contains("=S")) {
+            return true;
+        }
+        // Jika kunci terdiri dari rangkaian token B/S (minimal 2 butir) dipisah koma/titik-koma/spasi
+        String[] kParts = upKunci.split("[,;\\s]+");
+        if (kParts.length >= 2) {
+            boolean allBS = true;
+            for (String p : kParts) {
+                if (parseBSToken(p) == null) {
+                    allBS = false;
+                    break;
+                }
+            }
+            if (allBS) return true;
+        }
+        // Fallback: Jika jawaban siswa terdiri dari rangkaian token B/S (misal "B,S,B,B")
+        String upJawaban = rawJawaban != null ? rawJawaban.toUpperCase() : "";
+        String[] aParts = upJawaban.split("[,;\\s]+");
+        if (aParts.length >= 2) {
+            boolean allAnsBS = true;
+            for (String p : aParts) {
+                if (parseBSToken(p) == null) {
+                    allAnsBS = false;
+                    break;
+                }
+            }
+            if (allAnsBS && (rawKunci.contains(",") || rawKunci.contains(";"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public ScoringResult calculateScore(SoalPG soal, String jawabanSiswa) {
         if (jawabanSiswa == null || jawabanSiswa.trim().isEmpty()) {
             return new ScoringResult(0.0, false);
@@ -283,7 +347,7 @@ public class JawabanPGService {
         String cleanPilA = cleanHtml(soal.getPilihanA()).toLowerCase();
         String cleanPilB = cleanHtml(soal.getPilihanB()).toLowerCase();
 
-        boolean looksLikeBSMajemuk = "BS_MAJEMUK".equalsIgnoreCase(tipe);
+        boolean looksLikeBSMajemuk = isBSMajemukPattern(tipe, rawKunci, rawJawaban);
 
         boolean looksLikeBS = !looksLikeBSMajemuk && ("BENAR_SALAH".equalsIgnoreCase(tipe) ||
                 ((cleanPilA.equals("benar") || cleanPilA.equals("true")) &&
@@ -293,25 +357,43 @@ public class JawabanPGService {
                 (!looksLikeBS && (rawKunci.contains(",") || rawJawaban.contains(","))));
 
         if (looksLikeBSMajemuk) {
-            String[] keyParts = rawKunci.split(",", -1);
-            String[] ansParts = rawJawaban.split(",", -1);
+            String[] keyParts = rawKunci.split("[,;]+");
+            String[] ansParts = rawJawaban.split("[,;]+");
 
-            int totalItems = keyParts.length;
+            List<Boolean> keyBools = new ArrayList<>();
+            for (String k : keyParts) {
+                Boolean b = parseBSToken(k);
+                if (b != null) {
+                    keyBools.add(b);
+                }
+            }
+
+            // Hitung jumlah butir pernyataan aktif dari soal (A sampai E yang terdefinisi)
+            int activeStatements = 0;
+            if (soal.getPilihanA() != null && !"-".equals(soal.getPilihanA().trim()) && !soal.getPilihanA().trim().isEmpty()) activeStatements++;
+            if (soal.getPilihanB() != null && !"-".equals(soal.getPilihanB().trim()) && !soal.getPilihanB().trim().isEmpty()) activeStatements++;
+            if (soal.getPilihanC() != null && !"-".equals(soal.getPilihanC().trim()) && !soal.getPilihanC().trim().isEmpty()) activeStatements++;
+            if (soal.getPilihanD() != null && !"-".equals(soal.getPilihanD().trim()) && !soal.getPilihanD().trim().isEmpty()) activeStatements++;
+            if (soal.getPilihanE() != null && !"-".equals(soal.getPilihanE().trim()) && !soal.getPilihanE().trim().isEmpty()) activeStatements++;
+
+            int totalItems = keyBools.size();
+            if (activeStatements >= 2) {
+                totalItems = Math.max(totalItems, activeStatements);
+            }
+            if (totalItems == 0) {
+                totalItems = Math.max(keyParts.length, ansParts.length);
+            }
             if (totalItems == 0) {
                 return new ScoringResult(0.0, false);
             }
 
             int matchCount = 0;
             for (int i = 0; i < totalItems; i++) {
-                String k = keyParts[i].trim().toUpperCase();
-                String a = (i < ansParts.length) ? ansParts[i].trim().toUpperCase() : "";
+                Boolean kB = (i < keyBools.size()) ? keyBools.get(i) : null;
+                Boolean aB = (i < ansParts.length) ? parseBSToken(ansParts[i]) : null;
 
-                if (!k.isEmpty() && !a.isEmpty()) {
-                    boolean kIsB = k.startsWith("B") || k.equals("TRUE") || k.equals("1");
-                    boolean aIsB = a.startsWith("B") || a.equals("TRUE") || a.equals("1");
-                    if (kIsB == aIsB) {
-                        matchCount++;
-                    }
+                if (kB != null && aB != null && kB.equals(aB)) {
+                    matchCount++;
                 }
             }
 
