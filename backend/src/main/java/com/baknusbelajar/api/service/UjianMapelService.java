@@ -259,6 +259,7 @@ public class UjianMapelService {
 
     public List<UjianMapelDTO> getUjianByGuruId(Long guruId) {
         return ujianMapelRepository.findByGuruId(guruId).stream()
+                .filter(e -> e.getEventUjian() == null || Boolean.TRUE.equals(e.getEventUjian().getStatusAktif()))
                 .map(e -> mapToDTO(e, true))
                 .collect(Collectors.toList());
     }
@@ -496,6 +497,7 @@ public class UjianMapelService {
         if (entity.getEventUjian() != null) {
             dto.setEventId(entity.getEventUjian().getId());
             dto.setNamaEvent(entity.getEventUjian().getNamaEvent());
+            dto.setStatusAktifEvent(entity.getEventUjian().getStatusAktif());
         }
 
         if (entity.getMapel() != null) {

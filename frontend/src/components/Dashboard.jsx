@@ -76,7 +76,9 @@ const Dashboard = () => {
         const res = await axios.get(`/api/exam/ujian-mapel/guru/${user.profileId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setMyExams(res.data);
+        // Filter out exams where the event is explicitly inactive
+        const activeExams = (res.data || []).filter(ex => ex.statusAktifEvent !== false);
+        setMyExams(activeExams);
       } catch (e) { console.error(e); }
     };
 
