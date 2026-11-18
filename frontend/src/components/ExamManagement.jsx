@@ -1379,7 +1379,6 @@ const ExamManagement = () => {
     };
 
     const handleDeleteExam = async (id) => {
-        alert('DEBUG: Clicked Hapus Jadwal Ujian ID ' + id);
         if (!window.confirm('Hapus jadwal ujian ini? Data soal akan tetap ada tetapi tidak lagi terjadwal.')) return;
         const token = localStorage.getItem('token');
         try {
@@ -1394,7 +1393,6 @@ const ExamManagement = () => {
     };
 
     const handleDeleteEvent = async (id, force = false) => {
-        alert('DEBUG: Clicked Hapus Event ID ' + id + ', Force: ' + force);
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
@@ -1622,7 +1620,12 @@ const ExamManagement = () => {
             } else {
                 setQuestionsPG(prev => prev.filter(q => q.id !== id));
             }
-            await handleManageQuestions(viewingQuestions);
+            if (editingQuestion && editingQuestion.id === id) {
+                setEditingQuestion(null);
+            }
+            if (viewingQuestions && viewingQuestions.id) {
+                await handleManageQuestions(viewingQuestions);
+            }
             alert('Soal berhasil dihapus.');
         } catch (err) {
             console.error('Delete question error:', err);

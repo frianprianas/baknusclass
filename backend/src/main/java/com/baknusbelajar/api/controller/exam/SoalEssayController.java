@@ -18,11 +18,12 @@ public class SoalEssayController {
     private final SoalEssayService soalEssayService;
 
     @GetMapping("/ujian/{ujianId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'SISWA')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'SISWA', 'CO_ADMIN')")
     public ResponseEntity<List<SoalEssayDTO>> getByUjian(@PathVariable Long ujianId, Authentication authentication) {
         boolean isGuruOrTUOrAdmin = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_GURU") ||
                         a.getAuthority().equals("ROLE_TU") ||
+                        a.getAuthority().equals("ROLE_CO_ADMIN") ||
                         a.getAuthority().equals("ROLE_ADMIN"));
 
         // Hide Kunci Jawaban if requested by SISWA
@@ -30,19 +31,19 @@ public class SoalEssayController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<SoalEssayDTO> create(@RequestBody SoalEssayDTO dto) {
         return ResponseEntity.ok(soalEssayService.createSoal(dto));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<SoalEssayDTO> update(@PathVariable Long id, @RequestBody SoalEssayDTO dto) {
         return ResponseEntity.ok(soalEssayService.updateSoal(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         soalEssayService.deleteSoal(id);
         return ResponseEntity.ok().build();

@@ -27,8 +27,13 @@ public interface JawabanSiswaRepository extends JpaRepository<JawabanSiswa, Long
     long countBySoalEssay_UjianMapel_Guru_IdAndSkorFinalGuruIsNull(Long guruId);
     List<JawabanSiswa> findBySoalEssay_UjianMapel_Guru_Id(Long guruId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
-    @Query("DELETE FROM JawabanSiswa j WHERE j.soalEssay.id = :soalEssayId")
+    @Query(value = "DELETE FROM tb_jawaban_siswa WHERE soal_id = :soalEssayId", nativeQuery = true)
     void deleteBySoalEssayId(@Param("soalEssayId") Long soalEssayId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(value = "DELETE FROM tb_jawaban_siswa WHERE soal_id IN (SELECT id FROM tb_soal_essay WHERE ujian_mapel_id = :ujianId)", nativeQuery = true)
+    void deleteByUjianMapelId(@Param("ujianId") Long ujianId);
 }

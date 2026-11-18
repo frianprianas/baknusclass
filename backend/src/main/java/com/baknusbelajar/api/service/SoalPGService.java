@@ -142,12 +142,8 @@ public class SoalPGService {
     @Transactional
     public void deleteSoal(Long id) {
         log.info("[SoalPGService] Deleting SoalPG with ID: {}", id);
-        try {
-            jawabanPGRepository.deleteBySoalPGId(id);
-        } catch (Exception e) {
-            log.warn("[SoalPGService] deleteBySoalPGId failed or no rows: {}", e.getMessage());
-        }
-        soalPGRepository.deleteById(id);
+        jawabanPGRepository.deleteBySoalPGId(id);
+        soalPGRepository.deleteSoalById(id);
         log.info("[SoalPGService] Deleted SoalPG with ID: {}", id);
     }
 

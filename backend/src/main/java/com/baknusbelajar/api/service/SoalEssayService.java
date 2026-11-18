@@ -78,12 +78,8 @@ public class SoalEssayService {
     @Transactional
     public void deleteSoal(Long id) {
         log.info("[SoalEssayService] Deleting SoalEssay with ID: {}", id);
-        try {
-            jawabanSiswaRepository.deleteBySoalEssayId(id);
-        } catch (Exception e) {
-            log.warn("[SoalEssayService] deleteBySoalEssayId failed or no rows: {}", e.getMessage());
-        }
-        soalEssayRepository.deleteById(id);
+        jawabanSiswaRepository.deleteBySoalEssayId(id);
+        soalEssayRepository.deleteSoalById(id);
         log.info("[SoalEssayService] Deleted SoalEssay with ID: {}", id);
     }
 

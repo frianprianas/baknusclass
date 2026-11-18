@@ -478,7 +478,10 @@ public class UjianMapelService {
         return mapToDTO(saved, true);
     }
 
+    @Transactional
     public void deleteUjian(Long id) {
+        log.info("[UjianMapelService] Deleting UjianMapel ID: {}", id);
+        clearAllSoal(id);
         ujianMapelRepository.deleteById(id);
     }
 
@@ -1393,29 +1396,10 @@ public class UjianMapelService {
     @Transactional
     public void clearAllSoal(Long ujianId) {
         log.info("[UjianMapelService] Clearing all questions for Ujian ID: {}", ujianId);
-        List<com.baknusbelajar.api.entity.SoalPG> pgList = soalPGRepository.findByUjianMapelId(ujianId);
-        for (var pg : pgList) {
-            try {
-                jawabanPGRepository.deleteBySoalPGId(pg.getId());
-            } catch (Exception e) {
-                log.warn("[UjianMapelService] deleteBySoalPGId error: {}", e.getMessage());
-            }
-        }
-        if (!pgList.isEmpty()) {
-            soalPGRepository.deleteAll(pgList);
-        }
-
-        List<com.baknusbelajar.api.entity.SoalEssay> essayList = soalEssayRepository.findByUjianMapelId(ujianId);
-        for (var essay : essayList) {
-            try {
-                jawabanSiswaRepository.deleteBySoalEssayId(essay.getId());
-            } catch (Exception e) {
-                log.warn("[UjianMapelService] deleteBySoalEssayId error: {}", e.getMessage());
-            }
-        }
-        if (!essayList.isEmpty()) {
-            soalEssayRepository.deleteAll(essayList);
-        }
-        log.info("[UjianMapelService] Cleared {} PG and {} Essay questions for Ujian ID: {}", pgList.size(), essayList.size(), ujianId);
+        jawabanPGRepository.deleteByUjianMapelId(ujianId);
+        soalPGRepository.deleteByUjianMapelId(ujianId);
+        jawabanSiswaRepository.deleteByUjianMapelId(ujianId);
+        soalEssayRepository.deleteByUjianMapelId(ujianId);
+        log.info("[UjianMapelService] Cleared all PG and Essay questions for Ujian ID: {}", ujianId);
     }
 }

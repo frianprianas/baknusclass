@@ -19,8 +19,13 @@ public interface JawabanPGRepository extends JpaRepository<JawabanPG, Long> {
     List<JawabanPG> findBySoalPG_UjianMapel_Id(Long ujianMapelId);
     List<JawabanPG> findBySiswaIdAndSoalPG_UjianMapel_Id(Long siswaId, Long ujianMapelId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
-    @Query("DELETE FROM JawabanPG j WHERE j.soalPG.id = :soalPGId")
+    @Query(value = "DELETE FROM tb_jawaban_pg WHERE soal_pg_id = :soalPGId", nativeQuery = true)
     void deleteBySoalPGId(@Param("soalPGId") Long soalPGId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(value = "DELETE FROM tb_jawaban_pg WHERE soal_pg_id IN (SELECT id FROM tb_soal_pg WHERE ujian_mapel_id = :ujianId)", nativeQuery = true)
+    void deleteByUjianMapelId(@Param("ujianId") Long ujianId);
 }
