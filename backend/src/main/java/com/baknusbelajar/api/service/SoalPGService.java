@@ -56,7 +56,7 @@ public class SoalPGService {
         }).collect(Collectors.toList());
     }
 
-    private boolean isBSMajemukKey(String kj) {
+    public static boolean isBSMajemukKey(String kj) {
         if (kj == null) return false;
         String s = kj.trim().toUpperCase();
         if (s.contains(":B") || s.contains(":S") || s.contains("=B") || s.contains("=S")) {
