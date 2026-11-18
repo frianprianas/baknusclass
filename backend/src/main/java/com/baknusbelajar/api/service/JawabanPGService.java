@@ -122,6 +122,13 @@ public class JawabanPGService {
         JawabanPG entity = jawabanPGRepository.findBySiswaIdAndSoalPGId(siswa.getId(), targetSoalId)
                 .orElse(new JawabanPG());
 
+        if (soal.getTipeSoal() != null && "PG_KOMPLEKS".equalsIgnoreCase(soal.getTipeSoal())) {
+            Set<String> keys = extractOptionKeys(soal, targetJawaban);
+            if (keys.size() > 3) {
+                targetJawaban = keys.stream().limit(3).collect(Collectors.joining(","));
+            }
+        }
+
         entity.setSoalPG(soal);
         entity.setSiswa(siswa);
         entity.setJawaban(targetJawaban);
@@ -258,6 +265,30 @@ public class JawabanPGService {
         return clean;
     }
 
+    public Set<String> extractOptionKeys(SoalPG soal, String raw) {
+        if (raw == null || raw.trim().isEmpty()) return Collections.emptySet();
+        String clean = cleanHtml(raw).trim().toUpperCase();
+        Set<String> result = new LinkedHashSet<>();
+
+        String[] parts = clean.split("[,;\\s]+");
+        for (String p : parts) {
+            p = p.trim();
+            if (p.isEmpty()) continue;
+            // Token gabungan huruf opsi seperti "ABC" atau "AB"
+            if (p.matches("^[A-E]{2,5}$")) {
+                for (char c : p.toCharArray()) {
+                    result.add(String.valueOf(c));
+                }
+            } else {
+                String norm = normalizeOptionLetter(soal, p);
+                if (!norm.isEmpty()) {
+                    result.add(norm);
+                }
+            }
+        }
+        return result;
+    }
+
     @Transactional
     public void reevaluateAllJawabanForSoal(SoalPG soal) {
         List<JawabanPG> list = jawabanPGRepository.findBySoalPGId(soal.getId());
@@ -299,6 +330,9 @@ public class JawabanPGService {
     private boolean isBSMajemukPattern(String tipe, String rawKunci, String rawJawaban) {
         if ("BS_MAJEMUK".equalsIgnoreCase(tipe)) {
             return true;
+        }
+        if ("PG_KOMPLEKS".equalsIgnoreCase(tipe) || "PG_BIASA".equalsIgnoreCase(tipe) || "BENAR_SALAH".equalsIgnoreCase(tipe)) {
+            return false;
         }
         String upKunci = rawKunci != null ? rawKunci.toUpperCase() : "";
         if (upKunci.contains(":B") || upKunci.contains(":S") || upKunci.contains("=B") || upKunci.contains("=S")) {
@@ -354,7 +388,7 @@ public class JawabanPGService {
                  (cleanPilB.equals("salah") || cleanPilB.equals("false"))));
 
         boolean looksLikeKompleks = !looksLikeBSMajemuk && ("PG_KOMPLEKS".equalsIgnoreCase(tipe) ||
-                (!looksLikeBS && (rawKunci.contains(",") || rawJawaban.contains(","))));
+                (!looksLikeBS && (rawKunci.contains(",") || rawKunci.contains(";") || rawJawaban.contains(",") || rawJawaban.contains(";") || rawKunci.matches("(?i).*[A-E]{2,}.*"))));
 
         if (looksLikeBSMajemuk) {
             String[] keyParts = rawKunci.split("[,;]+");
@@ -425,20 +459,8 @@ public class JawabanPGService {
         }
 
         if (looksLikeKompleks) {
-            // Split keys and answers into sets, normalizing to option letters (A, B, C, D, E)
-            Set<String> setKunci = Arrays.stream(rawKunci.split("[,;\\s]+"))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .map(s -> normalizeOptionLetter(soal, s))
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toSet());
-
-            Set<String> setJawaban = Arrays.stream(rawJawaban.split("[,;\\s]+"))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .map(s -> normalizeOptionLetter(soal, s))
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toSet());
+            Set<String> setKunci = extractOptionKeys(soal, rawKunci);
+            Set<String> setJawaban = extractOptionKeys(soal, rawJawaban);
 
             if (setKunci.isEmpty() || setJawaban.isEmpty()) {
                 return new ScoringResult(0.0, false);
@@ -450,13 +472,16 @@ public class JawabanPGService {
             if (correctSelected == setKunci.size() && wrongSelected == 0) {
                 log.info("Scoring PG_KOMPLEKS [Soal {}]: Full Match (Bobot {})", soal.getId(), bobot);
                 return new ScoringResult(bobot, true);
-            } else if (correctSelected > 0 && wrongSelected == 0) {
-                double partial = (double) correctSelected / setKunci.size() * bobot;
+            } else if (correctSelected > 0) {
+                // Proporsional parsial dengan penalti moderat (0.5 bobot per salah):
+                double netRatio = Math.max(0.0, ((double) correctSelected - (wrongSelected * 0.5)) / setKunci.size());
+                double partial = netRatio * bobot;
                 double rounded = Math.round(partial * 100.0) / 100.0;
-                log.info("Scoring PG_KOMPLEKS [Soal {}]: Partial Match ({}/{}) -> {}", soal.getId(), correctSelected, setKunci.size(), rounded);
-                return new ScoringResult(rounded, false);
+                log.info("Scoring PG_KOMPLEKS [Soal {}]: Partial Match ({}/{} correct, {} wrong) -> {}",
+                        soal.getId(), correctSelected, setKunci.size(), wrongSelected, rounded);
+                return new ScoringResult(rounded, rounded >= bobot);
             } else {
-                log.info("Scoring PG_KOMPLEKS [Soal {}]: Wrong answer selected (Wrong={})", soal.getId(), wrongSelected);
+                log.info("Scoring PG_KOMPLEKS [Soal {}]: No correct answers (Wrong={})", soal.getId(), wrongSelected);
                 return new ScoringResult(0.0, false);
             }
         }

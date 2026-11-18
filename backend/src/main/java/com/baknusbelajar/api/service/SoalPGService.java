@@ -243,6 +243,8 @@ public class SoalPGService {
         kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), fullPertanyaan, dto.getKunciJawaban(),
                 dto.getBobotNilai(), "PG_Update");
 
+        jawabanPGService.reevaluateAllJawabanForSoal(saved);
+
         return mapToDTO(saved);
     }
 

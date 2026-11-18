@@ -525,7 +525,7 @@ const StudentExams = () => {
                 nomorSoal: 2,
                 qType: 'pg',
                 tipeSoal: 'PG_KOMPLEKS',
-                pertanyaan: '<p>Manakah di antara protokol berikut yang <strong>menggunakan enkripsi kriptografi untuk keamanan data</strong>? <em>(Pilihan Ganda Kompleks: Anda dapat memilih lebih dari satu jawaban yang benar)</em></p>',
+                pertanyaan: '<p>Manakah di antara protokol berikut yang <strong>menggunakan enkripsi kriptografi untuk keamanan data</strong>? <em>(Pilihan Ganda Kompleks: Anda dapat memilih maksimal 3 jawaban yang benar)</em></p>',
                 pilihanA: 'HTTPS (Port 443 - Enkripsi TLS/SSL)',
                 pilihanB: 'HTTP biasa (Port 80 - Plaintext tidak terenkripsi)',
                 pilihanC: 'SSH (Port 22 - Secure Shell dengan public/private key)',
@@ -888,6 +888,10 @@ const StudentExams = () => {
         if (currentKeys.includes(opt)) {
             newKeys = currentKeys.filter(k => k !== opt);
         } else {
+            if (currentKeys.length >= 3) {
+                alert('Peringatan: Untuk soal Pilihan Ganda Kompleks, Anda hanya dapat memilih maksimal 3 jawaban!');
+                return;
+            }
             newKeys = [...currentKeys, opt].sort();
         }
         const val = newKeys.join(',');
@@ -1229,7 +1233,7 @@ const StudentExams = () => {
                                                         : q.tipeSoal === 'BS_MAJEMUK'
                                                             ? 'Soal Tabel Pernyataan: Benar atau Salah (Poin per Butir)'
                                                             : q.tipeSoal === 'PG_KOMPLEKS'
-                                                                ? 'Soal Pilihan Ganda Kompleks (Bisa 2 atau Lebih Jawaban Benar)'
+                                                                ? 'Soal Pilihan Ganda Kompleks (Maksimal 3 Jawaban Benar)'
                                                                 : 'Soal Pilihan Ganda (1 Jawaban Benar)'
                                                 ) : 'Soal Essay / Uraian Terbuka'}
                                             </div>
@@ -1240,7 +1244,7 @@ const StudentExams = () => {
                                                         : q.tipeSoal === 'BS_MAJEMUK'
                                                             ? 'Tentukan Benar atau Salah pada setiap butir pernyataan di dalam tabel. Setiap jawaban yang tepat mendapatkan poin mandiri.'
                                                             : q.tipeSoal === 'PG_KOMPLEKS'
-                                                                ? 'Soal ini memiliki lebih dari 1 pilihan jawaban yang benar (misal: 2 pilihan benar atau lebih). Centang semua pilihan yang kamu anggap benar!'
+                                                                ? 'Soal ini memiliki beberapa pilihan jawaban benar. Centang semua pilihan yang kamu anggap benar (maksimal 3 pilihan)!'
                                                                 : 'Pilihlah salah satu jawaban yang paling tepat dari pilihan A sampai E di bawah.'
                                                 ) : 'Tuliskan uraian atau penjelasan lengkap jawaban Anda pada kolom jawaban di bawah ini.'}
                                             </div>
@@ -1249,7 +1253,7 @@ const StudentExams = () => {
                                             {q?.qType === 'pg' ? (
                                                 q.tipeSoal === 'BENAR_SALAH' ? '1 Opsi Benar/Salah' :
                                                 q.tipeSoal === 'BS_MAJEMUK' ? 'Nilai per Butir' :
-                                                q.tipeSoal === 'PG_KOMPLEKS' ? 'Bisa >1 Jawaban' : 'Pilih 1 Jawaban'
+                                                q.tipeSoal === 'PG_KOMPLEKS' ? 'Maks. 3 Pilihan' : 'Pilih 1 Jawaban'
                                             ) : 'Teks Terbuka'}
                                         </div>
                                     </div>
@@ -1455,10 +1459,10 @@ const StudentExams = () => {
                                                         <div className="cbt-pg-tip-box complex-tip">
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                 <CheckSquare size={18} />
-                                                                <span><strong>Soal Pilihan Ganda Kompleks:</strong> Centang semua opsi yang menurutmu benar (bisa 2 atau lebih jawaban).</span>
+                                                                <span><strong>Soal Pilihan Ganda Kompleks:</strong> Centang opsi yang menurutmu benar (maksimal 3 pilihan).</span>
                                                             </div>
                                                             <div className="cbt-complex-pill">
-                                                                {((answers[q.id] || '').split(',').filter(Boolean).length)} Opsi Terpilih
+                                                                {((answers[q.id] || '').split(',').filter(Boolean).length)} / 3 Pilihan Terpilih
                                                             </div>
                                                         </div>
                                                         <div className="cbt-opt-list">
@@ -1467,12 +1471,15 @@ const StudentExams = () => {
                                                                 if (!optText || optText === '-') return null;
                                                                 const currentKeys = (answers[q.id] || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
                                                                 const isChecked = currentKeys.includes(opt);
+                                                                const isLimitReached = !isChecked && currentKeys.length >= 3;
 
                                                                 return (
                                                                     <div
                                                                         key={opt}
-                                                                        className={`cbt-opt-row complex-row ${isChecked ? 'selected' : ''}`}
+                                                                        className={`cbt-opt-row complex-row ${isChecked ? 'selected' : ''} ${isLimitReached ? 'limit-reached' : ''}`}
                                                                         onClick={() => handleToggleComplexOption(q.id, opt)}
+                                                                        style={isLimitReached ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                                                                        title={isLimitReached ? 'Maksimal 3 pilihan jawaban tercapai' : ''}
                                                                     >
                                                                         <div className={`cbt-checkbox-box ${isChecked ? 'checked' : ''}`}>
                                                                             {isChecked ? <Check size={18} strokeWidth={3} /> : null}

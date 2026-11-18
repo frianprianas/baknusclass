@@ -207,15 +207,35 @@ public class UjianMapelService {
 
                     if (isFinished && dto.getTampilkanNilai()) {
                         try {
-                            var questions = soalEssayRepository.findByUjianMapelId(e.getId());
-                            var userAnswers = jawabanSiswaRepository
-                                    .findBySiswaIdAndSoalEssay_UjianMapel_Id(siswa.getId(), e.getId());
+                            var essayQuestions = soalEssayRepository.findByUjianMapelId(e.getId());
+                            var pgQuestions = soalPGRepository.findByUjianMapelId(e.getId());
 
-                            if (!questions.isEmpty()) {
-                                double totalSkor = userAnswers.stream()
-                                        .mapToDouble(a -> a.getSkorFinalGuru() != null ? a.getSkorFinalGuru() : 0.0)
-                                        .sum();
-                                dto.setNilaiAkhir(Math.round((totalSkor / questions.size()) * 10.0) / 10.0);
+                            double totalMaxBobot = 0.0;
+                            for (var spg : pgQuestions) {
+                                totalMaxBobot += (spg.getBobotNilai() != null && spg.getBobotNilai() > 0 ? spg.getBobotNilai() : 2.0);
+                            }
+                            for (var se : essayQuestions) {
+                                totalMaxBobot += (se.getBobotNilai() != null && se.getBobotNilai() > 0 ? se.getBobotNilai() : 10.0);
+                            }
+
+                            if (totalMaxBobot > 0.0) {
+                                var userEssayAnswers = jawabanSiswaRepository
+                                        .findBySiswaIdAndSoalEssay_UjianMapel_Id(siswa.getId(), e.getId());
+                                var userPgAnswers = jawabanPGRepository
+                                        .findBySiswaIdAndSoalPG_UjianMapel_Id(siswa.getId(), e.getId());
+
+                                double totalEarned = 0.0;
+                                for (var a : userPgAnswers) {
+                                    totalEarned += (a.getSkor() != null ? a.getSkor() : 0.0);
+                                }
+                                for (var a : userEssayAnswers) {
+                                    totalEarned += (a.getSkorFinalGuru() != null ? a.getSkorFinalGuru() : (a.getSkorAi() != null ? a.getSkorAi() : 0.0));
+                                }
+
+                                double scaled = (totalEarned / totalMaxBobot) * 100.0;
+                                if (scaled > 100.0) scaled = 100.0;
+                                if (scaled < 0.0) scaled = 0.0;
+                                dto.setNilaiAkhir(Math.round(scaled * 10.0) / 10.0);
                             }
                         } catch (Exception ex) {
                             log.error("Error calculating nilaiAkhir for student: {}", ex.getMessage());
