@@ -31,11 +31,13 @@ public class SoalPGService {
     public List<SoalPGDTO> getSoalByUjian(Long ujianId, boolean includeKunci) {
         List<SoalPG> soalList = soalPGRepository.findByUjianMapelId(ujianId);
         return soalList.stream().map(s -> {
-            // Respect existing tipeSoal. Only fallback if null or empty.
+            // Resolusi & sinkronisasi tipeSoal otomatis agar akurat
+            String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
+            boolean isBSKey = isBSMajemukKey(kj);
+            boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
+
             if (s.getTipeSoal() == null || s.getTipeSoal().trim().isEmpty()) {
-                String kj = s.getKunciJawaban() != null ? s.getKunciJawaban().trim() : "";
-                boolean isMultiKey = kj.contains(",") || kj.contains(";") || kj.matches("(?i).*[A-E].*[A-E].*");
-                if (isBSMajemukKey(kj)) {
+                if (isBSKey) {
                     s.setTipeSoal("BS_MAJEMUK");
                 } else if (("Benar".equalsIgnoreCase(s.getPilihanA()) || "True".equalsIgnoreCase(s.getPilihanA())) &&
                            ("Salah".equalsIgnoreCase(s.getPilihanB()) || "False".equalsIgnoreCase(s.getPilihanB()))) {
@@ -45,6 +47,10 @@ public class SoalPGService {
                 } else {
                     s.setTipeSoal("PG_BIASA");
                 }
+                soalPGRepository.save(s);
+            } else if (!isBSKey && isMultiKey && !"PG_KOMPLEKS".equalsIgnoreCase(s.getTipeSoal())) {
+                // Self-healing: jika soal memiliki multi-kunci (seperti A,B atau A,B,C) tapi tipe belum PG_KOMPLEKS, koreksi otomatis
+                s.setTipeSoal("PG_KOMPLEKS");
                 soalPGRepository.save(s);
             }
 

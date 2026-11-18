@@ -505,8 +505,8 @@ public class QuestionExcelService {
         if (raw == null || raw.trim().isEmpty()) return "PG_BIASA";
         String s = raw.trim().toUpperCase();
         if (s.contains("ESSAY") || s.contains("URAIAN")) return "ESSAY";
-        if (s.contains("KOMPLEKS")) return "PG_KOMPLEKS";
-        if (s.contains("MAJEMUK") || s.contains("BS_MAJEMUK")) return "BS_MAJEMUK";
+        if (s.contains("KOMPLEKS") || s.contains("PG_MAJEMUK") || s.contains("PG MAJEMUK") || (s.contains("PG") && s.contains("MAJEMUK")) || s.equals("MAJEMUK")) return "PG_KOMPLEKS";
+        if (s.contains("BS_MAJEMUK") || s.contains("BS MAJEMUK") || s.contains("BENAR SALAH MAJEMUK") || s.contains("TABEL")) return "BS_MAJEMUK";
         if (s.contains("BENAR") || s.contains("SALAH")) return "BENAR_SALAH";
         return "PG_BIASA";
     }

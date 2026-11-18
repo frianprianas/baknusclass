@@ -1578,6 +1578,26 @@ const ExamScoring = () => {
                                                                 );
                                                             })()
                                                         ) : (
+                                                        <>
+                                                        {isKompleks && (() => {
+                                                            const totalKeys = keyChoicesList.length || 1;
+                                                            const maxBobot = q.bobotNilai || 2;
+                                                            const ptsPerKey = (maxBobot / totalKeys).toFixed(1).replace(/\.0$/, '');
+                                                            const correctMatches = studentChoicesList.filter(k => keyChoicesList.includes(k)).length;
+                                                            const wrongMatches = studentChoicesList.filter(k => !keyChoicesList.includes(k)).length;
+
+                                                            return (
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#eff6ff', borderRadius: '10px', margin: '12px 0 8px', fontSize: '0.85rem', flexWrap: 'wrap', gap: '8px', border: '1px solid #bfdbfe' }}>
+                                                                    <span style={{ color: '#1e40af', fontWeight: 800 }}>
+                                                                        ☑️ Hasil Evaluasi PG Kompleks: <span style={{ color: '#2563eb' }}>{correctMatches} dari {totalKeys} Kunci Benar Terpilih</span>
+                                                                        {wrongMatches > 0 && <span style={{ color: '#dc2626', marginLeft: '6px' }}>({wrongMatches} Opsi Salah)</span>}
+                                                                    </span>
+                                                                    <span style={{ background: '#2563eb', color: 'white', padding: '3px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '0.8rem' }}>
+                                                                        Nilai: {earnedScore} / {maxBobot} Poin ({ptsPerKey} Pts/Kunci Benar)
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         <div className="pg-options-preview" style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0' }}>
                                                             {options.map(opt => {
                                                                 const cleanOptText = stripHtml(opt.text).toUpperCase();
@@ -1637,8 +1657,8 @@ const ExamScoring = () => {
                                                                 );
                                                             })}
                                                         </div>
-
-                                                                                                                )}
+                                                        </>
+                                                        )}
 
                                                         {/* Summary evaluation box */}
                                                         <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>

@@ -750,6 +750,7 @@ const StudentExams = () => {
                 );
                 const hasComplexTextHint = pertHtml.includes('lebih dari') || 
                                           pertHtml.includes('kompleks') || 
+                                          pertHtml.includes('majemuk') ||
                                           pertHtml.includes('pilih 2') ||
                                           pertHtml.includes('pilihan 2') ||
                                           pertHtml.includes('pilihlah 2') ||
@@ -770,6 +771,7 @@ const StudentExams = () => {
 
                 const isKompleks = !isBS && (
                     resolvedTipe.includes('KOMPLEKS') ||
+                    resolvedTipe.includes('MAJEMUK') ||
                     (q.kunciJawaban && (q.kunciJawaban.includes(',') || q.kunciJawaban.includes(';') || q.kunciJawaban.trim().length > 1)) ||
                     hasComplexTextHint
                 );
