@@ -81,6 +81,26 @@ public class SoalPGService {
         return false;
     }
 
+    public static void validateKunciPGKompleks(String tipe, String kunciJawaban) {
+        if (kunciJawaban == null) return;
+        boolean isKompleks = "PG_KOMPLEKS".equalsIgnoreCase(tipe) ||
+                (tipe != null && tipe.toUpperCase().contains("KOMPLEKS")) ||
+                kunciJawaban.contains(",") || kunciJawaban.contains(";");
+        if (isKompleks && !"BS_MAJEMUK".equalsIgnoreCase(tipe) && !isBSMajemukKey(kunciJawaban)) {
+            String[] parts = kunciJawaban.split("[,;\\s]+");
+            java.util.Set<String> validKeys = new java.util.LinkedHashSet<>();
+            for (String p : parts) {
+                String clean = p.replaceAll("[^A-Ea-e]", "").toUpperCase();
+                if (!clean.isEmpty()) {
+                    validKeys.add(clean);
+                }
+            }
+            if (validKeys.size() > 3) {
+                throw new IllegalArgumentException("Soal PG Majemuk / Kompleks maksimal hanya boleh memiliki 3 jawaban benar (dari 5 pilihan). Ditemukan " + validKeys.size() + " kunci (" + String.join(",", validKeys) + ")!");
+            }
+        }
+    }
+
     @CacheEvict(value = "soalPGCache", allEntries = true)
     public SoalPGDTO createSoal(SoalPGDTO dto) {
         Long uId = dto.getUjianId() != null ? dto.getUjianId() : dto.getUjianMapelId();
@@ -112,6 +132,7 @@ public class SoalPGService {
             }
         }
         entity.setTipeSoal(tipe != null ? tipe : "PG_BIASA");
+        validateKunciPGKompleks(entity.getTipeSoal(), entity.getKunciJawaban());
 
         SoalPG saved = soalPGRepository.save(entity);
         String fullPertanyaan;
@@ -144,6 +165,9 @@ public class SoalPGService {
         log.info("[SoalPGService] Deleting SoalPG with ID: {}", id);
         jawabanPGRepository.deleteBySoalPGId(id);
         soalPGRepository.deleteSoalById(id);
+        if (soalPGRepository.existsById(id)) {
+            soalPGRepository.deleteById(id);
+        }
         log.info("[SoalPGService] Deleted SoalPG with ID: {}", id);
     }
 
@@ -168,6 +192,7 @@ public class SoalPGService {
                 entity.setTipeSoal("PG_BIASA");
             }
         }
+        validateKunciPGKompleks(entity.getTipeSoal(), entity.getKunciJawaban());
 
         SoalPG saved = soalPGRepository.save(entity);
         jawabanPGService.reevaluateAllJawabanForSoal(saved);
@@ -198,6 +223,7 @@ public class SoalPGService {
             }
         }
         if (upTipe != null) entity.setTipeSoal(upTipe);
+        validateKunciPGKompleks(entity.getTipeSoal(), entity.getKunciJawaban());
 
         SoalPG saved = soalPGRepository.save(entity);
         String fullPertanyaan;

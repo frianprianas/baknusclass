@@ -582,6 +582,10 @@ const ExamScoring = () => {
             alert('Pilih minimal satu kunci jawaban!');
             return;
         }
+        if (keys.length > 3) {
+            alert(`Peringatan: Untuk soal PG Majemuk / Kompleks, maksimal hanya 3 jawaban benar yang dapat ditandai (dari 5 pilihan)! Saat ini terpilih: ${keys.length} (${keys.join(', ')})`);
+            return;
+        }
         const newKunciStr = keys.join(',');
         setIsSavingKunci(true);
         try {
@@ -1678,6 +1682,10 @@ const ExamScoring = () => {
                                                                                     key={opt}
                                                                                     type="button"
                                                                                     onClick={() => {
+                                                                                        if (!isChecked && curList.length >= 3) {
+                                                                                            alert('Peringatan: Untuk soal PG Majemuk / Kompleks, maksimal hanya 3 jawaban benar yang dapat ditandai (dari 5 pilihan)!');
+                                                                                            return;
+                                                                                        }
                                                                                         const nextList = isChecked ? curList.filter(k => k !== opt) : [...curList, opt].sort();
                                                                                         setTempKunciMap({ ...tempKunciMap, [q.id]: nextList });
                                                                                     }}

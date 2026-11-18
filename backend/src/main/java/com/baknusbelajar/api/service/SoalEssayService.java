@@ -80,6 +80,9 @@ public class SoalEssayService {
         log.info("[SoalEssayService] Deleting SoalEssay with ID: {}", id);
         jawabanSiswaRepository.deleteBySoalEssayId(id);
         soalEssayRepository.deleteSoalById(id);
+        if (soalEssayRepository.existsById(id)) {
+            soalEssayRepository.deleteById(id);
+        }
         log.info("[SoalEssayService] Deleted SoalEssay with ID: {}", id);
     }
 

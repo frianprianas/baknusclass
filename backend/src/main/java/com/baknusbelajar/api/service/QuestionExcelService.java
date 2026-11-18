@@ -220,7 +220,7 @@ public class QuestionExcelService {
                     {"Pilihan A - E", "Untuk PG_BIASA / PG_KOMPLEKS: Opsi A sampai E (jika hanya 4 opsi A-D, isi Pilihan E dengan '-').\nUntuk BENAR_SALAH: Pilihan A = 'Benar', B = 'Salah', C-E = '-'.\nUntuk BS_MAJEMUK: Pilihan A sampai E diisi butir-butir pernyataan.\nUntuk ESSAY: Pilihan A sampai E diisi '-'."},
                     {"Kunci Jawaban", "Format kunci berdasarkan tipe soal:\n"
                             + "1. PG_BIASA: 1 huruf kapital (misal: A atau B).\n"
-                            + "2. PG_KOMPLEKS: Huruf kapital dipisah koma (misal: A,C atau B,D,E).\n"
+                            + "2. PG_KOMPLEKS: Huruf kapital dipisah koma (MAKSIMAL 3 JAWABAN BENAR dari 5 pilihan A-E, misal: A,C atau B,D,E).\n"
                             + "3. BENAR_SALAH: Huruf 'A' jika Benar, atau 'B' jika Salah.\n"
                             + "4. BS_MAJEMUK: Status B dan S dipisah koma (misal: B,S,B atau B,B,S,B).\n"
                             + "5. ESSAY: Boleh diisi pedoman penskoran essay atau '-' (tidak dinilai otomatis)."},

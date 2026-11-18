@@ -177,8 +177,8 @@ public class AiQuestionImportService {
                 + "1. PG_BIASA: Pilihan Ganda dengan 1 kunci jawaban.\n"
                 + "   - pilihanA, pilihanB, pilihanC, pilihanD, pilihanE (jika 4 opsi, pilihanE diisi '-')\n"
                 + "   - kunciJawaban: huruf tunggal kapital (misal: 'A', 'B', 'C', 'D', 'E')\n"
-                + "2. PG_KOMPLEKS: Pilihan Ganda lebih dari 1 kunci jawaban benar.\n"
-                + "   - kunciJawaban: huruf kapital dipisah koma (misal: 'A,C' atau 'B,D,E')\n"
+                + "2. PG_KOMPLEKS: Pilihan Ganda lebih dari 1 kunci jawaban benar (Maksimal 3 jawaban benar dari 5 pilihan A-E).\n"
+                + "   - kunciJawaban: huruf kapital dipisah koma (maksimal 3 opsi benar, misal: 'A,C' atau 'B,D,E')\n"
                 + "3. BENAR_SALAH: Soal Benar / Salah tunggal.\n"
                 + "   - pilihanA: 'Benar', pilihanB: 'Salah', pilihanC: '-', pilihanD: '-', pilihanE: '-'\n"
                 + "   - kunciJawaban: 'A' jika Benar, 'B' jika Salah\n"
@@ -303,13 +303,26 @@ public class AiQuestionImportService {
                     if (pilA.equals("-")) pilA = "Benar";
                     if (pilB.equals("-")) pilB = "Salah";
                 }
+                String kj = d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "A";
+                if (("PG_KOMPLEKS".equalsIgnoreCase(tipe) || kj.contains(",") || kj.contains(";")) && !"BS_MAJEMUK".equalsIgnoreCase(tipe)) {
+                    String[] parts = kj.split("[,;\\s]+");
+                    java.util.Set<String> validKeys = new java.util.LinkedHashSet<>();
+                    for (String p : parts) {
+                        String clean = p.replaceAll("[^A-Ea-e]", "").toUpperCase();
+                        if (!clean.isEmpty()) validKeys.add(clean);
+                    }
+                    if (validKeys.size() > 3) {
+                        throw new IllegalArgumentException("Peringatan Template: Soal nomor " + (d.getNomor() != null ? d.getNomor() : (count + 1)) + " memiliki " + validKeys.size() + " kunci jawaban (" + String.join(",", validKeys) + "). Aturan PG Majemuk: Maksimal hanya 3 jawaban benar dari 5 pilihan jawaban!");
+                    }
+                    tipe = "PG_KOMPLEKS";
+                }
                 pg.setTipeSoal(tipe);
                 pg.setPilihanA(pilA);
                 pg.setPilihanB(pilB);
                 pg.setPilihanC(pilC);
                 pg.setPilihanD(pilD);
                 pg.setPilihanE(pilE);
-                pg.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "A");
+                pg.setKunciJawaban(kj);
                 pg.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 2.0);
                 pgList.add(pg);
             }

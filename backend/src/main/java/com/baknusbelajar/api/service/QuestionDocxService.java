@@ -86,7 +86,7 @@ public class QuestionDocxService {
             rTitle.setText("💡 PETUNJUK SINGKAT PENGISIAN TEMPLATE SOAL:");
 
             addBullet(infoCell, "1. Tipe Soal: Wajib diisi salah satu dari: PG_BIASA, PG_KOMPLEKS, BENAR_SALAH, BS_MAJEMUK, atau ESSAY.");
-            addBullet(infoCell, "2. Format Kunci Jawaban: PG_BIASA: 1 huruf (A/B/C/D/E) | PG_KOMPLEKS: pisah koma (misal: A,C) | BENAR_SALAH: A (Benar) atau B (Salah) | BS_MAJEMUK: B,S,B,B (status per butir) | ESSAY: Pedoman penskoran (boleh '-').");
+            addBullet(infoCell, "2. Format Kunci Jawaban: PG_BIASA: 1 huruf (A/B/C/D/E) | PG_KOMPLEKS: pisah koma (MAKSIMAL 3 JAWABAN BENAR dari 5 pilihan A-E, misal: A,C atau A,B,D) | BENAR_SALAH: A (Benar) atau B (Salah) | BS_MAJEMUK: B,S,B,B (status per butir) | ESSAY: Pedoman penskoran (boleh '-').");
             addBullet(infoCell, "3. Gambar (Foto/Diagram): Cukup Paste (Ctrl+V) atau Insert Picture langsung ke dalam sel Pertanyaan atau Pilihan jawaban.");
             addBullet(infoCell, "4. Huruf Arab & Jepang: Cukup ketik/paste langsung ke sel tabel (didukung penuh, teks Arab otomatis rapi RTL).");
             addBullet(infoCell, "5. Rumus Matematika: Mendukung format LaTeX (misal: $$\\int_0^1 x^2 dx$$ atau matriks $$\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}$$), simbol Unicode (∫, ∑, √, x²), atau tag HTML.");

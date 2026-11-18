@@ -408,6 +408,18 @@ const ExamManagement = () => {
                     alert('Tidak ada soal yang terdeteksi dalam tabel berkas tersebut. Pastikan tabel template tidak dihapus.');
                     return;
                 }
+                const overLimit = parsedDrafts.filter(d => {
+                    const isKompleks = d.tipeSoal === 'PG_KOMPLEKS' || (d.kunciJawaban && (d.kunciJawaban.includes(',') || d.kunciJawaban.includes(';')));
+                    if (isKompleks && d.tipeSoal !== 'BS_MAJEMUK') {
+                        const keys = (d.kunciJawaban || '').split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-E]$/.test(s));
+                        return keys.length > 3;
+                    }
+                    return false;
+                });
+                if (overLimit.length > 0) {
+                    const nos = overLimit.map(d => d.nomor || '?').join(', ');
+                    alert(`Peringatan Template: Ditemukan ${overLimit.length} butir soal PG Majemuk dengan lebih dari 3 jawaban benar (Nomor: ${nos}). Sesuai aturan, maksimal hanya 3 jawaban benar yang diperbolehkan dari 5 pilihan A-E. Silakan periksa dan sesuaikan pada tahap review.`);
+                }
                 setDraftQuestions(parsedDrafts);
                 setWordImportTargetExam(excelTargetExam);
                 setWordImportStep('review');
@@ -500,6 +512,18 @@ const ExamManagement = () => {
                 if (extractedList.length === 0) {
                     alert('AI tidak menemukan butir soal dalam dokumen. Pastikan dokumen berisi naskah soal berformat nomor dan opsi.');
                 } else {
+                    const overLimit = extractedList.filter(d => {
+                        const isKompleks = d.tipeSoal === 'PG_KOMPLEKS' || (d.kunciJawaban && (d.kunciJawaban.includes(',') || d.kunciJawaban.includes(';')));
+                        if (isKompleks && d.tipeSoal !== 'BS_MAJEMUK') {
+                            const keys = (d.kunciJawaban || '').split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-E]$/.test(s));
+                            return keys.length > 3;
+                        }
+                        return false;
+                    });
+                    if (overLimit.length > 0) {
+                        const nos = overLimit.map(d => d.nomor || '?').join(', ');
+                        alert(`Peringatan AI: Terdapat ${overLimit.length} butir soal PG Majemuk dengan lebih dari 3 jawaban benar (Nomor: ${nos}). Sesuai aturan, maksimal hanya 3 jawaban benar yang diperbolehkan dari 5 pilihan A-E. Silakan periksa dan sesuaikan pada tahap review.`);
+                    }
                     setDraftQuestions(extractedList);
                     setWordImportStep('review');
                 }
@@ -553,6 +577,20 @@ const ExamManagement = () => {
         if (!wordImportTargetExam) return;
         if (!draftQuestions || draftQuestions.length === 0) {
             alert('Tidak ada draf soal untuk disimpan.');
+            return;
+        }
+
+        const overLimit = draftQuestions.filter(d => {
+            const isKompleks = d.tipeSoal === 'PG_KOMPLEKS' || (d.kunciJawaban && (d.kunciJawaban.includes(',') || d.kunciJawaban.includes(';')));
+            if (isKompleks && d.tipeSoal !== 'BS_MAJEMUK') {
+                const keys = (d.kunciJawaban || '').split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-E]$/.test(s));
+                return keys.length > 3;
+            }
+            return false;
+        });
+        if (overLimit.length > 0) {
+            const nos = overLimit.map(d => d.nomor || '?').join(', ');
+            alert(`Peringatan: Terdapat ${overLimit.length} butir soal PG Majemuk dengan lebih dari 3 jawaban benar (Nomor: ${nos}). Sesuai aturan, maksimal hanya 3 jawaban benar yang dapat ditandai dari 5 pilihan (A-E)! Silakan kurangi kunci jawaban pada soal tersebut.`);
             return;
         }
 
@@ -1526,6 +1564,14 @@ const ExamManagement = () => {
                         body.tipeSoal = 'PG_BIASA';
                     }
                 }
+                if (body.tipeSoal === 'PG_KOMPLEKS') {
+                    const keys = (body.kunciJawaban || '').split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-E]$/.test(s));
+                    if (keys.length > 3) {
+                        alert(`Peringatan: Untuk soal PG Majemuk / Kompleks, maksimal hanya 3 jawaban benar yang dapat ditandai (dari 5 pilihan jawaban A-E)! Saat ini terpilih: ${keys.length} (${keys.join(', ')})`);
+                        setSavingQuestion(false);
+                        return;
+                    }
+                }
                 // Pastikan pilihan C, D, E tidak null/kosong agar tidak terkena constraint ORA-01400 pada Oracle
                 if (body.tipeSoal === 'BENAR_SALAH' || (body.pilihanA === 'Benar' && body.pilihanB === 'Salah')) {
                     body.tipeSoal = 'BENAR_SALAH';
@@ -1610,11 +1656,13 @@ const ExamManagement = () => {
     const handleDeleteSoal = async (id, type) => {
         if (!window.confirm('Yakin ingin menghapus soal ini?')) return;
         const token = localStorage.getItem('token');
+        let deleteSucceeded = false;
         try {
             const endpoint = type === 'essay' ? `/api/exam/soal-essay/${id}` : `/api/exam/soal-pg/${id}`;
             await axios.delete(endpoint, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            deleteSucceeded = true;
             if (type === 'essay') {
                 setQuestions(prev => prev.filter(q => q.id !== id));
             } else {
@@ -1624,13 +1672,19 @@ const ExamManagement = () => {
                 setEditingQuestion(null);
             }
             if (viewingQuestions && viewingQuestions.id) {
-                await handleManageQuestions(viewingQuestions);
+                try {
+                    await handleManageQuestions(viewingQuestions);
+                } catch (refreshErr) {
+                    console.warn('Failed to refresh questions list after delete:', refreshErr);
+                }
             }
             alert('Soal berhasil dihapus.');
         } catch (err) {
-            console.error('Delete question error:', err);
-            const msg = err.response?.data?.message || err.message || 'Gagal hapus soal';
-            alert('Gagal hapus soal: ' + msg);
+            if (!deleteSucceeded) {
+                console.error('Delete question error:', err);
+                const msg = err.response?.data?.message || err.message || 'Gagal hapus soal';
+                alert('Gagal hapus soal: ' + msg);
+            }
         }
     };
 
@@ -1641,13 +1695,17 @@ const ExamManagement = () => {
         setIsDeletingAll(true);
         const token = localStorage.getItem('token');
         try {
-            // Panggil endpoint atomic backend untuk membersihkan semua soal
             await axios.delete(`/api/exam/ujian-mapel/${viewingQuestions.id}/clear-soal`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setQuestions([]);
             setQuestionsPG([]);
-            await handleManageQuestions(viewingQuestions);
+            if (editingQuestion) setEditingQuestion(null);
+            if (viewingQuestions && viewingQuestions.id) {
+                try {
+                    await handleManageQuestions(viewingQuestions);
+                } catch (refreshErr) {}
+            }
             alert('Semua soal berhasil dibersihkan.');
         } catch (err) {
             console.warn('Dedicated clear-soal endpoint failed, falling back to sequential delete:', err);
@@ -1660,7 +1718,10 @@ const ExamManagement = () => {
                 }
                 setQuestions([]);
                 setQuestionsPG([]);
-                await handleManageQuestions(viewingQuestions);
+                if (editingQuestion) setEditingQuestion(null);
+                if (viewingQuestions && viewingQuestions.id) {
+                    await handleManageQuestions(viewingQuestions);
+                }
                 alert('Semua soal berhasil dibersihkan.');
             } catch (fallbackErr) {
                 console.error('Fallback delete error:', fallbackErr);
@@ -2936,6 +2997,10 @@ const ExamManagement = () => {
                                                                                 if (currentKeys.includes(opt)) {
                                                                                     currentKeys = currentKeys.filter(k => k !== opt);
                                                                                 } else {
+                                                                                    if (currentKeys.length >= 3) {
+                                                                                        alert('Peringatan: Untuk soal PG Majemuk / Kompleks, maksimal hanya 3 jawaban benar yang dapat ditandai (dari 5 pilihan)!');
+                                                                                        return;
+                                                                                    }
                                                                                     currentKeys.push(opt);
                                                                                     currentKeys.sort();
                                                                                 }
@@ -3919,13 +3984,13 @@ const ExamManagement = () => {
                                                     questionFormPG.tipeSoal === 'BENAR_SALAH'
                                                         ? 'Siswa diminta menentukan apakah pernyataan bernilai BENAR atau SALAH (pilih satu opsi).'
                                                         : questionFormPG.tipeSoal === 'PG_KOMPLEKS'
-                                                            ? 'Soal memiliki lebih dari 1 kunci jawaban benar (misal: A & C, atau 2-3 jawaban). Klik tombol opsi (A-E) untuk menandai kunci-kunci yang benar!'
+                                                            ? 'Soal memiliki lebih dari 1 kunci jawaban benar (maksimal 3 kunci benar dari 5 pilihan A-E). Klik tombol opsi (A-E) untuk menandai kunci-kunci yang benar!'
                                                             : 'Soal hanya memiliki 1 kunci jawaban benar (Single Choice). Siswa hanya dapat memilih 1 opsi jawaban tepat.'
                                                 )}
                                             </div>
                                         </div>
                                         <div className="fgb-badge-pill">
-                                            {qType === 'essay' ? 'Tipe Essay' : questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Tipe Benar / Salah' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Multi Jawaban Benar' : '1 Jawaban Benar'}
+                                            {qType === 'essay' ? 'Tipe Essay' : questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Tipe Benar / Salah' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Max 3 Kunci Benar' : '1 Jawaban Benar'}
                                         </div>
                                     </div>
 
@@ -4327,7 +4392,7 @@ const ExamManagement = () => {
                                                             )}
                                                         </div>
                                                         <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '4px 10px', borderRadius: '6px', background: questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '#e0e7ff' : '#f1f5f9', color: questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '#4338ca' : '#475569' }}>
-                                                            {questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '☑️ Mode PG Kompleks (Banyak Kunci)' : '🔘 Mode PG Biasa (1 Kunci Jawaban)'}
+                                                            {questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? '☑️ Mode PG Majemuk (Maksimal 3 Kunci Benar)' : '🔘 Mode PG Biasa (1 Kunci Jawaban)'}
                                                         </span>
                                                     </div>
 
@@ -4357,6 +4422,10 @@ const ExamManagement = () => {
                                                                                     if (selectedKeys.includes(opt)) {
                                                                                         newKeys = selectedKeys.filter(k => k !== opt);
                                                                                     } else {
+                                                                                        if (selectedKeys.length >= 3) {
+                                                                                            alert('Peringatan: Untuk soal PG Majemuk / Kompleks, maksimal hanya 3 jawaban benar yang dapat ditandai (dari 5 pilihan jawaban A-E)!');
+                                                                                            return;
+                                                                                        }
                                                                                         newKeys = [...selectedKeys, opt].sort();
                                                                                     }
                                                                                     setQuestionFormPG({
