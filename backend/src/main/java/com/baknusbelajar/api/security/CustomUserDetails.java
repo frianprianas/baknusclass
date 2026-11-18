@@ -28,6 +28,7 @@ public class CustomUserDetails implements UserDetails {
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase()));
         if (isCoAdmin) {
             authorities.add(new SimpleGrantedAuthority("ROLE_CO_ADMIN"));
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
         }
         return new CustomUserDetails(
                 user.getId(),

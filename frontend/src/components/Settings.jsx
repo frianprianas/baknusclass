@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, School, GraduationCap, ShieldAlert, Bot, AlertTriangle, LogOut, RefreshCcw, Download } from 'lucide-react';
+import { Save, School, GraduationCap, ShieldAlert, Bot, AlertTriangle, LogOut, RefreshCcw, Download, ShieldCheck, Users, Shield } from 'lucide-react';
+import { BAKNUS_MAIL_URL } from '../config';
 
 const Settings = () => {
     const [settings, setSettings] = useState({
@@ -17,6 +18,7 @@ const Settings = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [coAdmins, setCoAdmins] = useState([]);
 
     useEffect(() => {
         fetchSettings();
@@ -29,6 +31,13 @@ const Settings = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSettings(prev => ({ ...prev, ...res.data }));
+
+            const uRes = await axios.get('/api/users', {
+                headers: { Authorization: `Bearer ${token}` }
+            }).catch(() => null);
+            if (uRes && uRes.data) {
+                setCoAdmins(uRes.data.filter(u => u.role === 'GURU' && Boolean(u.isCoAdmin)));
+            }
         } catch (error) {
             console.error('Error fetching settings', error);
         }
@@ -344,6 +353,89 @@ const Settings = () => {
                                 <strong>Model AI:</strong> Biarkan kosong untuk menggunakan model default (Gemini: <code>gemini-2.0-flash</code>, Mistral: <code>mistral-large-latest</code>, OpenAI: <code>gpt-4o-mini</code>).
                             </p>
                         </div>
+                    </div>
+                </div>
+
+                {/* Otoritas Administrator untuk Guru (Co-Admin) */}
+                <div className="table-card" style={{ padding: '0', overflow: 'hidden', gridColumn: '1 / -1' }}>
+                    <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <ShieldCheck size={22} style={{ color: '#d97706' }} />
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Guru dengan Otoritas Admin (Co-Admin)</h2>
+                                    <span style={{
+                                        padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700',
+                                        backgroundColor: coAdmins.length >= 3 ? '#fee2e2' : '#fef3c7',
+                                        color: coAdmins.length >= 3 ? '#dc2626' : '#d97706'
+                                    }}>
+                                        {coAdmins.length} / 3 Guru Terpilih
+                                    </span>
+                                </div>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                    Maksimal 3 guru yang dapat dipilih memiliki otoritas penuh Administrator
+                                </span>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => window.location.href = '/users'}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                padding: '8px 14px', borderRadius: '8px',
+                                backgroundColor: '#fef3c7', color: '#d97706',
+                                border: '1px solid #fde68a', fontSize: '0.85rem', fontWeight: '600',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <Users size={16} /> Kelola di Manajemen User &rarr;
+                        </button>
+                    </div>
+
+                    <div style={{ padding: '20px' }}>
+                        {coAdmins.length > 0 ? (
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                gap: '12px'
+                            }}>
+                                {coAdmins.map(g => (
+                                    <div key={g.id} style={{
+                                        display: 'flex', alignItems: 'center', gap: '10px',
+                                        padding: '12px', borderRadius: '8px',
+                                        backgroundColor: 'var(--surface, #fff)',
+                                        border: '1px solid rgba(217, 119, 6, 0.3)'
+                                    }}>
+                                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                                            <img
+                                                src={`${BAKNUS_MAIL_URL}/api/public/avatar/${g.email}`}
+                                                alt=""
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(g.namaLengkap || 'Guru')}&background=d97706&color=fff`;
+                                                }}
+                                            />
+                                        </div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {g.namaLengkap}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                {g.email}
+                                            </div>
+                                            <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#d97706', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                <Shield size={10} /> Otoritas Admin Aktif
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                Belum ada guru yang ditunjuk memiliki otoritas admin. Anda dapat menunjuk maksimal 3 guru melalui halaman <strong>Manajemen User</strong>.
+                            </p>
+                        )}
                     </div>
                 </div>
 

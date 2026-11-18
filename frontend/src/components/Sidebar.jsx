@@ -132,7 +132,12 @@ const Sidebar = ({ activePage, setActivePage }) => {
     window.location.href = '/login';
   };
 
-  const filteredMenu = menuItems.filter(item => item.roles.includes(role));
+  const isCoAdmin = Boolean(user.isCoAdmin);
+  const filteredMenu = menuItems.filter(item => {
+    if (item.roles.includes(role)) return true;
+    if (isCoAdmin && (item.roles.includes('ADMIN') || item.roles.includes('TU'))) return true;
+    return false;
+  });
 
   const getRoleLabel = (r) => {
     switch (r) {

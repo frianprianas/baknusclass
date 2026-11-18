@@ -47,12 +47,18 @@ public class UserController {
 
     @PutMapping("/guru/{guruId}/toggle-co-admin")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> toggleCoAdmin(@PathVariable Long guruId) {
+    public ResponseEntity<?> toggleCoAdmin(@PathVariable Long guruId, org.springframework.security.core.Authentication authentication) {
         try {
+            if (authentication != null && authentication.getPrincipal() instanceof com.baknusbelajar.api.security.CustomUserDetails principal) {
+                com.baknusbelajar.api.entity.Users currentUser = userService.getUserById(principal.getId());
+                if (currentUser == null || !"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+                    return ResponseEntity.status(403).body(java.util.Map.of("message", "Hanya Super Admin yang berwenang menunjuk atau mencabut Co-Admin"));
+                }
+            }
             userService.toggleCoAdminStatus(guruId);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
-            if (e.getMessage().contains("LIMIT_REACHED")) {
+            if (e.getMessage() != null && e.getMessage().contains("LIMIT_REACHED")) {
                 return ResponseEntity.status(400).body(java.util.Map.of("message", e.getMessage()));
             }
             throw e;

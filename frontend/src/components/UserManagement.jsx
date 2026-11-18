@@ -15,7 +15,11 @@ import {
     ExternalLink,
     MessageCircle,
     Layers,
-    X
+    X,
+    ShieldCheck,
+    UserPlus,
+    Trash2,
+    AlertCircle
 } from 'lucide-react';
 
 const UserManagement = () => {
@@ -38,6 +42,8 @@ const UserManagement = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [classList, setClassList] = useState([]);
     const [updating, setUpdating] = useState(false);
+    const [selectedGuruToAppoint, setSelectedGuruToAppoint] = useState('');
+    const [appointing, setAppointing] = useState(false);
 
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
@@ -178,7 +184,12 @@ const UserManagement = () => {
             u.nip?.toLowerCase().includes(term)
         );
 
-        const matchesRole = !selectedRole || u.role?.toUpperCase() === selectedRole.toUpperCase();
+        let matchesRole = true;
+        if (selectedRole === 'CO_ADMIN') {
+            matchesRole = u.role === 'GURU' && Boolean(u.isCoAdmin);
+        } else if (selectedRole) {
+            matchesRole = u.role?.toUpperCase() === selectedRole.toUpperCase();
+        }
 
         let matchesKelas = true;
         if (selectedKelas === 'none') {
@@ -216,6 +227,51 @@ const UserManagement = () => {
             fetchUsers();
         } catch (err) {
             alert('Gagal mengubah status: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const isAdmin = currentUser.role?.toUpperCase() === 'ADMIN';
+    const coAdminTeachers = users.filter(u => u.role === 'GURU' && Boolean(u.isCoAdmin));
+    const availableTeachers = users.filter(u => u.role === 'GURU' && !u.isCoAdmin && (u.active !== false && u.isActive !== false));
+
+    const handleAppointCoAdmin = async () => {
+        if (!selectedGuruToAppoint) return;
+        const targetGuru = users.find(u => String(u.profileId) === String(selectedGuruToAppoint));
+        if (!targetGuru) return;
+        if (coAdminTeachers.length >= 3) {
+            alert('Batas maksimal 3 guru dengan otoritas admin telah tercapai.');
+            return;
+        }
+        if (!window.confirm(`Yakin ingin menunjuk ${targetGuru.namaLengkap} sebagai Guru dengan Otoritas Admin?`)) return;
+
+        setAppointing(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`/api/users/guru/${targetGuru.profileId}/toggle-co-admin`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSelectedGuruToAppoint('');
+            await fetchUsers();
+            alert(`Berhasil! ${targetGuru.namaLengkap} kini memiliki otoritas seperti Administrator.`);
+        } catch (err) {
+            alert('Gagal menunjuk Co-Admin: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setAppointing(false);
+        }
+    };
+
+    const handleRevokeCoAdmin = async (guru) => {
+        if (!window.confirm(`Yakin ingin mencabut otoritas admin dari guru ${guru.namaLengkap}?`)) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`/api/users/guru/${guru.profileId}/toggle-co-admin`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            await fetchUsers();
+            alert(`Otoritas admin dari ${guru.namaLengkap} berhasil dicabut.`);
+        } catch (err) {
+            alert('Gagal mencabut Co-Admin: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -289,6 +345,208 @@ const UserManagement = () => {
                 </button>
             </div>
 
+            {/* Panel Khusus: Guru dengan Otoritas Admin (Maksimal 3) */}
+            {isAdmin && (
+                <div className="table-card co-admin-panel" style={{
+                    marginBottom: '20px',
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)',
+                    border: '1px solid rgba(217, 119, 6, 0.25)',
+                    borderRadius: '12px'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                                width: '44px', height: '44px', borderRadius: '10px',
+                                backgroundColor: '#fef3c7', color: '#d97706',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 2px 4px rgba(217, 119, 6, 0.15)',
+                                flexShrink: 0
+                            }}>
+                                <ShieldCheck size={24} />
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <h2 style={{ fontSize: '1.15rem', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
+                                        Guru dengan Otoritas Admin (Co-Admin)
+                                    </h2>
+                                    <span style={{
+                                        padding: '3px 10px',
+                                        borderRadius: '20px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        backgroundColor: coAdminTeachers.length >= 3 ? '#fee2e2' : '#fef3c7',
+                                        color: coAdminTeachers.length >= 3 ? '#dc2626' : '#d97706',
+                                        border: `1px solid ${coAdminTeachers.length >= 3 ? '#fca5a5' : '#fde68a'}`
+                                    }}>
+                                        {coAdminTeachers.length} / 3 Terpilih
+                                    </span>
+                                </div>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                    Tunjuk maksimal 3 akun guru yang diberikan hak akses & otoritas penuh seperti Admin (Data Master, Token, Manajemen Ujian, Forum, dll) tanpa kehilangan data mengajar.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Quick Picker Dropdown */}
+                        {coAdminTeachers.length < 3 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <select
+                                    value={selectedGuruToAppoint}
+                                    onChange={(e) => setSelectedGuruToAppoint(e.target.value)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--border)',
+                                        backgroundColor: 'var(--surface)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '0.875rem',
+                                        minWidth: '240px'
+                                    }}
+                                >
+                                    <option value="">-- Pilih Guru untuk Otoritas Admin --</option>
+                                    {availableTeachers.map(g => (
+                                        <option key={g.profileId} value={g.profileId}>
+                                            {g.namaLengkap || g.username} {g.nip ? `(NIP: ${g.nip})` : `(${g.email})`}
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={handleAppointCoAdmin}
+                                    disabled={!selectedGuruToAppoint || appointing}
+                                    className="primary-btn"
+                                    style={{
+                                        padding: '8px 16px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        backgroundColor: '#d97706',
+                                        borderColor: '#d97706',
+                                        fontSize: '0.875rem',
+                                        cursor: (!selectedGuruToAppoint || appointing) ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    <UserPlus size={16} />
+                                    <span>{appointing ? 'Memproses...' : 'Tunjuk Guru'}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* List of currently appointed Co-Admins */}
+                    {coAdminTeachers.length > 0 ? (
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '12px',
+                            marginTop: '10px'
+                        }}>
+                            {coAdminTeachers.map(g => (
+                                <div key={g.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '12px 14px',
+                                    borderRadius: '10px',
+                                    backgroundColor: 'var(--surface)',
+                                    border: '1px solid rgba(217, 119, 6, 0.3)',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                                            <img
+                                                src={`${BAKNUS_MAIL_URL}/api/public/avatar/${g.email}`}
+                                                alt=""
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(g.namaLengkap || 'Guru')}&background=d97706&color=fff`;
+                                                }}
+                                            />
+                                        </div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {g.namaLengkap}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {g.email} {g.nip ? `• NIP: ${g.nip}` : ''}
+                                            </div>
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '3px',
+                                                marginTop: '4px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: '700',
+                                                color: '#d97706',
+                                                backgroundColor: '#fef3c7',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px'
+                                            }}>
+                                                <Shield size={10} /> Otoritas Admin Aktif
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleRevokeCoAdmin(g)}
+                                        style={{
+                                            backgroundColor: '#fee2e2',
+                                            color: '#dc2626',
+                                            border: '1px solid #fca5a5',
+                                            padding: '6px 10px',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: '600',
+                                            flexShrink: 0,
+                                            marginLeft: '8px'
+                                        }}
+                                        title="Cabut Otoritas Admin dari Guru ini"
+                                    >
+                                        <Trash2 size={13} />
+                                        <span>Cabut</span>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{
+                            padding: '16px',
+                            textAlign: 'center',
+                            backgroundColor: 'rgba(255,255,255,0.6)',
+                            borderRadius: '8px',
+                            border: '1px dashed rgba(217, 119, 6, 0.3)',
+                            color: 'var(--text-secondary)',
+                            fontSize: '0.85rem'
+                        }}>
+                            Belum ada guru yang ditunjuk memiliki otoritas admin. Pilih guru dari menu dropdown di atas untuk memberikan akses (maksimal 3 guru).
+                        </div>
+                    )}
+
+                    {coAdminTeachers.length >= 3 && (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            backgroundColor: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            color: '#b45309',
+                            fontSize: '0.8rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}>
+                            <AlertCircle size={15} />
+                            <span>Batas maksimal 3 guru telah tercapai. Untuk menunjuk guru lain, cabut otoritas dari salah satu guru di atas terlebih dahulu.</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="table-card">
                 <div className="table-actions">
                     <div className="search-box">
@@ -336,6 +594,7 @@ const UserManagement = () => {
                                 <option value="">Semua Role</option>
                                 <option value="SISWA">Siswa</option>
                                 <option value="GURU">Guru</option>
+                                <option value="CO_ADMIN">Co-Admin (Guru)</option>
                                 <option value="TU">TU</option>
                                 <option value="ADMIN">Admin</option>
                             </select>

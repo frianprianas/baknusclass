@@ -375,7 +375,7 @@ const SecurityToken = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    {(userRole === 'ADMIN' || userRole === 'TU' || isProktor) && (
+                    {(userRole === 'ADMIN' || userRole === 'TU' || isProktor || user.isCoAdmin) && (
                         <button
                             className="btn-action-proktor"
                             onClick={() => {

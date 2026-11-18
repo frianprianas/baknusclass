@@ -326,6 +326,10 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public Users getUserById(Long userId) {
+        return userRepository.findById(userId).orElse(null);
+    }
+
     @Transactional
     public void toggleCoAdminStatus(Long guruId) {
         Guru guru = guruRepository.findById(guruId)
