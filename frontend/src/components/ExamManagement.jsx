@@ -2717,6 +2717,7 @@ const ExamManagement = () => {
                                     <strong style={{ color: '#1e293b' }}>Alur Kerja Draf Soal (Aman & Terkontrol):</strong>
                                     <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
                                         <li>File Word Anda akan dibaca dan distrukturkan oleh AI menjadi <strong>Draf Soal</strong> terlebih dahulu.</li>
+                                        <li><strong>Aturan PG Majemuk / Kompleks:</strong> Maksimal hanya 3 kunci jawaban benar (dari 5 pilihan A-E). Penilaian dilakukan proporsional per kunci benar (misal bobot 30 dengan 3 kunci: tiap kunci benar = 10 poin).</li>
                                         <li>Soal <strong>TIDAK langsung masuk</strong> ke database ujian.</li>
                                         <li>Anda dapat meneliti, menyunting kunci, opsi, butir pernyataan benar-salah, atau menghapus soal yang tidak diinginkan di layar review sebelum menekan tombol ACC.</li>
                                     </ul>
@@ -3453,7 +3454,7 @@ const ExamManagement = () => {
                                     fontSize: '0.82rem',
                                     lineHeight: 1.5
                                 }}>
-                                    💡 <strong>Info:</strong> Tentukan jumlah butir untuk masing-masing tipe soal yang Anda perlukan. Template akan otomatis menyiapkan tabel dengan kolom nomor soal, tipe, pertanyaan, opsi jawaban, kunci, dan skor.
+                                    💡 <strong>Info & Aturan:</strong> Tentukan jumlah butir untuk masing-masing tipe soal. Untuk <strong>PG Majemuk / Kompleks</strong>: maksimal 3 kunci jawaban benar dari 5 pilihan A-E (misal: A,C atau A,B,D). Penilaian proporsional adil per kunci benar (misal bobot 30 dengan 3 kunci: tiap kunci benar = 10 poin). Siswa dapat memilih 1-3 pilihan.
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -3480,7 +3481,7 @@ const ExamManagement = () => {
                                         {/* PG Kompleks */}
                                         <div style={{ padding: '10px 14px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>2. PG Kompleks (Banyak Kunci)</label>
+                                                <label style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1e293b' }}>2. PG Kompleks / Majemuk</label>
                                                 <input
                                                     type="number"
                                                     min="0"
@@ -3489,7 +3490,7 @@ const ExamManagement = () => {
                                                     style={{ width: '65px', padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontWeight: 800, textAlign: 'center' }}
                                                 />
                                             </div>
-                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Opsi A-E, beberapa kunci benar (misal: A,C).</span>
+                                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Opsi A-E, maks. 3 kunci benar (misal: A,C). Skor proporsional per kunci.</span>
                                         </div>
 
                                         {/* Benar / Salah */}
@@ -3607,7 +3608,7 @@ const ExamManagement = () => {
                                     fontSize: '0.85rem',
                                     lineHeight: 1.5
                                 }}>
-                                    💡 <strong>Upload File Template:</strong> Unggah berkas Word (.docx) atau Excel (.xlsx) yang tabelnya telah Anda isi dengan soal, opsi, kunci, dan skor. Sistem akan membaca seluruh baris tabel secara otomatis.
+                                    💡 <strong>Upload File Template:</strong> Unggah berkas Word (.docx) atau Excel (.xlsx) yang tabelnya telah Anda isi dengan soal, opsi, kunci, dan skor. Pastikan untuk soal PG Majemuk maksimal menandai 3 kunci jawaban benar dari 5 pilihan A-E. Sistem akan membaca seluruh baris tabel secara otomatis.
                                 </div>
 
                                 {/* Drag and Drop Zone */}
@@ -3976,7 +3977,7 @@ const ExamManagement = () => {
                                         <div className="fgb-content">
                                             <div className="fgb-title">
                                                 {qType === 'essay' && 'Soal Essay / Uraian (Jawaban Terbuka)'}
-                                                {qType === 'pg' && (questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Soal Pernyataan Benar / Salah (1 Pilihan Tepat)' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Soal Pilihan Ganda Kompleks (Bisa 2 atau Lebih Jawaban Benar)' : 'Soal Pilihan Ganda Biasa (1 Jawaban Benar)')}
+                                                {qType === 'pg' && (questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Soal Pernyataan Benar / Salah (1 Pilihan Tepat)' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Soal Pilihan Ganda Kompleks / Majemuk (Maksimal 3 Kunci Benar)' : 'Soal Pilihan Ganda Biasa (1 Jawaban Benar)')}
                                             </div>
                                             <div className="fgb-desc">
                                                 {qType === 'essay' && 'Siswa akan menjawab dengan mengetikkan penjelasan/uraian secara mandiri. Penilaian dapat diperiksa manual oleh guru atau otomatis dibantu AI.'}
@@ -3984,13 +3985,13 @@ const ExamManagement = () => {
                                                     questionFormPG.tipeSoal === 'BENAR_SALAH'
                                                         ? 'Siswa diminta menentukan apakah pernyataan bernilai BENAR atau SALAH (pilih satu opsi).'
                                                         : questionFormPG.tipeSoal === 'PG_KOMPLEKS'
-                                                            ? 'Soal memiliki lebih dari 1 kunci jawaban benar (maksimal 3 kunci benar dari 5 pilihan A-E). Klik tombol opsi (A-E) untuk menandai kunci-kunci yang benar!'
+                                                            ? 'Soal memiliki lebih dari 1 kunci jawaban benar (maksimal 3 kunci benar dari 5 pilihan A-E). Skor dinilai proporsional per kunci benar (misal bobot 30 dengan 3 kunci: tiap kunci benar bernilai 10 poin). Siswa dapat memilih 1, 2, atau 3 jawaban.'
                                                             : 'Soal hanya memiliki 1 kunci jawaban benar (Single Choice). Siswa hanya dapat memilih 1 opsi jawaban tepat.'
                                                 )}
                                             </div>
                                         </div>
                                         <div className="fgb-badge-pill">
-                                            {qType === 'essay' ? 'Tipe Essay' : questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Tipe Benar / Salah' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Max 3 Kunci Benar' : '1 Jawaban Benar'}
+                                            {qType === 'essay' ? 'Tipe Essay' : questionFormPG.tipeSoal === 'BENAR_SALAH' ? 'Tipe Benar / Salah' : questionFormPG.tipeSoal === 'PG_KOMPLEKS' ? 'Maks 3 Kunci Benar' : '1 Jawaban Benar'}
                                         </div>
                                     </div>
 
@@ -4374,7 +4375,7 @@ const ExamManagement = () => {
                                                         </div>
                                                         {questionFormPG.tipeSoal === 'PG_KOMPLEKS' && (
                                                             <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 600 }}>
-                                                                *Klik tombol opsi (A-E) untuk memilih satu atau lebih kunci jawaban benar
+                                                                *Klik tombol opsi (A-E) untuk menandai kunci benar (maksimal 3 kunci dari 5 pilihan A-E). Penilaian proporsional per kunci benar.
                                                             </span>
                                                         )}
                                                     </div>
