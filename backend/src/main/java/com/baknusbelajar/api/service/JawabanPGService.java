@@ -473,13 +473,13 @@ public class JawabanPGService {
                 log.info("Scoring PG_KOMPLEKS [Soal {}]: Full Match (Bobot {})", soal.getId(), bobot);
                 return new ScoringResult(bobot, true);
             } else if (correctSelected > 0) {
-                // Proporsional parsial dengan penalti moderat (0.5 bobot per salah):
-                double netRatio = Math.max(0.0, ((double) correctSelected - (wrongSelected * 0.5)) / setKunci.size());
-                double partial = netRatio * bobot;
+                // Proporsional murni per kunci benar (misal bobot 7.5 dgn 3 kunci: 1 benar = 2.5, 2 benar = 5.0, 3 benar = 7.5)
+                double partial = ((double) correctSelected / setKunci.size()) * bobot;
                 double rounded = Math.round(partial * 100.0) / 100.0;
-                log.info("Scoring PG_KOMPLEKS [Soal {}]: Partial Match ({}/{} correct, {} wrong) -> {}",
-                        soal.getId(), correctSelected, setKunci.size(), wrongSelected, rounded);
-                return new ScoringResult(rounded, rounded >= bobot);
+                boolean isFull = (correctSelected == setKunci.size() && wrongSelected == 0) || rounded >= bobot;
+                log.info("Scoring PG_KOMPLEKS [Soal {}]: Match {}/{} correct (Wrong={}, Bobot={}) -> {}",
+                        soal.getId(), correctSelected, setKunci.size(), wrongSelected, bobot, rounded);
+                return new ScoringResult(rounded, isFull);
             } else {
                 log.info("Scoring PG_KOMPLEKS [Soal {}]: No correct answers (Wrong={})", soal.getId(), wrongSelected);
                 return new ScoringResult(0.0, false);
