@@ -42,6 +42,13 @@ public class SoalEssayController {
         return ResponseEntity.ok(soalEssayService.updateSoal(id, dto));
     }
 
+    @PutMapping("/ujian/{ujianId}/reorder")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<Void> reorder(@PathVariable Long ujianId, @RequestBody java.util.List<Long> orderedIds) {
+        soalEssayService.reorderSoal(ujianId, orderedIds);
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

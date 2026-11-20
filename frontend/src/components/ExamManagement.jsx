@@ -41,7 +41,9 @@ import {
     Filter,
     FileSpreadsheet,
     Download,
-    Upload
+    Upload,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -1699,6 +1701,70 @@ const ExamManagement = () => {
                 const msg = err.response?.data?.message || err.message || 'Gagal hapus soal';
                 alert('Gagal hapus soal: ' + msg);
             }
+        }
+    };
+
+    const [isReordering, setIsReordering] = useState(false);
+
+    const handleMoveQuestion = async (index, direction, type) => {
+        if (!viewingQuestions || isReordering) return;
+        const list = type === 'essay' ? [...questions] : [...questionsPG];
+        const targetIdx = direction === 'up' ? index - 1 : index + 1;
+        if (targetIdx < 0 || targetIdx >= list.length) return;
+
+        const temp = list[index];
+        list[index] = list[targetIdx];
+        list[targetIdx] = temp;
+
+        if (type === 'essay') setQuestions(list);
+        else setQuestionsPG(list);
+
+        setIsReordering(true);
+        try {
+            const token = localStorage.getItem('token');
+            const orderedIds = list.map(q => q.id);
+            const endpoint = type === 'essay'
+                ? `/api/exam/soal-essay/ujian/${viewingQuestions.id}/reorder`
+                : `/api/exam/soal-pg/ujian/${viewingQuestions.id}/reorder`;
+            await axios.put(endpoint, orderedIds, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error('Failed to save reordered questions:', err);
+            alert('Gagal memperbarui urutan soal: ' + (err.response?.data?.message || err.message));
+            await handleManageQuestions(viewingQuestions);
+        } finally {
+            setIsReordering(false);
+        }
+    };
+
+    const handleMoveQuestionTo = async (fromIndex, toIndex, type) => {
+        if (!viewingQuestions || isReordering) return;
+        const list = type === 'essay' ? [...questions] : [...questionsPG];
+        if (toIndex < 0 || toIndex >= list.length || fromIndex === toIndex) return;
+
+        const [movedItem] = list.splice(fromIndex, 1);
+        list.splice(toIndex, 0, movedItem);
+
+        if (type === 'essay') setQuestions(list);
+        else setQuestionsPG(list);
+
+        setIsReordering(true);
+        try {
+            const token = localStorage.getItem('token');
+            const orderedIds = list.map(q => q.id);
+            const endpoint = type === 'essay'
+                ? `/api/exam/soal-essay/ujian/${viewingQuestions.id}/reorder`
+                : `/api/exam/soal-pg/ujian/${viewingQuestions.id}/reorder`;
+            await axios.put(endpoint, orderedIds, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (err) {
+            console.error('Failed to move question position:', err);
+            alert('Gagal memindahkan posisi soal: ' + (err.response?.data?.message || err.message));
+            await handleManageQuestions(viewingQuestions);
+        } finally {
+            setIsReordering(false);
         }
     };
 
@@ -4634,6 +4700,73 @@ const ExamManagement = () => {
                                                                 <Clock size={13} /> {q.bobotNilai || 2} Poin
                                                             </span>
                                                             <div className="q-actions-v2">
+                                                                {/* Kontrol Ubah Posisi Soal PG */}
+                                                                <div className="q-reorder-ctrls" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#f8fafc', padding: '2px 6px', borderRadius: '8px', border: '1.5px solid #e2e8f0' }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={idx === 0 || isReordering}
+                                                                        onClick={() => handleMoveQuestion(idx, 'up', 'pg')}
+                                                                        style={{
+                                                                            padding: '3px 5px',
+                                                                            background: idx === 0 ? 'transparent' : '#ffffff',
+                                                                            border: '1px solid',
+                                                                            borderColor: idx === 0 ? 'transparent' : '#cbd5e1',
+                                                                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                                                            color: idx === 0 ? '#cbd5e1' : '#1e293b',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            borderRadius: '5px',
+                                                                            boxShadow: idx === 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)'
+                                                                        }}
+                                                                        title="Geser soal ini naik ke atas (nomor sebelumnya)"
+                                                                    >
+                                                                        <ChevronUp size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={idx === questionsPG.length - 1 || isReordering}
+                                                                        onClick={() => handleMoveQuestion(idx, 'down', 'pg')}
+                                                                        style={{
+                                                                            padding: '3px 5px',
+                                                                            background: idx === questionsPG.length - 1 ? 'transparent' : '#ffffff',
+                                                                            border: '1px solid',
+                                                                            borderColor: idx === questionsPG.length - 1 ? 'transparent' : '#cbd5e1',
+                                                                            cursor: idx === questionsPG.length - 1 ? 'not-allowed' : 'pointer',
+                                                                            color: idx === questionsPG.length - 1 ? '#cbd5e1' : '#1e293b',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            borderRadius: '5px',
+                                                                            boxShadow: idx === questionsPG.length - 1 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)'
+                                                                        }}
+                                                                        title="Geser soal ini turun ke bawah (nomor berikutnya)"
+                                                                    >
+                                                                        <ChevronDown size={14} />
+                                                                    </button>
+                                                                    <select
+                                                                        value={idx + 1}
+                                                                        onChange={(e) => handleMoveQuestionTo(idx, parseInt(e.target.value) - 1, 'pg')}
+                                                                        disabled={isReordering}
+                                                                        style={{
+                                                                            fontSize: '0.75rem',
+                                                                            fontWeight: 800,
+                                                                            padding: '2px 4px',
+                                                                            border: '1px solid #94a3b8',
+                                                                            borderRadius: '6px',
+                                                                            background: '#ffffff',
+                                                                            color: '#0f172a',
+                                                                            cursor: 'pointer',
+                                                                            outline: 'none'
+                                                                        }}
+                                                                        title="Pindah langsung ke nomor urut pilihan"
+                                                                    >
+                                                                        {questionsPG.map((_, i) => (
+                                                                            <option key={i} value={i + 1}>
+                                                                                Ke #{i + 1}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+
                                                                 <button type="button" className="q-btn-edit" onClick={() => handleEditSoal(q, 'pg')} title="Edit Soal">
                                                                     <Edit3 size={15} />
                                                                     <span>Edit</span>
@@ -4776,6 +4909,73 @@ const ExamManagement = () => {
                                                             <Clock size={13} /> {q.bobotNilai || 10} Poin
                                                         </span>
                                                         <div className="q-actions-v2">
+                                                            {/* Kontrol Ubah Posisi Soal Essay */}
+                                                            <div className="q-reorder-ctrls" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#f8fafc', padding: '2px 6px', borderRadius: '8px', border: '1.5px solid #e2e8f0' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={idx === 0 || isReordering}
+                                                                    onClick={() => handleMoveQuestion(idx, 'up', 'essay')}
+                                                                    style={{
+                                                                        padding: '3px 5px',
+                                                                        background: idx === 0 ? 'transparent' : '#ffffff',
+                                                                        border: '1px solid',
+                                                                        borderColor: idx === 0 ? 'transparent' : '#cbd5e1',
+                                                                        cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                                                        color: idx === 0 ? '#cbd5e1' : '#1e293b',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        borderRadius: '5px',
+                                                                        boxShadow: idx === 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)'
+                                                                    }}
+                                                                    title="Geser soal essay naik ke atas"
+                                                                >
+                                                                    <ChevronUp size={14} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={idx === questions.length - 1 || isReordering}
+                                                                    onClick={() => handleMoveQuestion(idx, 'down', 'essay')}
+                                                                    style={{
+                                                                        padding: '3px 5px',
+                                                                        background: idx === questions.length - 1 ? 'transparent' : '#ffffff',
+                                                                        border: '1px solid',
+                                                                        borderColor: idx === questions.length - 1 ? 'transparent' : '#cbd5e1',
+                                                                        cursor: idx === questions.length - 1 ? 'not-allowed' : 'pointer',
+                                                                        color: idx === questions.length - 1 ? '#cbd5e1' : '#1e293b',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        borderRadius: '5px',
+                                                                        boxShadow: idx === questions.length - 1 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)'
+                                                                    }}
+                                                                    title="Geser soal essay turun ke bawah"
+                                                                >
+                                                                    <ChevronDown size={14} />
+                                                                </button>
+                                                                <select
+                                                                    value={idx + 1}
+                                                                    onChange={(e) => handleMoveQuestionTo(idx, parseInt(e.target.value) - 1, 'essay')}
+                                                                    disabled={isReordering}
+                                                                    style={{
+                                                                        fontSize: '0.75rem',
+                                                                        fontWeight: 800,
+                                                                        padding: '2px 4px',
+                                                                        border: '1px solid #94a3b8',
+                                                                        borderRadius: '6px',
+                                                                        background: '#ffffff',
+                                                                        color: '#0f172a',
+                                                                        cursor: 'pointer',
+                                                                        outline: 'none'
+                                                                    }}
+                                                                    title="Pindah langsung ke nomor urut essay yang dipilih"
+                                                                >
+                                                                    {questions.map((_, i) => (
+                                                                        <option key={i} value={i + 1}>
+                                                                            Ke #{questionsPG.length + i + 1}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
                                                             <button
                                                                 type="button"
                                                                 className="q-btn-kartu"

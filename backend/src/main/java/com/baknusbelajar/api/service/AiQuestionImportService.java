@@ -314,6 +314,14 @@ public class AiQuestionImportService {
 
         int count = 0;
         int seqNo = 1;
+        int maxExistingPG = soalPGRepository.findByUjianMapelId(ujianId).stream()
+                .mapToInt(s -> s.getUrutan() != null ? s.getUrutan() : 0)
+                .max().orElse(0);
+        int maxExistingEssay = soalEssayRepository.findByUjianMapelId(ujianId).stream()
+                .mapToInt(s -> s.getUrutan() != null ? s.getUrutan() : 0)
+                .max().orElse(0);
+        int pgSeq = maxExistingPG + 1;
+        int essaySeq = maxExistingEssay + 1;
         List<SoalPG> pgList = new ArrayList<>();
         List<SoalEssay> essayList = new ArrayList<>();
 
@@ -330,6 +338,7 @@ public class AiQuestionImportService {
                 se.setPertanyaan(cleanPertanyaan);
                 se.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "-");
                 se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 10.0);
+                se.setUrutan(essaySeq++);
                 essayList.add(se);
             } else {
                 SoalPG pg = new SoalPG();
@@ -366,6 +375,7 @@ public class AiQuestionImportService {
                 pg.setPilihanE(pilE);
                 pg.setKunciJawaban(kj);
                 pg.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 2.0);
+                pg.setUrutan(pgSeq++);
                 pgList.add(pg);
             }
             count++;

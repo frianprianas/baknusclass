@@ -48,6 +48,14 @@ public class SoalEssayService {
         entity.setPertanyaan(dto.getPertanyaan());
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        if (dto.getUrutan() != null && dto.getUrutan() > 0) {
+            entity.setUrutan(dto.getUrutan());
+        } else {
+            int nextUrutan = soalEssayRepository.findByUjianMapelId(uId).stream()
+                    .mapToInt(s -> s.getUrutan() != null ? s.getUrutan() : 0)
+                    .max().orElse(0) + 1;
+            entity.setUrutan(nextUrutan);
+        }
 
         SoalEssay saved = soalEssayRepository.save(entity);
         try {
@@ -67,6 +75,9 @@ public class SoalEssayService {
         entity.setPertanyaan(dto.getPertanyaan());
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        if (dto.getUrutan() != null) {
+            entity.setUrutan(dto.getUrutan());
+        }
 
         SoalEssay saved = soalEssayRepository.save(entity);
         kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), dto.getPertanyaan(),
@@ -91,6 +102,7 @@ public class SoalEssayService {
         dto.setId(entity.getId());
         dto.setPertanyaan(entity.getPertanyaan());
         dto.setBobotNilai(entity.getBobotNilai());
+        dto.setUrutan(entity.getUrutan());
         if (includeKunci) {
             dto.setKunciJawaban(entity.getKunciJawaban());
         }
@@ -120,6 +132,7 @@ public class SoalEssayService {
                                     .pertanyaan(se.getPertanyaan())
                                     .kunciJawaban(se.getKunciJawaban())
                                     .bobotNilai(se.getBobotNilai())
+                                    .urutan(se.getUrutan())
                                     .build();
                             soalEssayRepository.save(newEssay);
                         }
@@ -128,5 +141,24 @@ public class SoalEssayService {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    @CacheEvict(value = "soalEssayCache", allEntries = true)
+    @Transactional
+    public void reorderSoal(Long ujianId, List<Long> orderedIds) {
+        if (orderedIds == null || orderedIds.isEmpty()) return;
+        int order = 1;
+        for (Long id : orderedIds) {
+            if (id == null) continue;
+            var opt = soalEssayRepository.findById(id);
+            if (opt.isPresent()) {
+                SoalEssay s = opt.get();
+                if (s.getUjianMapel() != null && s.getUjianMapel().getId().equals(ujianId)) {
+                    s.setUrutan(order++);
+                    soalEssayRepository.save(s);
+                }
+            }
+        }
+        log.info("[SoalEssayService] Successfully reordered {} Essay questions for ujianId: {}", orderedIds.size(), ujianId);
     }
 }

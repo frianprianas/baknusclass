@@ -32,4 +32,8 @@ public class SoalEssay {
 
     @Column(name = "bobot_nilai", nullable = false)
     private Double bobotNilai;
+
+    @Column(name = "urutan")
+    @Builder.Default
+    private Integer urutan = 0;
 }

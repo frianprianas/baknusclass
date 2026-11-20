@@ -17,6 +17,7 @@ public class SoalPGDTO implements Serializable {
     private String kunciJawaban;
     private Double bobotNilai;
     private String tipeSoal; // "PG_BIASA", "PG_KOMPLEKS", "BENAR_SALAH", "BS_MAJEMUK"
+    private Integer urutan;
 
     public Long getUjianId() {
         return ujianId != null ? ujianId : ujianMapelId;

@@ -54,7 +54,9 @@ public class DbMigrationRunner implements CommandLineRunner {
             "ALTER TABLE tb_soal_pg MODIFY pilihan_c VARCHAR2(2000)",
             "ALTER TABLE tb_soal_pg MODIFY pilihan_d VARCHAR2(2000)",
             "ALTER TABLE tb_soal_pg MODIFY pilihan_e VARCHAR2(2000)",
-            "ALTER TABLE tb_soal_pg ADD tipe_soal VARCHAR2(20) DEFAULT 'PG_BIASA'"
+            "ALTER TABLE tb_soal_pg ADD tipe_soal VARCHAR2(20) DEFAULT 'PG_BIASA'",
+            "ALTER TABLE tb_soal_pg ADD urutan NUMBER(10) DEFAULT 0",
+            "ALTER TABLE tb_soal_essay ADD urutan NUMBER(10) DEFAULT 0"
         };
 
         try (Connection conn = dataSource.getConnection();

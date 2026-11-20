@@ -48,6 +48,13 @@ public class SoalPGController {
         return ResponseEntity.ok(soalPGService.updateKunciJawaban(id, kunci));
     }
 
+    @PutMapping("/ujian/{ujianId}/reorder")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<Void> reorder(@PathVariable Long ujianId, @RequestBody List<Long> orderedIds) {
+        soalPGService.reorderSoal(ujianId, orderedIds);
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

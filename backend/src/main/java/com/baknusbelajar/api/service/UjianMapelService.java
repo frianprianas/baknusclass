@@ -896,6 +896,7 @@ public class UjianMapelService {
                     .kunciJawaban(spg.getKunciJawaban())
                     .bobotNilai(spg.getBobotNilai())
                     .tipeSoal(spg.getTipeSoal() != null ? spg.getTipeSoal() : "PG_BIASA")
+                    .urutan(spg.getUrutan())
                     .build();
             soalPGRepository.save(newPG);
             copiedPG++;
@@ -908,6 +909,7 @@ public class UjianMapelService {
                     .pertanyaan(se.getPertanyaan())
                     .kunciJawaban(se.getKunciJawaban())
                     .bobotNilai(se.getBobotNilai())
+                    .urutan(se.getUrutan())
                     .build();
             soalEssayRepository.save(newEssay);
             copiedEssay++;

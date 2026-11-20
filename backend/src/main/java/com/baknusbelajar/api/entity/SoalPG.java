@@ -50,4 +50,8 @@ public class SoalPG {
     @Column(name = "tipe_soal", length = 20)
     @Builder.Default
     private String tipeSoal = "PG_BIASA"; // PG_BIASA, PG_KOMPLEKS, BENAR_SALAH, BS_MAJEMUK
+
+    @Column(name = "urutan")
+    @Builder.Default
+    private Integer urutan = 0;
 }

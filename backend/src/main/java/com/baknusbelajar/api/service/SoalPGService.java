@@ -126,6 +126,14 @@ public class SoalPGService {
         entity.setPilihanE(dto.getPilihanE() != null && !dto.getPilihanE().trim().isEmpty() ? dto.getPilihanE() : "-");
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        if (dto.getUrutan() != null && dto.getUrutan() > 0) {
+            entity.setUrutan(dto.getUrutan());
+        } else {
+            int nextUrutan = soalPGRepository.findByUjianMapelId(uId).stream()
+                    .mapToInt(s -> s.getUrutan() != null ? s.getUrutan() : 0)
+                    .max().orElse(0) + 1;
+            entity.setUrutan(nextUrutan);
+        }
         String tipe = dto.getTipeSoal();
         String kj = dto.getKunciJawaban() != null ? dto.getKunciJawaban().trim() : "";
         if (tipe == null || tipe.isEmpty() || "PG_BIASA".equalsIgnoreCase(tipe)) {
@@ -217,6 +225,9 @@ public class SoalPGService {
         entity.setPilihanE(dto.getPilihanE() != null && !dto.getPilihanE().trim().isEmpty() ? dto.getPilihanE() : "-");
         entity.setKunciJawaban(dto.getKunciJawaban());
         entity.setBobotNilai(dto.getBobotNilai());
+        if (dto.getUrutan() != null) {
+            entity.setUrutan(dto.getUrutan());
+        }
         String upTipe = dto.getTipeSoal();
         String upKj = dto.getKunciJawaban() != null ? dto.getKunciJawaban().trim() : "";
         if (upTipe == null || upTipe.isEmpty() || "PG_BIASA".equalsIgnoreCase(upTipe)) {
@@ -266,6 +277,7 @@ public class SoalPGService {
         dto.setPilihanE(s.getPilihanE());
         dto.setKunciJawaban(s.getKunciJawaban());
         dto.setBobotNilai(s.getBobotNilai());
+        dto.setUrutan(s.getUrutan());
 
         // Preserve explicitly saved tipeSoal without aggressive keyword override
         String tipe = s.getTipeSoal();
@@ -323,6 +335,7 @@ public class SoalPGService {
                                     .kunciJawaban(spg.getKunciJawaban())
                                     .bobotNilai(spg.getBobotNilai())
                                     .tipeSoal(spg.getTipeSoal() != null ? spg.getTipeSoal() : "PG_BIASA")
+                                    .urutan(spg.getUrutan())
                                     .build();
                             soalPGRepository.save(newPG);
                         }
@@ -333,5 +346,24 @@ public class SoalPGService {
         } catch (Exception e) {
             log.warn("[SoalPG] tryAutoCopyQuestions error: {}", e.getMessage());
         }
+    }
+
+    @CacheEvict(value = "soalPGCache", allEntries = true)
+    @Transactional
+    public void reorderSoal(Long ujianId, List<Long> orderedIds) {
+        if (orderedIds == null || orderedIds.isEmpty()) return;
+        int order = 1;
+        for (Long id : orderedIds) {
+            if (id == null) continue;
+            var opt = soalPGRepository.findById(id);
+            if (opt.isPresent()) {
+                SoalPG s = opt.get();
+                if (s.getUjianMapel() != null && s.getUjianMapel().getId().equals(ujianId)) {
+                    s.setUrutan(order++);
+                    soalPGRepository.save(s);
+                }
+            }
+        }
+        log.info("[SoalPGService] Successfully reordered {} PG questions for ujianId: {}", orderedIds.size(), ujianId);
     }
 }

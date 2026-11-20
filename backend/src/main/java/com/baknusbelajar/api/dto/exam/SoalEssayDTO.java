@@ -11,6 +11,7 @@ public class SoalEssayDTO implements Serializable {
     private String pertanyaan;
     private String kunciJawaban;
     private Double bobotNilai;
+    private Integer urutan;
 
     public Long getUjianMapelId() {
         return ujianMapelId != null ? ujianMapelId : ujianId;
