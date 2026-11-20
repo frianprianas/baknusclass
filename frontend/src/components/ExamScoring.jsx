@@ -1781,7 +1781,7 @@ const ExamScoring = () => {
                                                                     type="number"
                                                                     max={q.bobotNilai || 2}
                                                                     min="0"
-                                                                    step="0.5"
+                                                                    step="any"
                                                                     defaultValue={earnedScore}
                                                                     id={`score-${ans ? ans.id : 'pg-' + q.id}`}
                                                                     style={{ width: '70px', padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 'bold', textAlign: 'center' }}
@@ -1871,6 +1871,7 @@ const ExamScoring = () => {
                                                                 <div className="score-input-group">
                                                                     <input
                                                                         type="number"
+                                                                        step="any"
                                                                         max={q.bobotNilai || 10} min="0"
                                                                         defaultValue={ans.skorFinalGuru ?? ''}
                                                                         id={`score-${ans.id}`}

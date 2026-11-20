@@ -348,7 +348,7 @@ const SubjectManagement = () => {
                 const payload = {
                     ujianMapelId: selectedQuiz.id,
                     pertanyaan: newQuestionForm.pertanyaan,
-                    bobotNilai: parseFloat(newQuestionForm.bobot)
+                    bobotNilai: parseFloat(String(newQuestionForm.bobot).replace(',', '.')) || 0
                 };
                 await axios.post('/api/exam/soal-essay', payload, { headers });
             } else {
@@ -1538,10 +1538,13 @@ const SubjectManagement = () => {
                                             <label>Bobot Nilai</label>
                                             <input
                                                 type="number"
+                                                step="any"
+                                                min="0.1"
+                                                max="100"
                                                 value={newQuestionForm.bobot}
-                                                onChange={(e) => setNewQuestionForm({ ...newQuestionForm, bobot: parseFloat(e.target.value) })}
+                                                onChange={(e) => setNewQuestionForm({ ...newQuestionForm, bobot: e.target.value })}
                                                 required
-                                                min="1"
+                                                placeholder="Misal: 7.5 atau 12.5"
                                                 style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
                                             />
                                         </div>

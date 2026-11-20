@@ -615,10 +615,15 @@ const ExamManagement = () => {
 
         setIsSavingBatch(true);
         try {
-            const payload = draftQuestions.map((d, i) => ({
-                ...d,
-                nomor: i + 1
-            }));
+            const payload = draftQuestions.map((d, i) => {
+                const rawBobot = d.bobotNilai;
+                const parsedBobot = typeof rawBobot === 'string' ? parseFloat(rawBobot.replace(',', '.')) : Number(rawBobot);
+                return {
+                    ...d,
+                    nomor: i + 1,
+                    bobotNilai: isNaN(parsedBobot) || parsedBobot <= 0 ? (d.tipeSoal === 'ESSAY' ? 10 : 2) : parsedBobot
+                };
+            });
             const res = await axios.post(`/api/exam/ujian-mapel/${wordImportTargetExam.id}/save-batch-questions`, payload, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -898,8 +903,11 @@ const ExamManagement = () => {
         const headers = { Authorization: `Bearer ${token}` };
         try {
             setLoading(true);
+            const rawBobot = kartuForm.bobotNilai;
+            const parsedBobot = typeof rawBobot === 'string' ? parseFloat(rawBobot.replace(',', '.')) : Number(rawBobot);
             const payload = {
                 ...kartuForm,
+                bobotNilai: isNaN(parsedBobot) || parsedBobot <= 0 ? 10 : parsedBobot,
                 ujianMapelId: viewingQuestions.id,
                 soalEssayId: editingKartuSoal ? editingKartuSoal.id : null // if editing existing soal
             };
@@ -1551,14 +1559,28 @@ const ExamManagement = () => {
         try {
             const isEditing = !!editingQuestion;
             if (qType === 'essay') {
-                const body = { ...questionForm, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
+                const rawBobot = questionForm.bobotNilai;
+                const parsedBobot = typeof rawBobot === 'string' ? parseFloat(rawBobot.replace(',', '.')) : Number(rawBobot);
+                const body = {
+                    ...questionForm,
+                    bobotNilai: isNaN(parsedBobot) || parsedBobot <= 0 ? 10 : parsedBobot,
+                    ujianMapelId: viewingQuestions.id,
+                    ujianId: viewingQuestions.id
+                };
                 if (isEditing) {
                     await axios.put(`/api/exam/soal-essay/${editingQuestion.id}`, body, { headers });
                 } else {
                     await axios.post('/api/exam/soal-essay', body, { headers });
                 }
             } else {
-                const body = { ...questionFormPG, ujianMapelId: viewingQuestions.id, ujianId: viewingQuestions.id };
+                const rawBobot = questionFormPG.bobotNilai;
+                const parsedBobot = typeof rawBobot === 'string' ? parseFloat(rawBobot.replace(',', '.')) : Number(rawBobot);
+                const body = {
+                    ...questionFormPG,
+                    bobotNilai: isNaN(parsedBobot) || parsedBobot <= 0 ? 2 : parsedBobot,
+                    ujianMapelId: viewingQuestions.id,
+                    ujianId: viewingQuestions.id
+                };
                 // Respect user selected tipeSoal; only set PG_KOMPLEKS if teacher actually selected multiple keys
                 const kj = (body.kunciJawaban || '').trim();
                 const isMultiKey = kj.includes(',') || kj.includes(';') || kj.length > 1;
@@ -2884,7 +2906,11 @@ const ExamManagement = () => {
                                         {draftQuestions.length} Butir Soal Terdeteksi
                                     </span>
                                     <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                        Total Bobot: <strong>{draftQuestions.reduce((acc, q) => acc + (Number(q.bobotNilai) || 0), 0).toFixed(1)}</strong>
+                                        Total Bobot: <strong>{Number(draftQuestions.reduce((acc, q) => {
+                                            const raw = q.bobotNilai;
+                                            const p = typeof raw === 'string' ? parseFloat(raw.replace(',', '.')) : Number(raw);
+                                            return acc + (isNaN(p) ? 0 : p);
+                                        }, 0).toFixed(2))}</strong>
                                     </span>
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -2983,11 +3009,13 @@ const ExamManagement = () => {
                                                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Bobot:</label>
                                                         <input
                                                             type="number"
-                                                            step="0.5"
+                                                            step="any"
+                                                            min="0.1"
+                                                            max="100"
                                                             value={draft.bobotNilai !== undefined ? draft.bobotNilai : 2}
-                                                            onChange={(e) => handleUpdateDraft(idx, 'bobotNilai', parseFloat(e.target.value) || 0)}
+                                                            onChange={(e) => handleUpdateDraft(idx, 'bobotNilai', e.target.value)}
                                                             style={{
-                                                                width: '60px',
+                                                                width: '65px',
                                                                 padding: '4px 8px',
                                                                 borderRadius: '6px',
                                                                 border: '1px solid #cbd5e1',
@@ -3976,13 +4004,19 @@ const ExamManagement = () => {
                                 <label>Total Soal</label>
                                 <div className="value">{questions.length + questionsPG.length}</div>
                             </div>
-                            <div className={`stat - item ${questions.reduce((acc, q) => acc + q.bobotNilai, 0) + questionsPG.reduce((acc, q) => acc + q.bobotNilai, 0) === 100 ? 'valid' : 'warning'} `}>
-                                <label>Total Bobot</label>
-                                <div className="value">
-                                    {questions.reduce((acc, q) => acc + q.bobotNilai, 0) + questionsPG.reduce((acc, q) => acc + q.bobotNilai, 0)}
-                                    <span className="total">/ 100</span>
-                                </div>
-                            </div>
+                            {(() => {
+                                const totalBobot = Number((questions.reduce((acc, q) => acc + (Number(q.bobotNilai) || 0), 0) + questionsPG.reduce((acc, q) => acc + (Number(q.bobotNilai) || 0), 0)).toFixed(2));
+                                const isValid = Math.abs(totalBobot - 100) < 0.01;
+                                return (
+                                    <div className={`stat-item ${isValid ? 'valid' : 'warning'}`}>
+                                        <label>Total Bobot</label>
+                                        <div className="value">
+                                            {totalBobot}
+                                            <span className="total">/ 100</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -4250,7 +4284,7 @@ const ExamManagement = () => {
                                                         }
 
                                                         const totalStatements = statementCount;
-                                                        const totalBobot = Number(questionFormPG.bobotNilai) || 2;
+                                                        const totalBobot = Number(String(questionFormPG.bobotNilai).replace(',', '.')) || 2;
                                                         const ptsPerItem = (totalBobot / totalStatements).toFixed(2).replace(/\.00$/, '');
                                                         
                                                         // Parse clean normalized keys
@@ -4606,13 +4640,20 @@ const ExamManagement = () => {
                                                 <div className="input-icon"><Plus size={16} /></div>
                                                 <input
                                                     type="number"
-                                                    value={qType === 'essay' ? questionForm.bobotNilai : questionFormPG.bobotNilai}
-                                                    onChange={(e) => qType === 'essay'
-                                                        ? setQuestionForm({ ...questionForm, bobotNilai: parseInt(e.target.value) })
-                                                        : setQuestionFormPG({ ...questionFormPG, bobotNilai: parseInt(e.target.value) })}
-                                                    required
-                                                    min="1"
+                                                    step="any"
+                                                    min="0.1"
                                                     max="100"
+                                                    value={qType === 'essay' ? questionForm.bobotNilai : questionFormPG.bobotNilai}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (qType === 'essay') {
+                                                            setQuestionForm(prev => ({ ...prev, bobotNilai: val }));
+                                                        } else {
+                                                            setQuestionFormPG(prev => ({ ...prev, bobotNilai: val }));
+                                                        }
+                                                    }}
+                                                    required
+                                                    placeholder="Contoh: 2, 7.5, atau 10"
                                                 />
                                             </div>
                                         </div>
@@ -6515,9 +6556,13 @@ const ExamManagement = () => {
                                                     <label style={{ fontWeight: 800, fontSize: '0.8rem', display: 'block', marginBottom: '8px' }}>Bobot Nilai</label>
                                                     <input
                                                         type="number"
+                                                        step="any"
+                                                        min="0.1"
+                                                        max="100"
                                                         value={kartuForm.bobotNilai}
-                                                        onChange={(e) => setKartuForm({ ...kartuForm, bobotNilai: parseFloat(e.target.value) })}
+                                                        onChange={(e) => setKartuForm(prev => ({ ...prev, bobotNilai: e.target.value }))}
                                                         style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '2px solid #e2e8f0', fontWeight: 700 }}
+                                                        placeholder="Misal: 7.5 atau 12.5"
                                                     />
                                                 </div>
                                             </div>
