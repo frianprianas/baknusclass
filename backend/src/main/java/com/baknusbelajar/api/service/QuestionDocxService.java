@@ -322,7 +322,7 @@ public class QuestionDocxService {
                 pilD = (pilD != null && !pilD.trim().isEmpty()) ? pilD.trim() : "-";
                 pilE = (pilE != null && !pilE.trim().isEmpty()) ? pilE.trim() : "-";
 
-                pertanyaan = formatRichContent(pertanyaan);
+                pertanyaan = AiQuestionImportService.cleanQuestionNumberPrefix(formatRichContent(pertanyaan));
                 pilA = formatRichContent(pilA);
                 pilB = formatRichContent(pilB);
                 pilC = formatRichContent(pilC);

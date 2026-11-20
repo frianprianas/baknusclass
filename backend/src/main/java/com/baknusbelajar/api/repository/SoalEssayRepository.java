@@ -12,7 +12,10 @@ import java.util.List;
 
 @Repository
 public interface SoalEssayRepository extends JpaRepository<SoalEssay, Long> {
-    List<SoalEssay> findByUjianMapelId(Long ujianMapelId);
+    @Query("SELECT s FROM SoalEssay s WHERE s.ujianMapel.id = :ujianMapelId ORDER BY s.id ASC")
+    List<SoalEssay> findByUjianMapelId(@Param("ujianMapelId") Long ujianMapelId);
+
+    List<SoalEssay> findByUjianMapelIdOrderByIdAsc(Long ujianMapelId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional

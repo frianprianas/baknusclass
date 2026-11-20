@@ -170,6 +170,24 @@ public class AiQuestionImportService {
         }
     }
 
+    public static String cleanQuestionNumberPrefix(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return text;
+        }
+        String s = text.trim();
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                "^(?:\\s*(<p[^>]*>|<div[^>]*>))?\\s*(?:<(?:strong|b|span)[^>]*>)?\\s*(?:(?i:soal|nomor|no\\.?)\\s*)?(?:\\(?\\d+[\\.\\)\\-:]|\\(\\d+\\))\\s*(?:</(?:strong|b|span)>)?\\s*(.*)$",
+                java.util.regex.Pattern.DOTALL
+        );
+        java.util.regex.Matcher m = p.matcher(s);
+        if (m.matches()) {
+            String openTag = m.group(1) != null ? m.group(1) : "";
+            String rest = m.group(2);
+            return (openTag + rest).trim();
+        }
+        return s;
+    }
+
     private String buildAiExtractionPrompt(String documentText) {
         return "Anda adalah asisten AI profesional untuk sistem CBT Ujian Sekolah (BaknusClass).\n"
                 + "Tugas Anda adalah membaca dan menganalisis naskah bank soal berikut ini, lalu menguraikannya (ekstraksi) ke dalam format JSON array yang rapi dan terstruktur.\n\n"
@@ -194,10 +212,12 @@ public class AiQuestionImportService {
                 + "   - pilihanA sampai E diisi '-'\n\n"
                 + "Instruksi Penting:\n"
                 + "1. Pisahkan setiap nomor soal dengan rapi.\n"
-                + "2. Jika ada teks bacaan/stimulus yang berlaku untuk beberapa nomor soal, sertakan teks bacaan tersebut di awal teks pertanyaan nomor bersangkutan agar utuh.\n"
-                + "3. Deteksi kunci jawaban jika terdapat tanda bold, garis bawah, centang, atau lampiran kunci jawaban di naskah. Jika tidak ada kunci, berikan estimasi terbaik atau default 'A'.\n"
-                + "4. Berikan bobotNilai default 2.0 (atau sesuaikan jika tertulis skor pada soal).\n"
-                + "5. Berikan output HANYA berupa JSON Array valid murni tanpa markdown triple backticks atau penjelasan lainnya.\n\n"
+                + "2. Urutkan nomor soal secara berurutan mulai dari nomor 1, 2, 3, dst. Jangan pernah melompati nomor! Jika pada naskah terdapat nomor yang melompat (misal nomor 2 langsung ke 8), tetap rapikan dan urutkan nomornya secara sekuensial (1, 2, 3, dst).\n"
+                + "3. Bersihkan awalan nomor pada teks pertanyaan (misal hilangkan '1. ', '2. ', '8. ') agar teks pertanyaan bersih tanpa nomor awalan yang berulang di sistem CBT.\n"
+                + "4. Jika ada teks bacaan/stimulus yang berlaku untuk beberapa nomor soal, sertakan teks bacaan tersebut di awal teks pertanyaan nomor bersangkutan agar utuh.\n"
+                + "5. Deteksi kunci jawaban jika terdapat tanda bold, garis bawah, centang, atau lampiran kunci jawaban di naskah. Jika tidak ada kunci, berikan estimasi terbaik atau default 'A'.\n"
+                + "6. Berikan bobotNilai default 2.0 (atau sesuaikan jika tertulis skor pada soal).\n"
+                + "7. Berikan output HANYA berupa JSON Array valid murni tanpa markdown triple backticks atau penjelasan lainnya.\n\n"
                 + "Format JSON yang wajib diikuti:\n"
                 + "[\n"
                 + "  {\n"
@@ -242,10 +262,19 @@ public class AiQuestionImportService {
 
         try {
             List<DraftSoalDTO> list = objectMapper.readValue(cleanJson, new TypeReference<List<DraftSoalDTO>>() {});
-            // Normalize items
+            if (list == null) list = new ArrayList<>();
+
+            // Urutkan berdasarkan nomor jika ada (agar urutan naskah terjaga), lalu pastikan nomor selalu berurutan dari 1
+            list.sort((a, b) -> {
+                int noA = (a != null && a.getNomor() != null) ? a.getNomor() : Integer.MAX_VALUE;
+                int noB = (b != null && b.getNomor() != null) ? b.getNomor() : Integer.MAX_VALUE;
+                return Integer.compare(noA, noB);
+            });
+
+            // Normalize items & pastikan nomor berurutan mulai dari 1 tanpa celah
             int num = 1;
             for (DraftSoalDTO d : list) {
-                if (d.getNomor() == null) d.setNomor(num);
+                d.setNomor(num++);
                 if (d.getBobotNilai() == null || d.getBobotNilai() <= 0) d.setBobotNilai(2.0);
                 if (d.getTipeSoal() == null || d.getTipeSoal().isEmpty()) d.setTipeSoal("PG_BIASA");
                 if (d.getPilihanA() == null) d.setPilihanA("-");
@@ -254,7 +283,9 @@ public class AiQuestionImportService {
                 if (d.getPilihanD() == null) d.setPilihanD("-");
                 if (d.getPilihanE() == null) d.setPilihanE("-");
                 if (d.getKunciJawaban() == null) d.setKunciJawaban("A");
-                num++;
+                if (d.getPertanyaan() != null) {
+                    d.setPertanyaan(cleanQuestionNumberPrefix(d.getPertanyaan()));
+                }
             }
             return list;
         } catch (Exception e) {
@@ -264,7 +295,7 @@ public class AiQuestionImportService {
     }
 
     @Transactional
-    @CacheEvict(value = "soalPGCache", allEntries = true)
+    @CacheEvict(value = {"soalPGCache", "soalEssayCache"}, allEntries = true)
     public int saveBatchQuestions(Long ujianId, List<DraftSoalDTO> draftList) {
         UjianMapel ujian = ujianMapelRepository.findById(ujianId)
                 .orElseThrow(() -> new RuntimeException("Ujian tidak ditemukan dengan ID: " + ujianId));
@@ -273,26 +304,37 @@ public class AiQuestionImportService {
             return 0;
         }
 
+        // Urutkan berdasarkan nomor jika ada agar urutan tetap konsisten
+        List<DraftSoalDTO> sortedDrafts = new ArrayList<>(draftList);
+        sortedDrafts.sort((a, b) -> {
+            int noA = (a != null && a.getNomor() != null) ? a.getNomor() : Integer.MAX_VALUE;
+            int noB = (b != null && b.getNomor() != null) ? b.getNomor() : Integer.MAX_VALUE;
+            return Integer.compare(noA, noB);
+        });
+
         int count = 0;
+        int seqNo = 1;
         List<SoalPG> pgList = new ArrayList<>();
         List<SoalEssay> essayList = new ArrayList<>();
 
-        for (DraftSoalDTO d : draftList) {
-            if (d.getPertanyaan() == null || d.getPertanyaan().trim().isEmpty()) {
+        for (DraftSoalDTO d : sortedDrafts) {
+            if (d == null || d.getPertanyaan() == null || d.getPertanyaan().trim().isEmpty()) {
                 continue;
             }
+            d.setNomor(seqNo++);
+            String cleanPertanyaan = cleanQuestionNumberPrefix(d.getPertanyaan().trim());
 
             if ("ESSAY".equalsIgnoreCase(d.getTipeSoal())) {
                 SoalEssay se = new SoalEssay();
                 se.setUjianMapel(ujian);
-                se.setPertanyaan(d.getPertanyaan().trim());
+                se.setPertanyaan(cleanPertanyaan);
                 se.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "-");
                 se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 10.0);
                 essayList.add(se);
             } else {
                 SoalPG pg = new SoalPG();
                 pg.setUjianMapel(ujian);
-                pg.setPertanyaan(d.getPertanyaan().trim());
+                pg.setPertanyaan(cleanPertanyaan);
                 String tipe = (d.getTipeSoal() != null && !d.getTipeSoal().trim().isEmpty()) ? d.getTipeSoal().trim().toUpperCase() : "PG_BIASA";
                 String pilA = (d.getPilihanA() != null && !d.getPilihanA().trim().isEmpty()) ? d.getPilihanA().trim() : "-";
                 String pilB = (d.getPilihanB() != null && !d.getPilihanB().trim().isEmpty()) ? d.getPilihanB().trim() : "-";
@@ -312,7 +354,7 @@ public class AiQuestionImportService {
                         if (!clean.isEmpty()) validKeys.add(clean);
                     }
                     if (validKeys.size() > 3) {
-                        throw new IllegalArgumentException("Peringatan Template: Soal nomor " + (d.getNomor() != null ? d.getNomor() : (count + 1)) + " memiliki " + validKeys.size() + " kunci jawaban (" + String.join(",", validKeys) + "). Aturan PG Majemuk: Maksimal hanya 3 jawaban benar dari 5 pilihan jawaban!");
+                        throw new IllegalArgumentException("Peringatan Template: Soal nomor " + d.getNomor() + " memiliki " + validKeys.size() + " kunci jawaban (" + String.join(",", validKeys) + "). Aturan PG Majemuk: Maksimal hanya 3 jawaban benar dari 5 pilihan jawaban!");
                     }
                     tipe = "PG_KOMPLEKS";
                 }

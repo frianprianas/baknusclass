@@ -403,11 +403,16 @@ const ExamManagement = () => {
             });
 
             if (res.data && res.data.success) {
-                const parsedDrafts = res.data.drafts || [];
-                if (parsedDrafts.length === 0) {
+                const rawDrafts = res.data.drafts || [];
+                if (rawDrafts.length === 0) {
                     alert('Tidak ada soal yang terdeteksi dalam tabel berkas tersebut. Pastikan tabel template tidak dihapus.');
                     return;
                 }
+                // Pastikan seluruh nomor draf selalu berurutan mulai dari nomor 1
+                const parsedDrafts = rawDrafts.map((d, i) => ({
+                    ...d,
+                    nomor: i + 1
+                }));
                 const overLimit = parsedDrafts.filter(d => {
                     const isKompleks = d.tipeSoal === 'PG_KOMPLEKS' || (d.kunciJawaban && (d.kunciJawaban.includes(',') || d.kunciJawaban.includes(';')));
                     if (isKompleks && d.tipeSoal !== 'BS_MAJEMUK') {
@@ -512,7 +517,12 @@ const ExamManagement = () => {
                 if (extractedList.length === 0) {
                     alert('AI tidak menemukan butir soal dalam dokumen. Pastikan dokumen berisi naskah soal berformat nomor dan opsi.');
                 } else {
-                    const overLimit = extractedList.filter(d => {
+                    // Pastikan draf hasil ekstraksi AI selalu berurutan dari nomor 1
+                    const parsedDrafts = extractedList.map((d, i) => ({
+                        ...d,
+                        nomor: i + 1
+                    }));
+                    const overLimit = parsedDrafts.filter(d => {
                         const isKompleks = d.tipeSoal === 'PG_KOMPLEKS' || (d.kunciJawaban && (d.kunciJawaban.includes(',') || d.kunciJawaban.includes(';')));
                         if (isKompleks && d.tipeSoal !== 'BS_MAJEMUK') {
                             const keys = (d.kunciJawaban || '').split(/[,;\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-E]$/.test(s));
@@ -524,7 +534,7 @@ const ExamManagement = () => {
                         const nos = overLimit.map(d => d.nomor || '?').join(', ');
                         alert(`Peringatan AI: Terdapat ${overLimit.length} butir soal PG Majemuk dengan lebih dari 3 jawaban benar (Nomor: ${nos}). Sesuai aturan, maksimal hanya 3 jawaban benar yang diperbolehkan dari 5 pilihan A-E. Silakan periksa dan sesuaikan pada tahap review.`);
                     }
-                    setDraftQuestions(extractedList);
+                    setDraftQuestions(parsedDrafts);
                     setWordImportStep('review');
                 }
             } else {
@@ -603,7 +613,11 @@ const ExamManagement = () => {
 
         setIsSavingBatch(true);
         try {
-            const res = await axios.post(`/api/exam/ujian-mapel/${wordImportTargetExam.id}/save-batch-questions`, draftQuestions, {
+            const payload = draftQuestions.map((d, i) => ({
+                ...d,
+                nomor: i + 1
+            }));
+            const res = await axios.post(`/api/exam/ujian-mapel/${wordImportTargetExam.id}/save-batch-questions`, payload, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem('token')}`
                 }

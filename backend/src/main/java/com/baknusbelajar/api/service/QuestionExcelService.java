@@ -363,7 +363,7 @@ public class QuestionExcelService {
                 }
 
                 // Format teks (proses markdown image, arab RTL wrapper jika perlu)
-                pertanyaan = formatRichContent(pertanyaan);
+                pertanyaan = AiQuestionImportService.cleanQuestionNumberPrefix(formatRichContent(pertanyaan));
                 pilA = formatRichContent(pilA != null && !pilA.trim().isEmpty() ? pilA.trim() : "-");
                 pilB = formatRichContent(pilB != null && !pilB.trim().isEmpty() ? pilB.trim() : "-");
                 pilC = formatRichContent(pilC != null && !pilC.trim().isEmpty() ? pilC.trim() : "-");
