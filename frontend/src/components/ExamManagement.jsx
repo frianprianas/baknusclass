@@ -979,12 +979,15 @@ const ExamManagement = () => {
         return () => { document.body.style.overflow = 'unset'; };
     }, [isModalOpen, isKartuModalOpen, isExcelModalOpen, isWordImportModalOpen]);
 
-    // Render MathJax (LaTeX, integral, pangkat, matrix) whenever questions or drafts update
+    // Render MathJax (LaTeX, integral, pangkat, matrix) whenever questions, drafts, or form update
     useEffect(() => {
-        if (window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise().catch(() => {});
-        }
-    }, [viewingQuestions, questions, questionsPG, draftQuestions, wordImportStep]);
+        const timer = setTimeout(() => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise().catch(() => {});
+            }
+        }, 80);
+        return () => clearTimeout(timer);
+    }, [viewingQuestions, questions, questionsPG, draftQuestions, wordImportStep, questionForm, questionFormPG, qType]);
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
@@ -3068,6 +3071,12 @@ const ExamManagement = () => {
                                                         boxSizing: 'border-box'
                                                     }}
                                                 />
+                                                {(draft.pertanyaan || '').includes('<img') && (
+                                                    <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                                                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Pratinjau Gambar / Rumus:</span>
+                                                        <div dangerouslySetInnerHTML={{ __html: draft.pertanyaan }} style={{ maxHeight: '180px', overflowY: 'auto' }} />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Option inputs based on type */}
@@ -3122,19 +3131,36 @@ const ExamManagement = () => {
                                                                         style={{ cursor: 'pointer' }}
                                                                     />
                                                                     <span style={{ fontWeight: 800, fontSize: '0.85rem', color: isChecked ? '#059669' : '#64748b' }}>{opt}.</span>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={draft[fieldName] === '-' ? '' : (draft[fieldName] || '')}
-                                                                        onChange={(e) => handleUpdateDraft(idx, fieldName, e.target.value)}
-                                                                        placeholder={`Opsi ${opt}...`}
-                                                                        style={{
-                                                                            flex: 1,
-                                                                            border: 'none',
-                                                                            outline: 'none',
-                                                                            background: 'transparent',
-                                                                            fontSize: '0.82rem'
-                                                                        }}
-                                                                    />
+                                                                    {(draft[fieldName] || '').includes('<img') ? (
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
+                                                                            <div
+                                                                                style={{ maxHeight: '42px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}
+                                                                                dangerouslySetInnerHTML={{ __html: draft[fieldName] }}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleUpdateDraft(idx, fieldName, '')}
+                                                                                style={{ fontSize: '0.7rem', color: '#ef4444', border: 'none', background: '#fee2e2', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontWeight: 700, flexShrink: 0 }}
+                                                                                title="Hapus gambar opsi"
+                                                                            >
+                                                                                Hapus
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={draft[fieldName] === '-' ? '' : (draft[fieldName] || '')}
+                                                                            onChange={(e) => handleUpdateDraft(idx, fieldName, e.target.value)}
+                                                                            placeholder={`Opsi ${opt}...`}
+                                                                            style={{
+                                                                                flex: 1,
+                                                                                border: 'none',
+                                                                                outline: 'none',
+                                                                                background: 'transparent',
+                                                                                fontSize: '0.82rem'
+                                                                            }}
+                                                                        />
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })}

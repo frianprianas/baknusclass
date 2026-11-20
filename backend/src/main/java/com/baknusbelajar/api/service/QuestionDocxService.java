@@ -23,6 +23,8 @@ public class QuestionDocxService {
 
     // Pattern untuk mendeteksi huruf Arab
     private static final Pattern ARABIC_PATTERN = Pattern.compile("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]");
+    // Pattern untuk mendeteksi huruf Jepang (Hiragana, Katakana, Kanji CJK)
+    private static final Pattern JAPANESE_PATTERN = Pattern.compile("[\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FAF]");
     // Pattern untuk mendeteksi sintaks markdown gambar ![alt](url)
     private static final Pattern MD_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
 
@@ -383,10 +385,11 @@ public class QuestionDocxService {
         StringBuilder sb = new StringBuilder();
 
         for (XWPFParagraph p : cell.getParagraphs()) {
+            StringBuilder paraSb = new StringBuilder();
             for (XWPFRun r : p.getRuns()) {
                 String text = r.getText(0);
                 if (text != null) {
-                    sb.append(text);
+                    paraSb.append(text);
                 }
 
                 // Ekstraksi gambar yang di-paste / insert ke dalam sel Word
@@ -401,7 +404,7 @@ public class QuestionDocxService {
                                     mime = "image/png";
                                 }
                                 String b64 = Base64.getEncoder().encodeToString(data.getData());
-                                sb.append("<p><img src=\"data:")
+                                paraSb.append("<p><img src=\"data:")
                                         .append(mime)
                                         .append(";base64,")
                                         .append(b64)
@@ -413,10 +416,69 @@ public class QuestionDocxService {
                     }
                 }
             }
-            sb.append(" ");
+
+            // Ekstraksi formula / equation matematika Word (OMML m:oMath) jika ada
+            try {
+                if (p.getCTP() != null) {
+                    String xml = p.getCTP().xmlText();
+                    if (xml != null && (xml.contains("<m:oMath") || xml.contains(":oMath"))) {
+                        String latexMath = convertOmmlToLatex(xml);
+                        if (latexMath != null && !latexMath.trim().isEmpty()) {
+                            paraSb.append(" ").append(latexMath).append(" ");
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("Notice parsing OMML math in Word paragraph: {}", ex.getMessage());
+            }
+
+            sb.append(paraSb.toString()).append(" ");
         }
 
         return sb.toString().trim();
+    }
+
+    /**
+     * Mengubah format persamaan Word (OMML Math XML) menjadi LaTeX formula yang dapat
+     * dirender otomatis oleh MathJax di browser ($ ... $).
+     */
+    public static String convertOmmlToLatex(String xml) {
+        if (xml == null || (!xml.contains("<m:oMath") && !xml.contains(":oMath"))) {
+            return null;
+        }
+        Matcher m = Pattern.compile("<m:oMath[^>]*>(.*?)</m:oMath>", Pattern.DOTALL).matcher(xml);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String block = m.group(1);
+            // Replace fraction <m:f> -> \frac{num}{den}
+            block = Pattern.compile("<m:f[^>]*>.*?<m:num[^>]*>(.*?)</m:num>.*?<m:den[^>]*>(.*?)</m:den>.*?</m:f>", Pattern.DOTALL)
+                    .matcher(block).replaceAll(mr -> "\\\\frac{" + cleanMathText(mr.group(1)) + "}{" + cleanMathText(mr.group(2)) + "}");
+            // Replace superscript <m:sSup> -> {base}^{exp}
+            block = Pattern.compile("<m:sSup[^>]*>.*?<m:e[^>]*>(.*?)</m:e>.*?<m:sup[^>]*>(.*?)</m:sup>.*?</m:sSup>", Pattern.DOTALL)
+                    .matcher(block).replaceAll(mr -> "{" + cleanMathText(mr.group(1)) + "}^{" + cleanMathText(mr.group(2)) + "}");
+            // Replace subscript <m:sSub> -> {base}_{sub}
+            block = Pattern.compile("<m:sSub[^>]*>.*?<m:e[^>]*>(.*?)</m:e>.*?<m:sub[^>]*>(.*?)</m:sub>.*?</m:sSub>", Pattern.DOTALL)
+                    .matcher(block).replaceAll(mr -> "{" + cleanMathText(mr.group(1)) + "}_{" + cleanMathText(mr.group(2)) + "}");
+            // Replace radical <m:rad> -> \sqrt{expr}
+            block = Pattern.compile("<m:rad[^>]*>.*?<m:e[^>]*>(.*?)</m:e>.*?</m:rad>", Pattern.DOTALL)
+                    .matcher(block).replaceAll(mr -> "\\\\sqrt{" + cleanMathText(mr.group(1)) + "}");
+            // Replace delimiters <m:d> -> \left( expr \right)
+            block = Pattern.compile("<m:d[^>]*>.*?<m:e[^>]*>(.*?)</m:e>.*?</m:d>", Pattern.DOTALL)
+                    .matcher(block).replaceAll(mr -> "\\\\left(" + cleanMathText(mr.group(1)) + "\\\\right)");
+
+            String formula = cleanMathText(block).trim();
+            if (!formula.isEmpty()) {
+                sb.append(" $").append(formula).append("$ ");
+            }
+        }
+        return sb.length() > 0 ? sb.toString().trim() : null;
+    }
+
+    private static String cleanMathText(String xmlPart) {
+        if (xmlPart == null) return "";
+        String text = xmlPart.replaceAll("</?m:t[^>]*>", "");
+        text = text.replaceAll("<[^>]+>", "");
+        return text.trim();
     }
 
     /**
@@ -460,7 +522,12 @@ public class QuestionDocxService {
 
         // 3. Jika mengandung teks Arab yang dominan dan belum dibungkus tag HTML, beri wadah RTL
         if (ARABIC_PATTERN.matcher(formatted).find() && !formatted.contains("<div dir=\"rtl\"") && !formatted.contains("<span dir=\"rtl\"")) {
-            formatted = "<div dir=\"rtl\" style=\"font-family:'Traditional Arabic', 'Amiri', Tahoma, sans-serif; text-align:right; font-size:1.25em; line-height:1.8;\">" + formatted + "</div>";
+            formatted = "<div dir=\"rtl\" style=\"font-family:'Amiri', 'Traditional Arabic', Tahoma, sans-serif; text-align:right; font-size:1.25em; line-height:1.8;\">" + formatted + "</div>";
+        }
+
+        // 4. Jika mengandung huruf Jepang (Kanji, Hiragana, Katakana) dan belum dibungkus font khusus
+        if (JAPANESE_PATTERN.matcher(formatted).find() && !formatted.contains("font-family") && !formatted.contains("japanese-text")) {
+            formatted = "<span class=\"japanese-text\" style=\"font-family:'Noto Sans JP', 'Meiryo', 'Yu Gothic', sans-serif; font-size:1.05em; line-height:1.6;\">" + formatted + "</span>";
         }
 
         return formatted;

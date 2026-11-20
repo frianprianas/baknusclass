@@ -26,12 +26,42 @@ html {
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Amiri', 'Traditional Arabic', 'Noto Sans JP', 'Meiryo', 'Yu Gothic', sans-serif;
   background-color: var(--background);
   color: var(--text-main);
   line-height: 1.5;
   font-size: 1rem !important;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Multi-language and Equation Support */
+.arabic-text, [dir="rtl"] {
+  font-family: 'Amiri', 'Traditional Arabic', Tahoma, sans-serif !important;
+  direction: rtl;
+  text-align: right;
+  line-height: 2 !important;
+}
+
+.japanese-text {
+  font-family: 'Noto Sans JP', 'Meiryo', 'Yu Gothic', sans-serif !important;
+  line-height: 1.7;
+}
+
+/* Support and scale math equations and formula images gracefully */
+mjx-container {
+  display: inline-block !important;
+  margin: 2px 4px !important;
+  outline: none;
+  font-size: 1.05em !important;
+}
+
+.q-options-v2 img, .cbt-opt-text img, .opt-text img, .review-ans-grid img {
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  vertical-align: middle;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 #root {

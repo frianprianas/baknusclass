@@ -298,9 +298,12 @@ const StudentExams = () => {
 
     // Render MathJax (LaTeX, integral, pangkat, matrix) whenever question changes
     useEffect(() => {
-        if (window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise().catch(() => {});
-        }
+        const timer = setTimeout(() => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise().catch(() => {});
+            }
+        }, 80);
+        return () => clearTimeout(timer);
     }, [currentIndex, currentExam, questions]);
 
     const DEFAULT_PRACTICE_EVENT = {

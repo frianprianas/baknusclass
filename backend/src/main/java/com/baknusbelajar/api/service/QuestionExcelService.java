@@ -26,6 +26,8 @@ public class QuestionExcelService {
 
     // Pattern untuk mendeteksi huruf Arab
     private static final Pattern ARABIC_PATTERN = Pattern.compile("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]");
+    // Pattern untuk mendeteksi huruf Jepang (Hiragana, Katakana, Kanji CJK)
+    private static final Pattern JAPANESE_PATTERN = Pattern.compile("[\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FAF]");
     // Pattern untuk mendeteksi sintaks markdown gambar ![alt](url)
     private static final Pattern MD_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)\\]\\(([^\\)]+)\\)");
 
@@ -484,7 +486,12 @@ public class QuestionExcelService {
 
         // 3. Jika mengandung teks Arab yang dominan dan belum dibungkus tag HTML, beri wadah RTL
         if (ARABIC_PATTERN.matcher(formatted).find() && !formatted.contains("<div dir=\"rtl\"") && !formatted.contains("<span dir=\"rtl\"")) {
-            formatted = "<div dir=\"rtl\" style=\"font-family:'Traditional Arabic', 'Amiri', Tahoma, sans-serif; text-align:right; font-size:1.25em; line-height:1.8;\">" + formatted + "</div>";
+            formatted = "<div dir=\"rtl\" style=\"font-family:'Amiri', 'Traditional Arabic', Tahoma, sans-serif; text-align:right; font-size:1.25em; line-height:1.8;\">" + formatted + "</div>";
+        }
+
+        // 4. Jika mengandung huruf Jepang (Kanji, Hiragana, Katakana) dan belum dibungkus font khusus
+        if (JAPANESE_PATTERN.matcher(formatted).find() && !formatted.contains("font-family") && !formatted.contains("japanese-text")) {
+            formatted = "<span class=\"japanese-text\" style=\"font-family:'Noto Sans JP', 'Meiryo', 'Yu Gothic', sans-serif; font-size:1.05em; line-height:1.6;\">" + formatted + "</span>";
         }
 
         return formatted;

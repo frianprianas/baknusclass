@@ -34,6 +34,16 @@ const ExamScoring = () => {
         fetchEvents();
     }, []);
 
+    // Render MathJax whenever selected student or answers/questions change
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise().catch(() => {});
+            }
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [selectedStudent, questions, allQuestions, activeTab]);
+
     const fetchEvents = async () => {
         try {
             const resp = await axios.get('/api/exam/event', { headers });

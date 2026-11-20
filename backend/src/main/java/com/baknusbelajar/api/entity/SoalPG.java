@@ -26,19 +26,24 @@ public class SoalPG {
     @Column(nullable = false)
     private String pertanyaan;
 
-    @Column(name = "pilihan_a", nullable = false, length = 2000)
+    @Lob
+    @Column(name = "pilihan_a", nullable = false)
     private String pilihanA;
 
-    @Column(name = "pilihan_b", nullable = false, length = 2000)
+    @Lob
+    @Column(name = "pilihan_b", nullable = false)
     private String pilihanB;
 
-    @Column(name = "pilihan_c", length = 2000)
+    @Lob
+    @Column(name = "pilihan_c")
     private String pilihanC;
 
-    @Column(name = "pilihan_d", length = 2000)
+    @Lob
+    @Column(name = "pilihan_d")
     private String pilihanD;
 
-    @Column(name = "pilihan_e", length = 2000)
+    @Lob
+    @Column(name = "pilihan_e")
     private String pilihanE;
 
     @Column(name = "kunci_jawaban", nullable = false, length = 50)

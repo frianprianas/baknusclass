@@ -49,11 +49,6 @@ public class DbMigrationRunner implements CommandLineRunner {
             "ALTER TABLE tb_soal_pg MODIFY pilihan_d NULL",
             "ALTER TABLE tb_soal_pg MODIFY pilihan_e NULL",
             "ALTER TABLE tb_soal_pg MODIFY kunci_jawaban VARCHAR2(50)",
-            "ALTER TABLE tb_soal_pg MODIFY pilihan_a VARCHAR2(2000)",
-            "ALTER TABLE tb_soal_pg MODIFY pilihan_b VARCHAR2(2000)",
-            "ALTER TABLE tb_soal_pg MODIFY pilihan_c VARCHAR2(2000)",
-            "ALTER TABLE tb_soal_pg MODIFY pilihan_d VARCHAR2(2000)",
-            "ALTER TABLE tb_soal_pg MODIFY pilihan_e VARCHAR2(2000)",
             "ALTER TABLE tb_soal_pg ADD tipe_soal VARCHAR2(20) DEFAULT 'PG_BIASA'",
             "ALTER TABLE tb_soal_pg ADD urutan NUMBER(10) DEFAULT 0",
             "ALTER TABLE tb_soal_essay ADD urutan NUMBER(10) DEFAULT 0"
@@ -70,6 +65,13 @@ public class DbMigrationRunner implements CommandLineRunner {
                     System.out.println("Oracle Migration Ignored: " + e.getMessage());
                 }
             }
+
+            // Migrate tb_soal_pg option columns to CLOB so long equation images, LaTeX, MathML, Arabic, and Japanese fit without ORA-12899
+            migrateVarcharToClob(conn, "tb_soal_pg", "pilihan_a", true);
+            migrateVarcharToClob(conn, "tb_soal_pg", "pilihan_b", true);
+            migrateVarcharToClob(conn, "tb_soal_pg", "pilihan_c", false);
+            migrateVarcharToClob(conn, "tb_soal_pg", "pilihan_d", false);
+            migrateVarcharToClob(conn, "tb_soal_pg", "pilihan_e", false);
 
             // Perform mapel one-time deletion check
             boolean alreadyCleared = false;
@@ -224,6 +226,57 @@ public class DbMigrationRunner implements CommandLineRunner {
         } catch (Exception e) {
             System.err.println("Auto-copy error in DbMigrationRunner: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void migrateVarcharToClob(Connection conn, String tableName, String columnName, boolean notNull) {
+        String upperTable = tableName.toUpperCase();
+        String upperCol = columnName.toUpperCase();
+        try (Statement stmt = conn.createStatement()) {
+            String checkSql = "SELECT data_type FROM user_tab_columns WHERE table_name = '" + upperTable + "' AND column_name = '" + upperCol + "'";
+            try (var rs = stmt.executeQuery(checkSql)) {
+                if (rs.next()) {
+                    String dataType = rs.getString(1);
+                    if ("CLOB".equalsIgnoreCase(dataType)) {
+                        System.out.println("Column " + upperTable + "." + upperCol + " is already CLOB. No migration needed.");
+                        return;
+                    }
+                } else {
+                    System.out.println("Column " + upperTable + "." + upperCol + " not found in user_tab_columns.");
+                    return;
+                }
+            }
+
+            System.out.println("Migrating " + upperTable + "." + upperCol + " from VARCHAR2 to CLOB...");
+            String tempCol = upperCol + "_CLOB";
+
+            // 1. Add temp CLOB column (if not exists)
+            try {
+                stmt.executeUpdate("ALTER TABLE " + upperTable + " ADD " + tempCol + " CLOB");
+            } catch (Exception e) {
+                System.out.println("Notice on ADD " + tempCol + ": " + e.getMessage());
+            }
+
+            // 2. Copy data from VARCHAR2 to CLOB
+            stmt.executeUpdate("UPDATE " + upperTable + " SET " + tempCol + " = " + upperCol);
+
+            // 3. Drop original VARCHAR2 column
+            stmt.executeUpdate("ALTER TABLE " + upperTable + " DROP COLUMN " + upperCol);
+
+            // 4. Rename temp CLOB column to original column name
+            stmt.executeUpdate("ALTER TABLE " + upperTable + " RENAME COLUMN " + tempCol + " TO " + upperCol);
+
+            // 5. Apply NOT NULL if required
+            if (notNull) {
+                try {
+                    stmt.executeUpdate("ALTER TABLE " + upperTable + " MODIFY " + upperCol + " NOT NULL");
+                } catch (Exception e) {
+                    System.out.println("Notice setting NOT NULL on " + upperCol + ": " + e.getMessage());
+                }
+            }
+            System.out.println("Successfully migrated " + upperTable + "." + upperCol + " to CLOB!");
+        } catch (Exception e) {
+            System.err.println("Error migrating " + upperTable + "." + upperCol + " to CLOB: " + e.getMessage());
         }
     }
 }
