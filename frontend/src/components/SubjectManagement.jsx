@@ -19,7 +19,9 @@ import {
     MessageSquare,
     Send,
     Check,
-    Users
+    Users,
+    Image as ImageIcon,
+    ZoomIn
 } from 'lucide-react';
 
 const SubjectManagement = () => {
@@ -93,12 +95,108 @@ const SubjectManagement = () => {
     const [newQuestionForm, setNewQuestionForm] = useState({
         pertanyaan: '',
         bobot: 10,
-        pilA: '', pilB: '', pilC: '', pilD: '',
+        pilA: '', pilB: '', pilC: '', pilD: '', pilE: '',
         kunciPG: 'A'
     });
+    const optFileInputRefs = React.useRef({});
+    const [uploadingOpt, setUploadingOpt] = useState(null);
+    const [enlargedImage, setEnlargedImage] = useState(null);
 
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
+
+    const extractImgSrc = (html) => {
+        if (!html) return '';
+        const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+        return m ? m[1] : '';
+    };
+
+    const uploadOptImageFile = async (opt, file) => {
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Hanya berkas gambar (JPG, PNG, GIF, WEBP) yang diizinkan!');
+            return;
+        }
+        setUploadingOpt(opt);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await axios.post('/api/exam/upload-image', formData, {
+                headers: {
+                    ...headers,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            if (res.data && res.data.url) {
+                applyOptImage(opt, res.data.url);
+            }
+        } catch (err) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new window.Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 800;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+                    applyOptImage(opt, compressedBase64);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setUploadingOpt(null);
+        }
+    };
+
+    const applyOptImage = (opt, imgUrl) => {
+        const key = `pil${opt}`;
+        setNewQuestionForm(prev => {
+            const currentVal = prev[key] || '';
+            const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+            const imgTag = `<p><img src="${imgUrl}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`;
+            const combined = textOnly ? `${textOnly} ${imgTag}` : imgTag;
+            return { ...prev, [key]: combined };
+        });
+    };
+
+    const handleRemoveOptImage = (opt) => {
+        const key = `pil${opt}`;
+        setNewQuestionForm(prev => {
+            const currentVal = prev[key] || '';
+            const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+            return { ...prev, [key]: textOnly };
+        });
+    };
+
+    const handleOptPaste = (opt, e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                e.preventDefault();
+                const file = items[i].getAsFile();
+                if (file) {
+                    uploadOptImageFile(opt, file);
+                    return;
+                }
+            }
+        }
+    };
 
 
     useEffect(() => {
@@ -355,16 +453,23 @@ const SubjectManagement = () => {
                 const payload = {
                     ujianMapelId: selectedQuiz.id,
                     pertanyaan: newQuestionForm.pertanyaan,
+                    bobotNilai: parseFloat(String(newQuestionForm.bobot).replace(',', '.')) || 2,
+                    pilihanA: newQuestionForm.pilA,
+                    pilihanB: newQuestionForm.pilB,
+                    pilihanC: newQuestionForm.pilC,
+                    pilihanD: newQuestionForm.pilD,
+                    pilihanE: newQuestionForm.pilE || '-',
                     opsiA: newQuestionForm.pilA,
                     opsiB: newQuestionForm.pilB,
                     opsiC: newQuestionForm.pilC,
                     opsiD: newQuestionForm.pilD,
+                    opsiE: newQuestionForm.pilE || '-',
                     kunciJawaban: newQuestionForm.kunciPG
                 };
                 await axios.post('/api/exam/soal-pg', payload, { headers });
             }
             alert('Soal berhasil ditambahkan!');
-            setNewQuestionForm({ pertanyaan: '', bobot: 10, pilA: '', pilB: '', pilC: '', pilD: '', kunciPG: 'A' });
+            setNewQuestionForm({ pertanyaan: '', bobot: 10, pilA: '', pilB: '', pilC: '', pilD: '', pilE: '', kunciPG: 'A' });
             fetchQuizQuestions(selectedQuiz.id);
         } catch (err) {
             alert('Gagal menambahkan soal');
@@ -1469,10 +1574,24 @@ const SubjectManagement = () => {
                                     <h4 style={{ fontSize: '0.9rem', color: '#64748b' }}>Pilihan Ganda ({quizQuestions.pg.length})</h4>
                                     {quizQuestions.pg.map((q, idx) => (
                                         <div key={q.id} style={{ padding: '10px', background: '#f8fafc', borderRadius: '10px', margin: '5px 0', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                            <div>
-                                                <strong>{idx + 1}. {q.pertanyaan}</strong>
-                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-                                                    Kunci: {q.kunciJawaban}
+                                            <div style={{ flex: 1, marginRight: '10px' }}>
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                                    <strong>{idx + 1}.</strong>
+                                                    <div dangerouslySetInnerHTML={{ __html: q.pertanyaan }} style={{ display: 'inline-block', wordBreak: 'break-word' }} />
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                    <span style={{ background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                                                        Kunci: {q.kunciJawaban}
+                                                    </span>
+                                                    {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                        const optText = q[`pilihan${opt}`] || q[`opsi${opt}`];
+                                                        if (!optText || optText === '-') return null;
+                                                        return (
+                                                            <span key={opt} style={{ background: q.kunciJawaban === opt ? '#dcfce7' : '#f1f5f9', color: q.kunciJawaban === opt ? '#15803d' : '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                <strong>{opt}:</strong> <span dangerouslySetInnerHTML={{ __html: optText }} />
+                                                            </span>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                             <button onClick={() => handleDeleteQuestion(q.id, 'pg')} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
@@ -1486,8 +1605,11 @@ const SubjectManagement = () => {
                                     <h4 style={{ fontSize: '0.9rem', color: '#64748b' }}>Essay ({quizQuestions.essay.length})</h4>
                                     {quizQuestions.essay.map((q, idx) => (
                                         <div key={q.id} style={{ padding: '10px', background: '#f8fafc', borderRadius: '10px', margin: '5px 0', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                            <div>
-                                                <strong>{idx + 1}. {q.pertanyaan}</strong>
+                                            <div style={{ flex: 1, marginRight: '10px' }}>
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                                    <strong>{idx + 1}.</strong>
+                                                    <div dangerouslySetInnerHTML={{ __html: q.pertanyaan }} style={{ display: 'inline-block', wordBreak: 'break-word' }} />
+                                                </div>
                                                 <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
                                                     Bobot: {q.bobotNilai}
                                                 </div>
@@ -1550,32 +1672,108 @@ const SubjectManagement = () => {
                                         </div>
                                     ) : (
                                         <>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-                                                <div>
-                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan A</label>
-                                                    <input type="text" value={newQuestionForm.pilA} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilA: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                                            <div style={{ marginTop: '12px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+                                                    <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', margin: 0 }}>Pilihan Jawaban (A - E)</label>
+                                                    <span style={{ fontSize: '0.75rem', color: '#6366f1' }}>💡 Sisipkan gambar via tombol atau Ctrl+V (Paste)</span>
                                                 </div>
-                                                <div>
-                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan B</label>
-                                                    <input type="text" value={newQuestionForm.pilB} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilB: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
-                                                </div>
-                                                <div>
-                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan C</label>
-                                                    <input type="text" value={newQuestionForm.pilC} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilC: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
-                                                </div>
-                                                <div>
-                                                    <label style={{ fontSize: '0.8rem' }}>Pilihan D</label>
-                                                    <input type="text" value={newQuestionForm.pilD} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, pilD: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                    {['A', 'B', 'C', 'D', 'E'].map(opt => {
+                                                        const key = `pil${opt}`;
+                                                        const optRaw = newQuestionForm[key] || '';
+                                                        const optImgSrc = extractImgSrc(optRaw);
+                                                        const optTextOnly = optRaw.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+
+                                                        return (
+                                                            <div key={opt} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px' }}>
+                                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                    <span style={{ fontWeight: 800, width: '24px', height: '24px', borderRadius: '6px', background: newQuestionForm.kunciPG === opt ? '#2563eb' : '#e2e8f0', color: newQuestionForm.kunciPG === opt ? '#fff' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>
+                                                                        {opt}
+                                                                    </span>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={optTextOnly}
+                                                                        onChange={(e) => {
+                                                                            const newText = e.target.value;
+                                                                            const combined = optImgSrc
+                                                                                ? (newText ? `${newText} <p><img src="${optImgSrc}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>` : `<p><img src="${optImgSrc}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`)
+                                                                                : newText;
+                                                                            setNewQuestionForm({ ...newQuestionForm, [key]: combined });
+                                                                        }}
+                                                                        onPaste={(e) => handleOptPaste(opt, e)}
+                                                                        placeholder={`Teks Opsi ${opt}... (Tekan Ctrl+V untuk Paste Gambar)`}
+                                                                        required={opt !== 'E' && !optImgSrc}
+                                                                        style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => optFileInputRefs.current[opt]?.click()}
+                                                                        title={`Sisipkan / Upload Gambar ke Opsi ${opt}`}
+                                                                        style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', background: optImgSrc ? '#eff6ff' : '#fff', color: optImgSrc ? '#2563eb' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 600, flexShrink: 0 }}
+                                                                    >
+                                                                        <ImageIcon size={14} />
+                                                                        <span>{uploadingOpt === opt ? '...' : optImgSrc ? 'Ganti Gbr' : 'Gbr'}</span>
+                                                                    </button>
+                                                                    <input
+                                                                        type="file"
+                                                                        ref={el => optFileInputRefs.current[opt] = el}
+                                                                        accept="image/*"
+                                                                        style={{ display: 'none' }}
+                                                                        onChange={(e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (file) uploadOptImageFile(opt, file);
+                                                                            e.target.value = '';
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                {optImgSrc && (
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', paddingLeft: '32px' }}>
+                                                                        <img
+                                                                            src={optImgSrc}
+                                                                            alt={`Preview ${opt}`}
+                                                                            style={{ height: '40px', maxWidth: '80px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                                                                            onClick={() => setEnlargedImage(optImgSrc)}
+                                                                            title="Klik untuk memperbesar gambar"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleRemoveOptImage(opt)}
+                                                                            style={{ background: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}
+                                                                            title="Hapus gambar opsi ini"
+                                                                        >
+                                                                            <X size={12} /> Hapus Gbr
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
-                                            <div className="form-group-bab" style={{ marginTop: '10px' }}>
-                                                <label>Kunci Jawaban</label>
-                                                <select value={newQuestionForm.kunciPG} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, kunciPG: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                                                    <option value="A">A</option>
-                                                    <option value="B">B</option>
-                                                    <option value="C">C</option>
-                                                    <option value="D">D</option>
-                                                </select>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '12px' }}>
+                                                <div className="form-group-bab" style={{ margin: 0 }}>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 700 }}>Kunci Jawaban</label>
+                                                    <select value={newQuestionForm.kunciPG} onChange={(e) => setNewQuestionForm({ ...newQuestionForm, kunciPG: e.target.value })} style={{ width: '100%', padding: '9px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}>
+                                                        <option value="A">Opsi A</option>
+                                                        <option value="B">Opsi B</option>
+                                                        <option value="C">Opsi C</option>
+                                                        <option value="D">Opsi D</option>
+                                                        <option value="E">Opsi E</option>
+                                                    </select>
+                                                </div>
+                                                <div className="form-group-bab" style={{ margin: 0 }}>
+                                                    <label style={{ fontSize: '0.82rem', fontWeight: 700 }}>Bobot Nilai</label>
+                                                    <input
+                                                        type="number"
+                                                        step="any"
+                                                        min="0.1"
+                                                        max="100"
+                                                        value={newQuestionForm.bobot}
+                                                        onChange={(e) => setNewQuestionForm({ ...newQuestionForm, bobot: e.target.value })}
+                                                        placeholder="Misal: 2 atau 2.5"
+                                                        style={{ width: '100%', padding: '9px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                                                    />
+                                                </div>
                                             </div>
                                         </>
                                     )}
@@ -1586,6 +1784,25 @@ const SubjectManagement = () => {
                                 </form>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {enlargedImage && (
+                <div
+                    className="modal-overlay"
+                    style={{ zIndex: 9999, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => setEnlargedImage(null)}
+                >
+                    <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+                        <img src={enlargedImage} alt="Perbesar" style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '10px', display: 'block', margin: '0 auto', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }} />
+                        <button
+                            type="button"
+                            onClick={() => setEnlargedImage(null)}
+                            style={{ position: 'absolute', top: '-12px', right: '-12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+                        >
+                            ✕
+                        </button>
                     </div>
                 </div>
             )}

@@ -807,6 +807,97 @@ const ExamManagement = () => {
         }));
     };
 
+    const draftFileInputRefs = useRef({});
+    const [uploadingDraftOpt, setUploadingDraftOpt] = useState(null);
+
+    const uploadDraftOptImage = async (draftIdx, opt, file) => {
+        if (!file) return;
+        const key = `${draftIdx}_${opt}`;
+        setUploadingDraftOpt(key);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/exam/upload-image', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            const imgUrl = res.data.url;
+            const fieldName = `pilihan${opt}`;
+            const currentVal = draftQuestions[draftIdx]?.[fieldName] || '';
+            const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+            const newTag = `<p><img src="${imgUrl}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`;
+            const combined = textOnly ? `${textOnly} ${newTag}` : newTag;
+            handleUpdateDraft(draftIdx, fieldName, combined);
+        } catch (err) {
+            console.error('Upload draft option image failed, using canvas fallback', err);
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new window.Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 800;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressed = canvas.toDataURL('image/jpeg', 0.85);
+                    const fieldName = `pilihan${opt}`;
+                    const currentVal = draftQuestions[draftIdx]?.[fieldName] || '';
+                    const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+                    const newTag = `<p><img src="${compressed}" alt="Opsi ${opt}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`;
+                    const combined = textOnly ? `${textOnly} ${newTag}` : newTag;
+                    handleUpdateDraft(draftIdx, fieldName, combined);
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setUploadingDraftOpt(null);
+        }
+    };
+
+    const handleDraftOptPaste = (draftIdx, opt, e) => {
+        const clipboardData = e.clipboardData;
+        if (!clipboardData) return;
+        let imageFile = null;
+        if (clipboardData.items) {
+            for (let i = 0; i < clipboardData.items.length; i++) {
+                const item = clipboardData.items[i];
+                if (item.type && item.type.startsWith('image/')) {
+                    imageFile = item.getAsFile();
+                    break;
+                }
+            }
+        }
+        if (!imageFile && clipboardData.files && clipboardData.files.length > 0) {
+            for (let i = 0; i < clipboardData.files.length; i++) {
+                const file = clipboardData.files[i];
+                if (file.type && file.type.startsWith('image/')) {
+                    imageFile = file;
+                    break;
+                }
+            }
+        }
+        if (imageFile) {
+            e.preventDefault();
+            uploadDraftOptImage(draftIdx, opt, imageFile);
+        }
+    };
+
     const handleDirectImageUpload = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -3134,12 +3225,28 @@ const ExamManagement = () => {
                                                                     {(draft[fieldName] || '').includes('<img') ? (
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
                                                                             <div
-                                                                                style={{ maxHeight: '42px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}
+                                                                                style={{ maxHeight: '48px', overflow: 'hidden', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
                                                                                 dangerouslySetInnerHTML={{ __html: draft[fieldName] }}
+                                                                                onClick={(e) => {
+                                                                                    if (e.target.tagName === 'IMG') setEnlargedImage(e.target.src);
+                                                                                }}
+                                                                                title="Klik untuk memperbesar gambar opsi"
                                                                             />
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => handleUpdateDraft(idx, fieldName, '')}
+                                                                                onClick={() => draftFileInputRefs.current[`${idx}_${opt}`]?.click()}
+                                                                                style={{ fontSize: '0.7rem', color: '#1d4ed8', border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontWeight: 700, flexShrink: 0 }}
+                                                                                title="Ganti gambar opsi"
+                                                                            >
+                                                                                {uploadingDraftOpt === `${idx}_${opt}` ? '...' : 'Ganti Gbr'}
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const currentVal = draft[fieldName] || '';
+                                                                                    const textOnly = currentVal.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+                                                                                    handleUpdateDraft(idx, fieldName, textOnly);
+                                                                                }}
                                                                                 style={{ fontSize: '0.7rem', color: '#ef4444', border: 'none', background: '#fee2e2', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontWeight: 700, flexShrink: 0 }}
                                                                                 title="Hapus gambar opsi"
                                                                             >
@@ -3147,20 +3254,47 @@ const ExamManagement = () => {
                                                                             </button>
                                                                         </div>
                                                                     ) : (
-                                                                        <input
-                                                                            type="text"
-                                                                            value={draft[fieldName] === '-' ? '' : (draft[fieldName] || '')}
-                                                                            onChange={(e) => handleUpdateDraft(idx, fieldName, e.target.value)}
-                                                                            placeholder={`Opsi ${opt}...`}
-                                                                            style={{
-                                                                                flex: 1,
-                                                                                border: 'none',
-                                                                                outline: 'none',
-                                                                                background: 'transparent',
-                                                                                fontSize: '0.82rem'
-                                                                            }}
-                                                                        />
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={draft[fieldName] === '-' ? '' : (draft[fieldName] || '')}
+                                                                                onChange={(e) => handleUpdateDraft(idx, fieldName, e.target.value)}
+                                                                                onPaste={(e) => handleDraftOptPaste(idx, opt, e)}
+                                                                                placeholder={`Opsi ${opt}... (Ketik / Ctrl+V Paste)`}
+                                                                                style={{
+                                                                                    flex: 1,
+                                                                                    border: 'none',
+                                                                                    outline: 'none',
+                                                                                    background: 'transparent',
+                                                                                    fontSize: '0.82rem'
+                                                                                }}
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => draftFileInputRefs.current[`${idx}_${opt}`]?.click()}
+                                                                                style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center' }}
+                                                                                title={`Sisipkan Gambar ke Opsi ${opt}`}
+                                                                            >
+                                                                                <ImageIcon size={14} />
+                                                                            </button>
+                                                                        </div>
                                                                     )}
+                                                                    <input
+                                                                        type="file"
+                                                                        ref={el => {
+                                                                            if (!draftFileInputRefs.current) draftFileInputRefs.current = {};
+                                                                            draftFileInputRefs.current[`${idx}_${opt}`] = el;
+                                                                        }}
+                                                                        accept="image/*"
+                                                                        style={{ display: 'none' }}
+                                                                        onChange={(e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (file) {
+                                                                                e.target.value = '';
+                                                                                uploadDraftOptImage(idx, opt, file);
+                                                                            }
+                                                                        }}
+                                                                    />
                                                                 </div>
                                                             );
                                                         })}
@@ -3222,54 +3356,103 @@ const ExamManagement = () => {
                                                                 const curKey = keys[st.keyIdx] || 'B';
                                                                 const val = draft[st.field] === '-' ? '' : (draft[st.field] || '');
                                                                 return (
-                                                                    <div key={st.field} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={val}
-                                                                            onChange={(e) => handleUpdateDraft(idx, st.field, e.target.value)}
-                                                                            placeholder={`Teks butir ${st.label}...`}
-                                                                            style={{
-                                                                                flex: 1,
-                                                                                padding: '6px 10px',
-                                                                                borderRadius: '6px',
-                                                                                border: '1px solid #cbd5e1',
-                                                                                fontSize: '0.8rem'
-                                                                            }}
-                                                                        />
-                                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                                    <div key={st.field} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#fff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={val.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim()}
+                                                                                onChange={(e) => {
+                                                                                    const newText = e.target.value;
+                                                                                    const curImg = extractImgSrc(val);
+                                                                                    const combined = curImg
+                                                                                        ? (newText ? `${newText} <p><img src="${curImg}" alt="${st.label}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>` : `<p><img src="${curImg}" alt="${st.label}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`)
+                                                                                        : newText;
+                                                                                    handleUpdateDraft(idx, st.field, combined);
+                                                                                }}
+                                                                                onPaste={(e) => handleDraftOptPaste(idx, st.field.replace('pilihan', ''), e)}
+                                                                                placeholder={`Teks butir ${st.label}... (Bisa Ctrl+V Paste)`}
+                                                                                style={{
+                                                                                    flex: 1,
+                                                                                    border: 'none',
+                                                                                    outline: 'none',
+                                                                                    fontSize: '0.8rem'
+                                                                                }}
+                                                                            />
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => updateBsKey(st.keyIdx, 'B')}
-                                                                                style={{
-                                                                                    padding: '4px 10px',
-                                                                                    borderRadius: '6px',
-                                                                                    border: `1px solid ${curKey === 'B' ? '#10b981' : '#cbd5e1'}`,
-                                                                                    background: curKey === 'B' ? '#10b981' : '#ffffff',
-                                                                                    color: curKey === 'B' ? '#ffffff' : '#64748b',
-                                                                                    fontWeight: 700,
-                                                                                    fontSize: '0.75rem',
-                                                                                    cursor: 'pointer'
-                                                                                }}
+                                                                                onClick={() => draftFileInputRefs.current[`${idx}_${st.field}`]?.click()}
+                                                                                style={{ border: 'none', background: '#f1f5f9', color: '#475569', borderRadius: '6px', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}
+                                                                                title={`Sisipkan Gambar ke ${st.label}`}
                                                                             >
-                                                                                Benar
+                                                                                <ImageIcon size={13} />
+                                                                                <span>{uploadingDraftOpt === `${idx}_${st.field.replace('pilihan', '')}` ? '...' : extractImgSrc(val) ? 'Ganti Gbr' : 'Gbr'}</span>
                                                                             </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => updateBsKey(st.keyIdx, 'S')}
-                                                                                style={{
-                                                                                    padding: '4px 10px',
-                                                                                    borderRadius: '6px',
-                                                                                    border: `1px solid ${curKey === 'S' ? '#ef4444' : '#cbd5e1'}`,
-                                                                                    background: curKey === 'S' ? '#ef4444' : '#ffffff',
-                                                                                    color: curKey === 'S' ? '#ffffff' : '#64748b',
-                                                                                    fontWeight: 700,
-                                                                                    fontSize: '0.75rem',
-                                                                                    cursor: 'pointer'
+                                                                            <input
+                                                                                type="file"
+                                                                                ref={el => {
+                                                                                    if (!draftFileInputRefs.current) draftFileInputRefs.current = {};
+                                                                                    draftFileInputRefs.current[`${idx}_${st.field}`] = el;
                                                                                 }}
-                                                                            >
-                                                                                Salah
-                                                                            </button>
+                                                                                accept="image/*"
+                                                                                style={{ display: 'none' }}
+                                                                                onChange={(e) => {
+                                                                                    const file = e.target.files?.[0];
+                                                                                    if (file) {
+                                                                                        e.target.value = '';
+                                                                                        uploadDraftOptImage(idx, st.field.replace('pilihan', ''), file);
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => updateBsKey(st.keyIdx, 'B')}
+                                                                                    style={{
+                                                                                        padding: '4px 10px',
+                                                                                        borderRadius: '6px',
+                                                                                        border: `1px solid ${curKey === 'B' ? '#10b981' : '#cbd5e1'}`,
+                                                                                        background: curKey === 'B' ? '#10b981' : '#ffffff',
+                                                                                        color: curKey === 'B' ? '#ffffff' : '#64748b',
+                                                                                        fontWeight: 700,
+                                                                                        fontSize: '0.75rem',
+                                                                                        cursor: 'pointer'
+                                                                                    }}
+                                                                                >
+                                                                                    Benar
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => updateBsKey(st.keyIdx, 'S')}
+                                                                                    style={{
+                                                                                        padding: '4px 10px',
+                                                                                        borderRadius: '6px',
+                                                                                        border: `1px solid ${curKey === 'S' ? '#ef4444' : '#cbd5e1'}`,
+                                                                                        background: curKey === 'S' ? '#ef4444' : '#ffffff',
+                                                                                        color: curKey === 'S' ? '#ffffff' : '#64748b',
+                                                                                        fontWeight: 700,
+                                                                                        fontSize: '0.75rem',
+                                                                                        cursor: 'pointer'
+                                                                                    }}
+                                                                                >
+                                                                                    Salah
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
+                                                                        {extractImgSrc(val) && (
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '4px' }}>
+                                                                                <img src={extractImgSrc(val)} alt={`Preview ${st.label}`} style={{ maxHeight: '48px', maxWidth: '100px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer' }} onClick={() => setEnlargedImage(extractImgSrc(val))} title="Klik untuk perbesar" />
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        const textOnly = val.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
+                                                                                        handleUpdateDraft(idx, st.field, textOnly);
+                                                                                    }}
+                                                                                    style={{ fontSize: '0.68rem', color: '#dc2626', background: '#fee2e2', border: 'none', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', fontWeight: 700 }}
+                                                                                >
+                                                                                    Hapus Gbr
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 );
                                                             })}
@@ -4427,6 +4610,9 @@ const ExamManagement = () => {
                                                                     {slots.slice(0, totalStatements).map((opt, idx) => {
                                                                         const rowKey = currentKeys[idx];
                                                                         const canDelete = totalStatements > 2;
+                                                                        const optRaw = questionFormPG[`pilihan${opt}`] === '-' ? '' : (questionFormPG[`pilihan${opt}`] || '');
+                                                                        const optImgSrc = extractImgSrc(optRaw);
+                                                                        const optTextOnly = optRaw.replace(/<p><img[^>]*><\/p>|<img[^>]*>/gi, '').trim();
 
                                                                         return (
                                                                             <div key={opt} className="bs-statement-card">
@@ -4454,15 +4640,58 @@ const ExamManagement = () => {
                                                                                     </div>
                                                                                 </div>
 
-                                                                                <div className="bs-stmt-input-wrap" style={{ marginTop: '12px' }}>
-                                                                                    <textarea
-                                                                                        className="bs-stmt-textarea"
-                                                                                        rows="2"
-                                                                                        placeholder={`Ketik teks butir pernyataan ke-${idx + 1} secara lengkap di sini...`}
-                                                                                        value={questionFormPG[`pilihan${opt}`] === '-' ? '' : (questionFormPG[`pilihan${opt}`] || '')}
-                                                                                        onChange={(e) => setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: e.target.value })}
-                                                                                        required={idx < 2}
-                                                                                    />
+                                                                                <div className="bs-stmt-input-wrap" style={{ marginTop: '12px' }} onPaste={(e) => handleOptPaste(opt, e)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleOptDrop(opt, e)}>
+                                                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                                                                        <textarea
+                                                                                            className="bs-stmt-textarea"
+                                                                                            rows="2"
+                                                                                            placeholder={`Ketik teks butir pernyataan ke-${idx + 1} di sini... (atau tekan Ctrl+V untuk Paste Screenshot Gambar)`}
+                                                                                            value={optTextOnly}
+                                                                                            onChange={(e) => {
+                                                                                                const newText = e.target.value;
+                                                                                                const combined = optImgSrc
+                                                                                                    ? (newText ? `${newText} <p><img src="${optImgSrc}" alt="Pernyataan #${idx + 1}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>` : `<p><img src="${optImgSrc}" alt="Pernyataan #${idx + 1}" style="max-height:160px; max-width:100%; border-radius:8px; display:block; margin:6px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);" /></p>`)
+                                                                                                    : newText;
+                                                                                                setQuestionFormPG({ ...questionFormPG, [`pilihan${opt}`]: combined });
+                                                                                            }}
+                                                                                            onPaste={(e) => handleOptPaste(opt, e)}
+                                                                                            required={idx < 2 && !optImgSrc}
+                                                                                            style={{ flex: 1 }}
+                                                                                        />
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className={`btn-opt-img-attach ${optImgSrc ? 'has-img' : ''}`}
+                                                                                            onClick={() => optFileInputRefs.current[opt]?.click()}
+                                                                                            title={`Sisipkan / Upload Gambar ke Pernyataan #${idx + 1}`}
+                                                                                            style={{ height: '42px', alignSelf: 'flex-start', flexShrink: 0 }}
+                                                                                        >
+                                                                                            <ImageIcon size={15} />
+                                                                                            <span>{uploadingOpt === opt ? 'Mengunggah...' : optImgSrc ? 'Ganti Gbr' : 'Sisipkan Gbr'}</span>
+                                                                                        </button>
+                                                                                        <input
+                                                                                            type="file"
+                                                                                            ref={el => optFileInputRefs.current[opt] = el}
+                                                                                            accept="image/*"
+                                                                                            style={{ display: 'none' }}
+                                                                                            onChange={(e) => handleOptImageUpload(opt, e)}
+                                                                                        />
+                                                                                    </div>
+                                                                                    {optImgSrc && (
+                                                                                        <div className="opt-preview-container" style={{ marginTop: '8px' }}>
+                                                                                            <div className="opt-thumb-wrapper" onClick={() => setEnlargedImage(optImgSrc)} title="Klik untuk memperbesar gambar pernyataan">
+                                                                                                <img src={optImgSrc} alt={`Preview Pernyataan #${idx + 1}`} className="opt-preview-thumb" />
+                                                                                                <span className="opt-zoom-hint"><ZoomIn size={12} /> Perbesar Gambar</span>
+                                                                                            </div>
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className="btn-opt-img-remove"
+                                                                                                onClick={() => handleRemoveOptImage(opt)}
+                                                                                                title="Hapus gambar dari butir pernyataan ini"
+                                                                                            >
+                                                                                                <X size={13} /> Hapus Gambar
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
 
                                                                                 <div className="bs-stmt-card-footer">

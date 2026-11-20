@@ -40,4 +40,20 @@ public class SoalPGDTO implements Serializable {
             this.ujianId = ujianMapelId;
         }
     }
+
+    // Aliases for compatibility with various question channels
+    public String getOpsiA() { return pilihanA; }
+    public void setOpsiA(String opsiA) { this.pilihanA = opsiA; }
+
+    public String getOpsiB() { return pilihanB; }
+    public void setOpsiB(String opsiB) { this.pilihanB = opsiB; }
+
+    public String getOpsiC() { return pilihanC; }
+    public void setOpsiC(String opsiC) { this.pilihanC = opsiC; }
+
+    public String getOpsiD() { return pilihanD; }
+    public void setOpsiD(String opsiD) { this.pilihanD = opsiD; }
+
+    public String getOpsiE() { return pilihanE; }
+    public void setOpsiE(String opsiE) { this.pilihanE = opsiE; }
 }
