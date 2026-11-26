@@ -2602,6 +2602,7 @@ const StudentExams = () => {
                         font-size: 1.35rem;
                         unicode-bidi: plaintext;
                         word-break: break-word;
+                        white-space: pre-wrap;
                         background: #f8fafc;
                         border-left: 5px solid #2563eb;
                         border-radius: 12px;

@@ -387,8 +387,8 @@ public class QuestionDocxService {
         for (XWPFParagraph p : cell.getParagraphs()) {
             StringBuilder paraSb = new StringBuilder();
             for (XWPFRun r : p.getRuns()) {
-                String text = r.getText(0);
-                if (text != null) {
+                String text = r.text();
+                if (text != null && !text.isEmpty()) {
                     paraSb.append(text);
                 }
 
@@ -432,10 +432,10 @@ public class QuestionDocxService {
                 log.debug("Notice parsing OMML math in Word paragraph: {}", ex.getMessage());
             }
 
-            sb.append(paraSb.toString()).append(" ");
+            sb.append(paraSb.toString()).append("\n");
         }
 
-        return sb.toString().trim();
+        return sb.toString().replaceAll("[\\r\\n]+$", "").trim();
     }
 
     /**

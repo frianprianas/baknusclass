@@ -3165,7 +3165,7 @@ const ExamManagement = () => {
                                                 {(draft.pertanyaan || '').includes('<img') && (
                                                     <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
                                                         <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Pratinjau Gambar / Rumus:</span>
-                                                        <div dangerouslySetInnerHTML={{ __html: draft.pertanyaan }} style={{ maxHeight: '180px', overflowY: 'auto' }} />
+                                                        <div dangerouslySetInnerHTML={{ __html: draft.pertanyaan }} style={{ maxHeight: '180px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }} />
                                                     </div>
                                                 )}
                                             </div>
@@ -5585,7 +5585,7 @@ const ExamManagement = () => {
                         margin: 12px 0;
                         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
                     }
-                    .q-text-v2 { font-size: 1.15rem; color: #0f172a; line-height: 1.6; font-weight: 700; margin-bottom: 24px; unicode-bidi: plaintext; }
+                    .q-text-v2 { font-size: 1.15rem; color: #0f172a; line-height: 1.6; font-weight: 700; margin-bottom: 24px; unicode-bidi: plaintext; white-space: pre-wrap; word-break: break-word; }
 
                     
                     .q-options-v2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }

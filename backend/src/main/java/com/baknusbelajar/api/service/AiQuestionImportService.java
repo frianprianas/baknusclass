@@ -52,19 +52,21 @@ public class AiQuestionImportService {
     public String extractTextFromDocx(InputStream inputStream) {
         StringBuilder sb = new StringBuilder();
         try (XWPFDocument doc = new XWPFDocument(inputStream)) {
-            // Read paragraphs
+            // Read paragraphs (preserve blank lines for paragraph spacing)
             for (XWPFParagraph p : doc.getParagraphs()) {
                 String text = p.getText();
-                if (text != null && !text.trim().isEmpty()) {
-                    sb.append(text).append("\n");
-                }
+                sb.append(text != null ? text : "").append("\n");
             }
             // Read tables
             for (XWPFTable table : doc.getTables()) {
                 for (XWPFTableRow row : table.getRows()) {
                     List<String> cells = new ArrayList<>();
                     for (XWPFTableCell cell : row.getTableCells()) {
-                        cells.add(cell.getText().trim());
+                        StringBuilder cellSb = new StringBuilder();
+                        for (XWPFParagraph p : cell.getParagraphs()) {
+                            cellSb.append(p.getText() != null ? p.getText() : "").append("\n");
+                        }
+                        cells.add(cellSb.toString().replaceAll("[\\r\\n]+$", "").trim());
                     }
                     sb.append(String.join(" | ", cells)).append("\n");
                 }

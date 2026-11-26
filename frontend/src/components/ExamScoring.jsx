@@ -2106,7 +2106,7 @@ const ExamScoring = () => {
                 .q-num { background: #3b82f6; color: white; padding: 4px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; }
                 .q-bobot { font-weight: 800; color: #64748b; font-size: 0.9rem; }
                 
-                .q-question { font-size: 1.35rem; color: #0f172a; font-weight: 600; line-height: 1.75; margin-bottom: 24px; background: #f8fafc; border-left: 5px solid #3b82f6; padding: 18px 24px; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+                .q-question { font-size: 1.35rem; color: #0f172a; font-weight: 600; line-height: 1.75; margin-bottom: 24px; background: #f8fafc; border-left: 5px solid #3b82f6; padding: 18px 24px; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); white-space: pre-wrap; word-break: break-word; }
                 
                 .std-answer-box { background: #f8fafc; border: 3px solid #64748b; border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
                 .key-answer-box { background: #fffbeb; border: 2px solid #fde68a; border-radius: 16px; padding: 20px; margin-bottom: 24px; }
