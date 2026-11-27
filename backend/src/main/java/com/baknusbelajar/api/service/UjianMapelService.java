@@ -1126,6 +1126,39 @@ public class UjianMapelService {
         long belumMengerjakan = pesertaList.stream().filter(p -> "BELUM".equalsIgnoreCase(p.getStatus())).count();
         double persenSelesai = totalPeserta > 0 ? (sudahSelesai * 100.0 / totalPeserta) : 0.0;
 
+        // 3b. Ambil daftar soal PG & Essay (terurut sesuai urutan) dan seluruh jawaban siswa
+        List<com.baknusbelajar.api.entity.SoalPG> pgSoalList = new java.util.ArrayList<>(soalPGRepository.findByUjianMapelId(ujianId));
+        pgSoalList.sort((a, b) -> {
+            int u1 = a.getUrutan() != null ? a.getUrutan() : Integer.MAX_VALUE;
+            int u2 = b.getUrutan() != null ? b.getUrutan() : Integer.MAX_VALUE;
+            int cmp = Integer.compare(u1, u2);
+            return cmp != 0 ? cmp : Long.compare(a.getId(), b.getId());
+        });
+
+        List<com.baknusbelajar.api.entity.SoalEssay> essaySoalList = new java.util.ArrayList<>(soalEssayRepository.findByUjianMapelId(ujianId));
+        essaySoalList.sort((a, b) -> {
+            int u1 = a.getUrutan() != null ? a.getUrutan() : Integer.MAX_VALUE;
+            int u2 = b.getUrutan() != null ? b.getUrutan() : Integer.MAX_VALUE;
+            int cmp = Integer.compare(u1, u2);
+            return cmp != 0 ? cmp : Long.compare(a.getId(), b.getId());
+        });
+
+        Map<Long, Map<Long, com.baknusbelajar.api.entity.JawabanPG>> pgAnsMap = new java.util.HashMap<>();
+        for (com.baknusbelajar.api.entity.JawabanPG jpg : jawabanPGRepository.findBySoalPG_UjianMapel_Id(ujianId)) {
+            if (jpg.getSiswa() != null && jpg.getSoalPG() != null) {
+                pgAnsMap.computeIfAbsent(jpg.getSiswa().getId(), k -> new java.util.HashMap<>())
+                        .put(jpg.getSoalPG().getId(), jpg);
+            }
+        }
+
+        Map<Long, Map<Long, com.baknusbelajar.api.entity.JawabanSiswa>> essayAnsMap = new java.util.HashMap<>();
+        for (com.baknusbelajar.api.entity.JawabanSiswa je : jawabanSiswaRepository.findBySoalEssay_UjianMapel_Id(ujianId)) {
+            if (je.getSiswa() != null && je.getSoalEssay() != null) {
+                essayAnsMap.computeIfAbsent(je.getSiswa().getId(), k -> new java.util.HashMap<>())
+                        .put(je.getSoalEssay().getId(), je);
+            }
+        }
+
         // 4. Generate Workbook dengan Apache POI
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             String rawSheetName = ujian.getMapel() != null ? ujian.getMapel().getNamaMapel() : "Rekap_Ujian";
@@ -1306,16 +1339,67 @@ public class UjianMapelService {
                     totalPeserta, sudahSelesai, persenSelesai, sedangMengerjakan, belumMengerjakan));
             cSum.setCellStyle(styleSummaryBox);
 
+            // Sub-Header Info Kunci & Bobot (Row 10)
+            CellStyle styleSubHeader = workbook.createCellStyle();
+            styleSubHeader.setFont(fontBold);
+            styleSubHeader.setFillForegroundColor(IndexedColors.PALE_BLUE.getIndex());
+            styleSubHeader.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            styleSubHeader.setAlignment(HorizontalAlignment.CENTER);
+            styleSubHeader.setVerticalAlignment(VerticalAlignment.CENTER);
+            styleSubHeader.setBorderTop(BorderStyle.THIN);
+            styleSubHeader.setBorderBottom(BorderStyle.THIN);
+            styleSubHeader.setBorderLeft(BorderStyle.THIN);
+            styleSubHeader.setBorderRight(BorderStyle.THIN);
+
+            Row subHeaderRow = sheet.createRow(10);
+            subHeaderRow.setHeightInPoints(20);
+            for (int c = 0; c < 9; c++) {
+                Cell sc = subHeaderRow.createCell(c);
+                sc.setCellValue(c == 8 ? "Kunci / Max:" : "");
+                sc.setCellStyle(styleSubHeader);
+            }
+
             // Table Header (Row 11)
             Row headerRow = sheet.createRow(11);
             headerRow.setHeightInPoints(24);
-            String[] headers = {
+            List<String> headerList = new java.util.ArrayList<>(java.util.Arrays.asList(
                     "No", "NISN", "Nama Lengkap Siswa", "Kelas", "Status Ujian",
                     "Nilai Akhir", "Waktu Mulai", "Waktu Selesai", "Durasi Pengerjaan"
-            };
-            for (int i = 0; i < headers.length; i++) {
+            ));
+
+            int colCursor = 9;
+            for (int qIdx = 0; qIdx < pgSoalList.size(); qIdx++) {
+                com.baknusbelajar.api.entity.SoalPG spg = pgSoalList.get(qIdx);
+                int noSoal = qIdx + 1;
+                headerList.add("PG " + noSoal + " (Jwb)");
+                headerList.add("PG " + noSoal + " (Skor)");
+
+                Cell scJwb = subHeaderRow.createCell(colCursor++);
+                scJwb.setCellValue("Kunci: " + (spg.getKunciJawaban() != null ? spg.getKunciJawaban() : "-"));
+                scJwb.setCellStyle(styleSubHeader);
+
+                Cell scSkor = subHeaderRow.createCell(colCursor++);
+                scSkor.setCellValue("Max: " + (spg.getBobotNilai() != null ? spg.getBobotNilai() : 0));
+                scSkor.setCellStyle(styleSubHeader);
+            }
+            for (int qIdx = 0; qIdx < essaySoalList.size(); qIdx++) {
+                com.baknusbelajar.api.entity.SoalEssay se = essaySoalList.get(qIdx);
+                int noSoal = qIdx + 1;
+                headerList.add("Essay " + noSoal + " (Jwb)");
+                headerList.add("Essay " + noSoal + " (Skor)");
+
+                Cell scJwb = subHeaderRow.createCell(colCursor++);
+                scJwb.setCellValue("Essay " + noSoal);
+                scJwb.setCellStyle(styleSubHeader);
+
+                Cell scSkor = subHeaderRow.createCell(colCursor++);
+                scSkor.setCellValue("Max: " + (se.getBobotNilai() != null ? se.getBobotNilai() : 0));
+                scSkor.setCellStyle(styleSubHeader);
+            }
+
+            for (int i = 0; i < headerList.size(); i++) {
                 Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
+                cell.setCellValue(headerList.get(i));
                 cell.setCellStyle(styleHeader);
             }
 
@@ -1406,13 +1490,114 @@ public class UjianMapelService {
                     cDur.setCellValue("-");
                 }
                 cDur.setCellStyle(styleCenter);
+
+                // 9+: Jawaban & Nilai Per Soal (PG & Essay)
+                Map<Long, com.baknusbelajar.api.entity.JawabanPG> sPgMap = p.getSiswaId() != null ? pgAnsMap.get(p.getSiswaId()) : null;
+                Map<Long, com.baknusbelajar.api.entity.JawabanSiswa> sEssayMap = p.getSiswaId() != null ? essayAnsMap.get(p.getSiswaId()) : null;
+                int dCol = 9;
+
+                for (com.baknusbelajar.api.entity.SoalPG spg : pgSoalList) {
+                    com.baknusbelajar.api.entity.JawabanPG ans = sPgMap != null ? sPgMap.get(spg.getId()) : null;
+                    Cell cJwb = row.createCell(dCol++);
+                    Cell cSkor = row.createCell(dCol++);
+
+                    if (ans != null) {
+                        cJwb.setCellValue(ans.getJawaban() != null ? ans.getJawaban() : "-");
+                        if (Boolean.TRUE.equals(ans.getIsCorrect())) {
+                            cJwb.setCellStyle(styleSudah);
+                        } else if (ans.getSkor() != null && ans.getSkor() > 0) {
+                            cJwb.setCellStyle(styleSedang);
+                        } else {
+                            cJwb.setCellStyle(styleBelum);
+                        }
+
+                        if (ans.getSkor() != null) {
+                            cSkor.setCellValue(ans.getSkor());
+                        } else {
+                            cSkor.setCellValue(0);
+                        }
+                        cSkor.setCellStyle(styleCenter);
+                    } else {
+                        cJwb.setCellValue("-");
+                        cJwb.setCellStyle(styleCenter);
+                        cSkor.setCellValue("-");
+                        cSkor.setCellStyle(styleCenter);
+                    }
+                }
+
+                for (com.baknusbelajar.api.entity.SoalEssay se : essaySoalList) {
+                    com.baknusbelajar.api.entity.JawabanSiswa ans = sEssayMap != null ? sEssayMap.get(se.getId()) : null;
+                    Cell cJwb = row.createCell(dCol++);
+                    Cell cSkor = row.createCell(dCol++);
+
+                    if (ans != null) {
+                        String cleanAns = cleanHtmlForExcel(ans.getTeksJawaban());
+                        cJwb.setCellValue(cleanAns);
+                        cJwb.setCellStyle(styleLeft);
+
+                        Double finalScore = ans.getSkorFinalGuru() != null ? ans.getSkorFinalGuru() : ans.getSkorAi();
+                        if (finalScore != null) {
+                            cSkor.setCellValue(finalScore);
+                        } else {
+                            cSkor.setCellValue("-");
+                        }
+                        cSkor.setCellStyle(styleCenter);
+                    } else {
+                        cJwb.setCellValue("-");
+                        cJwb.setCellStyle(styleCenter);
+                        cSkor.setCellValue("-");
+                        cSkor.setCellStyle(styleCenter);
+                    }
+                }
             }
 
-            // Auto-size columns with padding
-            for (int i = 0; i < headers.length; i++) {
+            // Auto-size columns with padding and sensible max width
+            for (int i = 0; i < headerList.size(); i++) {
                 sheet.autoSizeColumn(i);
                 int currentWidth = sheet.getColumnWidth(i);
-                sheet.setColumnWidth(i, Math.max(currentWidth + 1200, 3000));
+                sheet.setColumnWidth(i, Math.min(Math.max(currentWidth + 1000, 2800), 12000));
+            }
+
+            // Sheet 2: Daftar Soal & Kunci Referensi
+            Sheet soalSheet = workbook.createSheet("Daftar Soal & Kunci");
+            soalSheet.setDisplayGridlines(true);
+            Row sHeader = soalSheet.createRow(0);
+            sHeader.setHeightInPoints(24);
+            String[] sHeaders = {"No", "Kode Kolom", "Tipe Soal", "Pertanyaan", "Kunci Jawaban", "Bobot Maksimal"};
+            for (int i = 0; i < sHeaders.length; i++) {
+                Cell cell = sHeader.createCell(i);
+                cell.setCellValue(sHeaders[i]);
+                cell.setCellStyle(styleHeader);
+            }
+
+            int sRowIdx = 1;
+            int nomorRef = 1;
+            for (int qIdx = 0; qIdx < pgSoalList.size(); qIdx++) {
+                com.baknusbelajar.api.entity.SoalPG spg = pgSoalList.get(qIdx);
+                Row r = soalSheet.createRow(sRowIdx++);
+                r.setHeightInPoints(20);
+                Cell r0c = r.createCell(0); r0c.setCellValue(nomorRef++); r0c.setCellStyle(styleCenter);
+                Cell r1c = r.createCell(1); r1c.setCellValue("PG " + (qIdx + 1)); r1c.setCellStyle(styleCenter);
+                Cell r2c = r.createCell(2); r2c.setCellValue(spg.getTipeSoal() != null ? spg.getTipeSoal() : "PG_BIASA"); r2c.setCellStyle(styleCenter);
+                Cell r3c = r.createCell(3); r3c.setCellValue(cleanHtmlForExcel(spg.getPertanyaan())); r3c.setCellStyle(styleLeft);
+                Cell r4c = r.createCell(4); r4c.setCellValue(spg.getKunciJawaban() != null ? spg.getKunciJawaban() : "-"); r4c.setCellStyle(styleCenter);
+                Cell r5c = r.createCell(5); r5c.setCellValue(spg.getBobotNilai() != null ? spg.getBobotNilai() : 0); r5c.setCellStyle(styleCenter);
+            }
+            for (int qIdx = 0; qIdx < essaySoalList.size(); qIdx++) {
+                com.baknusbelajar.api.entity.SoalEssay se = essaySoalList.get(qIdx);
+                Row r = soalSheet.createRow(sRowIdx++);
+                r.setHeightInPoints(20);
+                Cell r0c = r.createCell(0); r0c.setCellValue(nomorRef++); r0c.setCellStyle(styleCenter);
+                Cell r1c = r.createCell(1); r1c.setCellValue("Essay " + (qIdx + 1)); r1c.setCellStyle(styleCenter);
+                Cell r2c = r.createCell(2); r2c.setCellValue("ESSAY"); r2c.setCellStyle(styleCenter);
+                Cell r3c = r.createCell(3); r3c.setCellValue(cleanHtmlForExcel(se.getPertanyaan())); r3c.setCellStyle(styleLeft);
+                Cell r4c = r.createCell(4); r4c.setCellValue(cleanHtmlForExcel(se.getKunciJawaban())); r4c.setCellStyle(styleLeft);
+                Cell r5c = r.createCell(5); r5c.setCellValue(se.getBobotNilai() != null ? se.getBobotNilai() : 0); r5c.setCellStyle(styleCenter);
+            }
+            for (int i = 0; i < sHeaders.length; i++) {
+                soalSheet.autoSizeColumn(i);
+                int currentWidth = soalSheet.getColumnWidth(i);
+                soalSheet.setColumnWidth(i, Math.min(Math.max(currentWidth + 1000, 3000), 18000));
             }
 
             workbook.write(out);
@@ -1421,6 +1606,25 @@ public class UjianMapelService {
             log.error("Error generating Excel for UjianMapel id={}: ", ujianId, e);
             throw new RuntimeException("Gagal membuat file Excel: " + e.getMessage());
         }
+    }
+
+    private String cleanHtmlForExcel(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return "-";
+        String text = raw.replaceAll("(?i)<br\\s*/?>", "\n")
+                .replaceAll("(?i)</p>", "\n")
+                .replaceAll("(?i)<img[^>]*>", " [Gambar] ")
+                .replaceAll("<[^>]+>", " ")
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replaceAll("[ \\t]+", " ")
+                .trim();
+        if (text.isEmpty()) return "-";
+        if (text.length() > 32000) {
+            text = text.substring(0, 32000) + "...";
+        }
+        return text;
     }
 
 
