@@ -190,6 +190,19 @@ public class AiQuestionImportService {
         return s;
     }
 
+    public static String preserveNewlinesAsHtml(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        if (!text.contains("\n") && !text.contains("\r")) {
+            return text;
+        }
+        String normalized = text.replace("\r\n", "\n").replace("\r", "\n");
+        normalized = normalized.replaceAll("(</(?:p|div|table|ul|ol|li|h[1-6])>)\\s*\\n", "$1");
+        normalized = normalized.replaceAll("\\n\\s*(<(?:p|div|table|ul|ol|h[1-6])[\\s>])", "$1");
+        return normalized.replace("\n", "<br />");
+    }
+
     private String buildAiExtractionPrompt(String documentText) {
         return "Anda adalah asisten AI profesional untuk sistem CBT Ujian Sekolah (BaknusClass).\n"
                 + "Tugas Anda adalah membaca dan menganalisis naskah bank soal berikut ini, lalu menguraikannya (ekstraksi) ke dalam format JSON array yang rapi dan terstruktur.\n\n"
@@ -332,13 +345,14 @@ public class AiQuestionImportService {
                 continue;
             }
             d.setNomor(seqNo++);
-            String cleanPertanyaan = cleanQuestionNumberPrefix(d.getPertanyaan().trim());
+            String cleanPertanyaan = preserveNewlinesAsHtml(cleanQuestionNumberPrefix(d.getPertanyaan().trim()));
 
             if ("ESSAY".equalsIgnoreCase(d.getTipeSoal())) {
                 SoalEssay se = new SoalEssay();
                 se.setUjianMapel(ujian);
                 se.setPertanyaan(cleanPertanyaan);
-                se.setKunciJawaban(d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "-");
+                String rawKj = d.getKunciJawaban() != null && !d.getKunciJawaban().trim().isEmpty() ? d.getKunciJawaban().trim() : "-";
+                se.setKunciJawaban(preserveNewlinesAsHtml(rawKj));
                 se.setBobotNilai(d.getBobotNilai() != null && d.getBobotNilai() > 0 ? d.getBobotNilai() : 10.0);
                 se.setUrutan(essaySeq++);
                 essayList.add(se);
@@ -347,11 +361,11 @@ public class AiQuestionImportService {
                 pg.setUjianMapel(ujian);
                 pg.setPertanyaan(cleanPertanyaan);
                 String tipe = (d.getTipeSoal() != null && !d.getTipeSoal().trim().isEmpty()) ? d.getTipeSoal().trim().toUpperCase() : "PG_BIASA";
-                String pilA = (d.getPilihanA() != null && !d.getPilihanA().trim().isEmpty()) ? d.getPilihanA().trim() : "-";
-                String pilB = (d.getPilihanB() != null && !d.getPilihanB().trim().isEmpty()) ? d.getPilihanB().trim() : "-";
-                String pilC = (d.getPilihanC() != null && !d.getPilihanC().trim().isEmpty()) ? d.getPilihanC().trim() : "-";
-                String pilD = (d.getPilihanD() != null && !d.getPilihanD().trim().isEmpty()) ? d.getPilihanD().trim() : "-";
-                String pilE = (d.getPilihanE() != null && !d.getPilihanE().trim().isEmpty()) ? d.getPilihanE().trim() : "-";
+                String pilA = preserveNewlinesAsHtml((d.getPilihanA() != null && !d.getPilihanA().trim().isEmpty()) ? d.getPilihanA().trim() : "-");
+                String pilB = preserveNewlinesAsHtml((d.getPilihanB() != null && !d.getPilihanB().trim().isEmpty()) ? d.getPilihanB().trim() : "-");
+                String pilC = preserveNewlinesAsHtml((d.getPilihanC() != null && !d.getPilihanC().trim().isEmpty()) ? d.getPilihanC().trim() : "-");
+                String pilD = preserveNewlinesAsHtml((d.getPilihanD() != null && !d.getPilihanD().trim().isEmpty()) ? d.getPilihanD().trim() : "-");
+                String pilE = preserveNewlinesAsHtml((d.getPilihanE() != null && !d.getPilihanE().trim().isEmpty()) ? d.getPilihanE().trim() : "-");
                 if ("BENAR_SALAH".equalsIgnoreCase(tipe)) {
                     if (pilA.equals("-")) pilA = "Benar";
                     if (pilB.equals("-")) pilB = "Salah";

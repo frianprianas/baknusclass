@@ -4379,6 +4379,7 @@ const ExamManagement = () => {
                                                 </div>
                                                 <div
                                                     className="lqp-body"
+                                                    style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                                     onClick={(e) => {
                                                         if (e.target.tagName === 'IMG') {
                                                             setEnlargedImage(e.target.src);
@@ -5078,6 +5079,7 @@ const ExamManagement = () => {
                                                     <div className="q-card-body">
                                                         <div
                                                             className="q-text-v2"
+                                                            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                                             onClick={(e) => {
                                                                 if (e.target.tagName === 'IMG') {
                                                                     setEnlargedImage(e.target.src);
@@ -5157,6 +5159,7 @@ const ExamManagement = () => {
                                                                             <div className="opt-marker">{opt}</div>
                                                                             <div
                                                                                 className="opt-text"
+                                                                                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                                                                 dangerouslySetInnerHTML={{ __html: optVal }}
                                                                                 onClick={(e) => {
                                                                                     if (e.target.tagName === 'IMG') {
@@ -5294,6 +5297,7 @@ const ExamManagement = () => {
                                                 <div className="q-card-body">
                                                     <div
                                                         className="q-text-v2"
+                                                        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                                         onClick={(e) => {
                                                             if (e.target.tagName === 'IMG') {
                                                                 setEnlargedImage(e.target.src);

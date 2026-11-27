@@ -1265,6 +1265,7 @@ const StudentExams = () => {
 
                                     <div
                                         className={`cbt-question-text ${fontClass}`}
+                                        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                                         onClick={(e) => {
                                             if (e.target.tagName === 'IMG') {
                                                 setEnlargedImg(e.target.src);
