@@ -163,12 +163,14 @@ public class SoalPGService {
                     dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(), entity.getPilihanC(), entity.getPilihanD(),
                     entity.getPilihanE() != null ? entity.getPilihanE() : "-");
         }
-        try {
-            kartuSoalService.generateAndUploadAutoKartuSoal(ujian, fullPertanyaan, dto.getKunciJawaban(),
-                    dto.getBobotNilai(), "PG");
-        } catch (Exception e) {
-            // Do not fail DB save if drive upload has an issue
-        }
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                kartuSoalService.generateAndUploadAutoKartuSoal(ujian, fullPertanyaan, dto.getKunciJawaban(),
+                        dto.getBobotNilai(), "PG");
+            } catch (Exception e) {
+                log.warn("[SoalPGService] Async auto Kartu Soal gagal: {}", e.getMessage());
+            }
+        });
 
         return mapToDTO(saved);
     }
@@ -257,8 +259,16 @@ public class SoalPGService {
                     dto.getPertanyaan(), entity.getPilihanA(), entity.getPilihanB(), entity.getPilihanC(), entity.getPilihanD(),
                     entity.getPilihanE() != null ? entity.getPilihanE() : "-");
         }
-        kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), fullPertanyaan, dto.getKunciJawaban(),
-                dto.getBobotNilai(), "PG_Update");
+        final UjianMapel targetUjian = entity.getUjianMapel();
+        final String finalFullPertanyaan = fullPertanyaan;
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                kartuSoalService.generateAndUploadAutoKartuSoal(targetUjian, finalFullPertanyaan, dto.getKunciJawaban(),
+                        dto.getBobotNilai(), "PG_Update");
+            } catch (Exception e) {
+                log.warn("[SoalPGService] Async auto Kartu Soal update gagal: {}", e.getMessage());
+            }
+        });
 
         jawabanPGService.reevaluateAllJawabanForSoal(saved);
 

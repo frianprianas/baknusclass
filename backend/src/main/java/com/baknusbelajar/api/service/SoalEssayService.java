@@ -58,12 +58,14 @@ public class SoalEssayService {
         }
 
         SoalEssay saved = soalEssayRepository.save(entity);
-        try {
-            kartuSoalService.generateAndUploadAutoKartuSoal(ujian, dto.getPertanyaan(), dto.getKunciJawaban(),
-                    dto.getBobotNilai(), "Essay");
-        } catch (Exception e) {
-            // Do not fail DB save if drive upload has an issue
-        }
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                kartuSoalService.generateAndUploadAutoKartuSoal(ujian, dto.getPertanyaan(), dto.getKunciJawaban(),
+                        dto.getBobotNilai(), "Essay");
+            } catch (Exception e) {
+                log.warn("[SoalEssayService] Async auto Kartu Soal gagal: {}", e.getMessage());
+            }
+        });
         return mapToDTO(saved, true);
     }
 
@@ -80,8 +82,15 @@ public class SoalEssayService {
         }
 
         SoalEssay saved = soalEssayRepository.save(entity);
-        kartuSoalService.generateAndUploadAutoKartuSoal(entity.getUjianMapel(), dto.getPertanyaan(),
-                dto.getKunciJawaban(), dto.getBobotNilai(), "Essay_Update");
+        final UjianMapel targetUjian = entity.getUjianMapel();
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                kartuSoalService.generateAndUploadAutoKartuSoal(targetUjian, dto.getPertanyaan(),
+                        dto.getKunciJawaban(), dto.getBobotNilai(), "Essay_Update");
+            } catch (Exception e) {
+                log.warn("[SoalEssayService] Async auto Kartu Soal update gagal: {}", e.getMessage());
+            }
+        });
         return mapToDTO(saved, true);
     }
 
