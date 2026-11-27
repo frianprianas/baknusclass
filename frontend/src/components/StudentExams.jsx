@@ -745,12 +745,14 @@ const StudentExams = () => {
                 }
 
                 const pertHtml = (q.pertanyaan || '').toLowerCase();
-                const isBS = resolvedTipe === 'BENAR_SALAH' || (
+                const hasExplicitType = ['PG_BIASA', 'PG_KOMPLEKS', 'BENAR_SALAH', 'BS_MAJEMUK'].includes(resolvedTipe);
+
+                const isBS = resolvedTipe === 'BENAR_SALAH' || (!hasExplicitType && (
                     q.pilihanA && q.pilihanB &&
                     (q.pilihanA.trim().toLowerCase() === 'benar' || q.pilihanA.trim().toLowerCase() === 'true') &&
                     (q.pilihanB.trim().toLowerCase() === 'salah' || q.pilihanB.trim().toLowerCase() === 'false') &&
                     (!q.pilihanC || q.pilihanC === '-' || q.pilihanC.trim() === '')
-                );
+                ));
                 const hasComplexTextHint = pertHtml.includes('lebih dari') || 
                                           pertHtml.includes('kompleks') || 
                                           pertHtml.includes('majemuk') ||
@@ -776,7 +778,7 @@ const StudentExams = () => {
                     resolvedTipe.includes('KOMPLEKS') ||
                     resolvedTipe.includes('MAJEMUK') ||
                     (q.kunciJawaban && (q.kunciJawaban.includes(',') || q.kunciJawaban.includes(';') || q.kunciJawaban.trim().length > 1)) ||
-                    hasComplexTextHint
+                    (!hasExplicitType && hasComplexTextHint)
                 );
 
                 if (isBS) resolvedTipe = 'BENAR_SALAH';
