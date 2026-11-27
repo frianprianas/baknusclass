@@ -565,6 +565,8 @@ public class SyncSiswaController {
                 }
                 if (attached.getUser() != null) {
                     Users u = attached.getUser();
+                    u.setIsActive(true);
+                    if (u.getRole() == null || u.getRole().trim().isEmpty()) u.setRole("SISWA");
                     if (row.nama != null && !row.nama.isEmpty()) u.setNamaLengkap(row.nama);
                     if (row.username != null && !row.username.isEmpty()) u.setUsername(row.username);
                     if (row.email != null && !row.email.isEmpty()) u.setEmail(row.email);
@@ -592,6 +594,8 @@ public class SyncSiswaController {
         }
 
         if (existingUser != null) {
+            existingUser.setIsActive(true);
+            if (existingUser.getRole() == null || existingUser.getRole().trim().isEmpty()) existingUser.setRole("SISWA");
             if (row.nama != null && !row.nama.isEmpty()) existingUser.setNamaLengkap(row.nama);
             if (row.username != null && !row.username.isEmpty()) existingUser.setUsername(row.username);
             if (row.email != null && !row.email.isEmpty()) existingUser.setEmail(row.email);
