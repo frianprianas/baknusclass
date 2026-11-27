@@ -126,7 +126,7 @@ public class SiswaBatchPasswordSyncRunner implements CommandLineRunner {
                         matchedSiswa.addAll(byName);
                     }
                 }
-                if (matchedSiswa.isEmpty() && byNis != null && byNis.size() == 1 && !nis.equals("242518070050")) {
+                if (matchedSiswa.isEmpty() && byNis != null && byNis.size() == 1) {
                     matchedSiswa.addAll(byNis);
                 }
 
@@ -138,7 +138,7 @@ public class SiswaBatchPasswordSyncRunner implements CommandLineRunner {
                             attached.setKelas(targetKelas);
                             kelasUpdated++;
                         }
-                        if (attached.getNisn() == null || attached.getNisn().trim().isEmpty()) {
+                        if (!nis.isEmpty()) {
                             attached.setNisn(nis);
                         }
                         if (!nama.isEmpty()) {
@@ -150,6 +150,15 @@ public class SiswaBatchPasswordSyncRunner implements CommandLineRunner {
                             u = findOrCreateUser(nis, nama, username, email, rawPassword);
                             attached.setUser(u);
                         } else {
+                            if (!username.isEmpty()) {
+                                u.setUsername(username);
+                            }
+                            if (!email.isEmpty()) {
+                                u.setEmail(email);
+                            }
+                            if (!nama.isEmpty()) {
+                                u.setNamaLengkap(nama);
+                            }
                             if (!Boolean.TRUE.equals(u.getIsActive())) {
                                 u.setIsActive(true);
                                 activated++;
