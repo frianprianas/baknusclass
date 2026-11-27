@@ -42,7 +42,7 @@ const ExamScoring = () => {
             }
         }, 100);
         return () => clearTimeout(timer);
-    }, [selectedStudent, questions, allQuestions, activeTab]);
+    }, [selectedStudent, questions, studentsData, selectedExam]);
 
     const fetchEvents = async () => {
         try {
