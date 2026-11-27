@@ -127,6 +127,17 @@ public class UjianMapelController {
         return ResponseEntity.ok(ujianMapelService.refreshToken(id));
     }
 
+    @PostMapping("/event/{eventId}/refresh-all-tokens")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TU', 'GURU', 'CO_ADMIN')")
+    public ResponseEntity<?> refreshAllTokensByEvent(@PathVariable Long eventId) {
+        int count = ujianMapelService.refreshAllTokensByEvent(eventId);
+        return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "count", count,
+                "message", "Berhasil mengacak ulang " + count + " token ujian!"
+        ));
+    }
+
     @PostMapping("/{id}/keep-alive")
     @PreAuthorize("hasAnyRole('SISWA', 'ADMIN', 'TU', 'GURU')")
     public ResponseEntity<Void> keepAlive(@PathVariable Long id, @RequestParam String nisn, @RequestParam String nama,

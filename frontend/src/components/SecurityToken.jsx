@@ -174,6 +174,8 @@ const SecurityToken = () => {
         refreshMonitoringData(selectedEventId, val);
     };
 
+    const [refreshingAllTokens, setRefreshingAllTokens] = useState(false);
+
     const handleRefreshToken = async (id) => {
         if (!window.confirm('Generate ulang token ujian ini? Peserta akan memerlukan token baru untuk melanjutkan.')) return;
         try {
@@ -182,6 +184,21 @@ const SecurityToken = () => {
             fetchExamsAndMonitoring(selectedEventId);
         } catch (err) {
             alert('Gagal refresh token');
+        }
+    };
+
+    const handleRefreshAllTokens = async () => {
+        if (!selectedEventId || exams.length === 0) return;
+        if (!window.confirm(`Acak ulang SEMUA (${exams.length}) token mata pelajaran pada event ini?\n\nSemua peserta yang belum masuk akan memerlukan token baru.`)) return;
+        setRefreshingAllTokens(true);
+        try {
+            const res = await axios.post(`/api/exam/ujian-mapel/event/${selectedEventId}/refresh-all-tokens`, {}, { headers });
+            alert(res.data?.message || `Berhasil mengacak ulang ${exams.length} token ujian!`);
+            await fetchExamsAndMonitoring(selectedEventId);
+        } catch (err) {
+            alert('Gagal mengacak semua token: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setRefreshingAllTokens(false);
         }
     };
 
@@ -725,8 +742,31 @@ const SecurityToken = () => {
             {/* TAB 2: DAFTAR JADWAL & TOKEN MAPEL */}
             {activeTab === 'token_list' && (
                 <div className="card table-card" style={{ padding: 0 }}>
-                    <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                         <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Daftar Token & Jadwal Ujian Mata Pelajaran</h3>
+                        <button
+                            type="button"
+                            onClick={handleRefreshAllTokens}
+                            disabled={refreshingAllTokens || exams.length === 0}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: refreshingAllTokens || exams.length === 0 ? '#94a3b8' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                                color: '#ffffff',
+                                fontWeight: 700,
+                                fontSize: '0.85rem',
+                                cursor: refreshingAllTokens || exams.length === 0 ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+                            }}
+                            title="Acak ulang seluruh token mata pelajaran dalam 1 kali klik"
+                        >
+                            <RefreshCw size={15} className={refreshingAllTokens ? 'spin' : ''} />
+                            <span>{refreshingAllTokens ? 'Mengacak Semua Token...' : `Acak Semua Token (${exams.length})`}</span>
+                        </button>
                     </div>
                     <div className="table-responsive">
                         <table className="monitor-table">

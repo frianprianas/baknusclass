@@ -451,6 +451,16 @@ public class UjianMapelService {
         return mapToDTO(ujianMapelRepository.save(entity), true);
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public int refreshAllTokensByEvent(Long eventId) {
+        List<UjianMapel> exams = ujianMapelRepository.findByEventUjianId(eventId);
+        for (UjianMapel exam : exams) {
+            exam.setToken(generateRandomToken());
+        }
+        ujianMapelRepository.saveAll(exams);
+        return exams.size();
+    }
+
     public UjianMapelDTO updateUjianMapel(Long id, UjianMapelDTO dto) {
         UjianMapel entity = ujianMapelRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("UjianMapel not found"));
